@@ -37,11 +37,11 @@ Once installed, the app **updates itself** (signed updates). What changed in eac
 
 ## ✨ What it does
 
-**🖥️ Streaming** — your graphics card encodes (hardware H.264) at up to 4K / 240 fps, with a steady frame rate even in heavy games. Per-app audio, separate switches for Aero's own sound and your Discord call. Relay servers around the world, so friends abroad can watch too.
+**🖥️ Streaming** — your graphics card encodes (hardware H.264) at up to 4K / 240 fps, with a steady frame rate even in heavy games. Per-app audio, separate switches for Aero's own sound and your Discord call. Relay servers around the world, so friends abroad can watch too. On Linux, game mode can **capture straight from the GPU** (KMS + VA-API, zero copies, like Sunshine) for lower latency and higher fps.
 
 **🎮 Play together** — remote controller, mouse and keyboard (up to 4 controllers), a game mode focused on latency, and the whole app works with a controller (including a bubble keyboard).
 
-**🫧 Aero Talk** — private and group chats, **end-to-end encrypted**: photos, voice notes (with a bubble visualizer), videos, GIFs, your own stickers, mentions, pinned messages, search, YouTube embeds, read receipts (only if both people want), voice and video calls.
+**🫧 Aero Talk** — private and group chats, **end-to-end encrypted**: photos, voice notes (with a bubble visualizer), videos, GIFs, your own stickers, mentions, pinned messages, search, YouTube embeds, read receipts (only if both people want), voice and video calls that reconnect on their own when the internet blinks.
 
 **🔒 Your account, your rules** — two-step verification (Google Authenticator), e-mail confirmation for new devices, blocking, message requests, hidden device names, sign out of every other device in one tap, multiple accounts on one device.
 
@@ -62,9 +62,9 @@ Once installed, the app **updates itself** (signed updates). What changed in eac
 | 🤖 **Android 7+** | [.apk](https://github.com/penumbradeveloper/aero-stream/releases/latest/download/AeroStream-Android.apk) |
 | 🌐 **Navegador** | [Aero Web](https://web.aerostream.workers.dev/app/) |
 
-- **Transmissão pela placa** (H.264 por hardware, até 4K e 240 fps), fps estável em jogo pesado, som por aplicativo e opções separadas para o som do Aero e o do Discord.
+- **Transmissão pela placa** (H.264 por hardware, até 4K e 240 fps), fps estável em jogo pesado, som por aplicativo e opções separadas para o som do Aero e o do Discord. No Linux, o modo jogo **captura direto da placa** (como o Sunshine): menos atraso e mais fps.
 - **Jogue junto**: controle, mouse e teclado remotos (até 4 controles), modo jogo com foco em latência, o app inteiro pelo controle (com teclado de bolhas).
-- **Aero Talk** cifrado de ponta a ponta: fotos, áudios com visualizador de bolhas, vídeos, GIFs, figurinhas, menções, fixadas, busca, YouTube, confirmação de leitura (se os dois quiserem) e chamadas.
+- **Aero Talk** cifrado de ponta a ponta: fotos, áudios com visualizador de bolhas, vídeos, GIFs, figurinhas, menções, fixadas, busca, YouTube, confirmação de leitura (se os dois quiserem) e chamadas que se reconectam sozinhas quando a internet pisca.
 - **Segurança**: verificação em duas etapas (Google Authenticator), confirmação por e-mail em aparelho novo, bloqueio, pedidos de mensagem e várias contas no mesmo aparelho.
 
 O que mudou em cada versão fica nas [Releases](https://github.com/penumbradeveloper/aero-stream/releases). Os aplicativos se atualizam sozinhos.

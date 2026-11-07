@@ -4,7 +4,7 @@
 
 <p align="center">
   <b>Your screen, your friends, no limits.</b><br>
-  Stream with your GPU, play on your friends' PCs and chat end-to-end encrypted. Free, no subscriptions.
+  Stream with your GPU, play on your friends' PCs and chat end-to-end encrypted. Free to use.
 </p>
 
 <p align="center">
@@ -41,11 +41,13 @@ Once installed, the app **updates itself** (signed updates). What changed in eac
 
 **🎮 Play together** — remote controller, mouse and keyboard (up to 4 controllers), a game mode focused on latency, and the whole app works with a controller (including a bubble keyboard).
 
-**🫧 Aero Talk** — private and group chats, **end-to-end encrypted**: photos, voice notes (with a bubble visualizer), videos, GIFs, your own stickers, mentions, pinned messages, search, YouTube embeds, read receipts (only if both people want), voice and video calls that reconnect on their own when the internet blinks.
+**🫧 Aero Talk** — private and group chats, **end-to-end encrypted**: photos, voice notes (with a bubble visualizer), videos, GIFs, your own stickers, mentions, pinned messages, search, YouTube embeds, read receipts (only if both people want), voice and video calls with strong **noise suppression** that reconnect on their own when the internet blinks. Notifications show the sender's photo, name and message (stacked per person on Android), plus "last seen" if both people want it.
+
+**👤 Make it yours** — profile cards with your own banner, colors, background image or GIF, a song from your profile with a vinyl player, Discord and Spotify, custom statuses with color and icon, nameplates, chat bubble styles and your own "is typing…" indicator (emojis, animations and several texts drawn at random for each message).
 
 **🔒 Your account, your rules** — two-step verification (Google Authenticator), e-mail confirmation for new devices, blocking, message requests, hidden device names, sign out of every other device in one tap, multiple accounts on one device.
 
-**🎨 Frutiger Aero** — glass, bubbles and sounds, smooth at 120 Hz+, light enough for weaker PCs (with an optimized mode).
+**🎨 Frutiger Aero** — glass, bubbles and sounds, smooth at 120 Hz+, ultrawide-ready, light enough for weaker PCs (with an optimized mode).
 
 ---
 
@@ -53,7 +55,7 @@ Once installed, the app **updates itself** (signed updates). What changed in eac
 
 ## 🇧🇷 Português
 
-**Sua tela, seus amigos, sem limites.** Transmita pela placa de vídeo, jogue na máquina dos amigos e converse com tudo cifrado de ponta a ponta. Grátis, sem assinaturas.
+**Sua tela, seus amigos, sem limites.** Transmita pela placa de vídeo, jogue na máquina dos amigos e converse com tudo cifrado de ponta a ponta. Grátis para usar.
 
 | Sistema | Baixar |
 | :-- | :-- |
@@ -64,7 +66,8 @@ Once installed, the app **updates itself** (signed updates). What changed in eac
 
 - **Transmissão pela placa** (H.264 por hardware, até 4K e 240 fps), fps estável em jogo pesado, som por aplicativo e opções separadas para o som do Aero e o do Discord. No Linux, o modo jogo **captura direto da placa** (como o Sunshine): menos atraso e mais fps.
 - **Jogue junto**: controle, mouse e teclado remotos (até 4 controles), modo jogo com foco em latência, o app inteiro pelo controle (com teclado de bolhas).
-- **Aero Talk** cifrado de ponta a ponta: fotos, áudios com visualizador de bolhas, vídeos, GIFs, figurinhas, menções, fixadas, busca, YouTube, confirmação de leitura (se os dois quiserem) e chamadas que se reconectam sozinhas quando a internet pisca.
+- **Aero Talk** cifrado de ponta a ponta: fotos, áudios com visualizador de bolhas, vídeos, GIFs, figurinhas, menções, fixadas, busca, YouTube, confirmação de leitura (se os dois quiserem) e chamadas com **supressão de ruído** forte que se reconectam sozinhas quando a internet pisca. Notificações com a foto, o nome e a mensagem de quem mandou (empilhadas por pessoa no Android) e "visto por último" se os dois quiserem.
+- **Do seu jeito**: cartão de perfil com banner, cores e fundo com imagem ou GIF, música no perfil com vinil, Discord e Spotify, status personalizado com cor e ícone, nameplates, estilos de bolha e o seu próprio "está digitando…" (emojis, animações e vários textos sorteados a cada mensagem).
 - **Segurança**: verificação em duas etapas (Google Authenticator), confirmação por e-mail em aparelho novo, bloqueio, pedidos de mensagem e várias contas no mesmo aparelho.
 
 O que mudou em cada versão fica nas [Releases](https://github.com/penumbradeveloper/aero-stream/releases). Os aplicativos se atualizam sozinhos.

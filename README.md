@@ -1,6 +1,6 @@
-<p align="center"><img src="https://web.aerostream.workers.dev/icon-512.png" width="132" alt="Aero Stream"></p>
+<p align="center"><img src="https://web.aerostream.workers.dev/icon-512.png" width="132" alt="Aero"></p>
 
-<h1 align="center">Aero Stream</h1>
+<h1 align="center">Aero</h1>
 
 <p align="center">
   <b>Your screen, your friends, no limits.</b><br>
@@ -43,9 +43,9 @@ Once installed, the app **updates itself** (signed updates). What changed in eac
 
 **🫧 Aero Talk** — private and group chats, **end-to-end encrypted**: photos, voice notes (with a bubble visualizer), videos, any file (zip, exe, pdf…), GIFs, your own stickers, mentions, pinned messages, search, YouTube embeds, read receipts (only if both people want), voice and video calls with strong **noise suppression** that reconnect on their own when the internet blinks. Sit on the left like everyone else or on the right like WhatsApp. Notifications show the sender's photo, name and message (stacked per person on Android), **even with Aero closed** (Android and the installed web app), plus "last seen" if both people want it.
 
-**👤 Make it yours** — profile cards with your own banner, colors, background image or GIF, a Wall with your favorite films, shows, anime, music, games and books, Letterboxd, a song from your profile with a vinyl player, Discord and Spotify, custom statuses with color and icon, nameplates, chat bubble styles and your own "is typing…" indicator (emojis, animations and several texts drawn at random for each message).
+**👤 Make it yours** — profile cards with your own banner, colors, background image or GIF, a Wall with your favorite films, shows, anime, music, games and books, Letterboxd, a song from your profile with a vinyl player, Discord and Spotify, custom statuses with color and icon, nameplates, chat bubble styles and your own "is typing…" indicator (emojis, animations and several texts drawn at random for each message). **Skins (.aer)** change the whole app, from colors and sounds to the call screen, and you can build your own in the Skin Studio or get one from the skin store.
 
-**🔒 Your account, your rules** — two-step verification (Google Authenticator), e-mail confirmation for new devices, blocking, message requests, hidden device names, sign out of every other device in one tap, multiple accounts on one device.
+**🔒 Your account, your rules** — sign in with an access code, a password or a **QR code** from a device you're already on, hide your IP in calls, two-step verification (Google Authenticator), e-mail confirmation for new devices, blocking, message requests, hidden device names, sign out of every other device in one tap, multiple accounts on one device.
 
 **🎨 Frutiger Aero** — glass, bubbles and sounds, smooth at 120 Hz+, ultrawide-ready, light enough for weaker PCs (with an optimized mode).
 
@@ -67,8 +67,8 @@ Once installed, the app **updates itself** (signed updates). What changed in eac
 - **Transmissão pela placa** (H.264 por hardware, até 4K e 240 fps), fps estável em jogo pesado, som por aplicativo e opções separadas para o som do Aero e o do Discord. No Linux, o modo jogo **captura direto da placa** (como o Sunshine): menos atraso e mais fps.
 - **Jogue junto**: controle, mouse e teclado remotos (até 4 controles), modo jogo com foco em latência, o app inteiro pelo controle (com teclado de bolhas).
 - **Aero Talk** cifrado de ponta a ponta: fotos (várias numa mensagem só, com galeria), áudios com visualizador de bolhas, vídeos, qualquer arquivo (zip, exe, pdf…), GIFs, figurinhas, menções, fixadas, busca, prévias do YouTube e do Twitter/X (com os vídeos tocando no chat), confirmação de leitura (se os dois quiserem) e chamadas com **supressão de ruído** forte que se reconectam sozinhas quando a internet pisca. Escolha ficar na esquerda, como todo mundo, ou na direita, como no WhatsApp. Notificações com a foto, o nome e a mensagem de quem mandou (empilhadas por pessoa no Android), **até com o Aero fechado** (Android e site instalado), e "visto por último" se os dois quiserem.
-- **Do seu jeito**: cartão de perfil com banner, cores e fundo com imagem ou GIF, Mural com filmes, séries, animes, músicas, jogos e livros favoritos, Letterboxd, música no perfil com vinil, Discord e Spotify, status personalizado com cor e ícone, nameplates, widget do guns.lol, estilos de bolha, bolhas de arte feitas por artistas (com GIFs animados), papel de parede animado e o seu próprio "está digitando…" (emojis, animações e vários textos sorteados a cada mensagem).
-- **Segurança**: verificação em duas etapas (Google Authenticator), confirmação por e-mail em aparelho novo, bloqueio, pedidos de mensagem e várias contas no mesmo aparelho.
+- **Do seu jeito**: cartão de perfil com banner, cores e fundo com imagem ou GIF, Mural com filmes, séries, animes, músicas, jogos e livros favoritos, Letterboxd, música no perfil com vinil, Discord e Spotify, status personalizado com cor e ícone, nameplates, widget do guns.lol, estilos de bolha, bolhas de arte feitas por artistas (com GIFs animados), papel de parede animado e o seu próprio "está digitando…" (emojis, animações e vários textos sorteados a cada mensagem). **Skins (.aer)** mudam o app inteiro, das cores e sons à tela de ligação: monte a sua no Estúdio de skins ou pegue uma na loja.
+- **Segurança**: entre com código de acesso, senha ou **QR code** de um aparelho onde você já entrou, esconda o seu IP nas chamadas, verificação em duas etapas (Google Authenticator), confirmação por e-mail em aparelho novo, bloqueio, pedidos de mensagem e várias contas no mesmo aparelho.
 
 O que mudou em cada versão fica nas [Releases](https://github.com/penumbradeveloper/aero-stream/releases). Os aplicativos se atualizam sozinhos.
 

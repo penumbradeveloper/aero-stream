@@ -421,7 +421,8 @@
     const est = U.estadoDe(eu.codigo);
     const estado = h('span', { class: 'pilula ' + est, dados: { estadoCod: eu.codigo } }); U.pintarPilula(estado, eu.codigo, est);
     const eubloco = h('div', { class: 'eu', role: 'button', tabindex: '0', title: T('Seu perfil', 'Your profile'), onclick: (e) => U.menuConta(e, { sair: () => dados.sair && dados.sair() }) }, U.avatar({ nome: eu.nome, codigo: eu.codigo, av: eu.av }, 46),
-      h('div', { class: 'eu-txt' }, h('div', { estilo: { 'font-weight': '700', 'font-size': '17px' } }, h('span', { dados: { nomeCod: eu.codigo } }, eu.nome), ' ', h('span', { class: 'tag', dados: { tagCod: eu.codigo } }, '#' + eu.tag), ' ', U.insignias && !(eu.pf && eu.pf.si === false) ? U.insignias(eu.ins, eu.sl, eu.pf && eu.pf.so) : null), estado, h('div', { class: 'eu-recado peq suave' }, eu.bio || '')));
+      h('div', { class: 'eu-txt' }, h('div', { estilo: { 'font-weight': '700', 'font-size': '17px' } }, h('span', { dados: { nomeCod: eu.codigo } }, eu.nome), ' ', h('span', { class: 'tag', dados: { tagCod: eu.codigo } }, '#' + eu.tag), ' ', U.insignias && !(eu.pf && eu.pf.si === false) ? U.insignias(eu.ins, eu.sl, eu.pf && eu.pf.so) : null), estado, h('div', { class: 'eu-recado peq suave' }, eu.bio || ''),
+        h('div', { class: 'eu-ativ' }, A.jogando ? A.jogando.linha(eu.codigo) : null, A.ouvindo ? A.ouvindo.linha(eu.codigo) : null, A.assistindo ? A.assistindo.linha(eu.codigo) : null))); // (1.0.0) a sua própria atividade, como os amigos veem
     { const c0 = estado.style.getPropertyValue('--stc'); if (c0) eubloco.style.setProperty('--stc', c0); } // (0.8.7) a moldura da foto na cor do status personalizado
     const botoes = {}, selos = {};
     const barra = h('nav', { class: 'abas', role: 'tablist' }, abas.map(([id, rot, ic]) => {

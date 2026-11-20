@@ -143,12 +143,13 @@
     const c = cfg();
     const opcoes = (vazio) => [...(vazio ? [['', vazio]] : []), ...LINGUAS];
     const sel = (valor, lista, on) => { const s = h('select', { class: 'campo', estilo: { 'max-width': '180px' }, onchange: () => on(s.value) }, ...lista.map(([v, n]) => h('option', { value: v }, n))); s.value = valor; return s; };
+    const on = (id) => !!(A.integ && A.integ.ligada(id)), tr = on('traducao') || on('dicionario');
     return [
-      opcao(T('Traduzir para', 'Translate to'), sel(minha(), opcoes(), (v) => { c.traduzirPara = v; A.cfg.salvar(); }), T('A língua do "Traduzir" nas mensagens e do dicionário.', 'The language for "Translate" on messages and for the dictionary.')),
-      opcao(T('Traduzir as mensagens dos outros sozinho', 'Auto-translate other people\'s messages'), U.chave(c.autoTraduzir === true, (v) => { c.autoTraduzir = v; A.cfg.salvar(); }), T('A tradução aparece embaixo da mensagem, com o original a um clique.', 'The translation shows under the message, with the original one click away.')),
-      opcao(T('Traduzir as minhas mensagens', 'Translate my messages'), sel(c.minhasPara || '', opcoes(T('Não traduzir', 'Don\'t translate')), (v) => { c.minhasPara = v; A.cfg.salvar(); }), T('O que você escreve vai traduzido para essa língua.', 'What you type is sent translated into this language.')),
-      opcao(T('Mostrar o meu horário', 'Show my local time'), U.chave(c.mostrarFuso === true, mostrarFuso), T('Seus amigos veem que horas são aí, ao lado do seu nome.', 'Your friends see what time it is for you, next to your name.')),
-    ];
+      tr && opcao(T('Traduzir para', 'Translate to'), sel(minha(), opcoes(), (v) => { c.traduzirPara = v; A.cfg.salvar(); }), T('A língua do "Traduzir" nas mensagens e do dicionário.', 'The language for "Translate" on messages and for the dictionary.')),
+      on('traducao') && opcao(T('Traduzir as mensagens dos outros sozinho', 'Auto-translate other people\'s messages'), U.chave(c.autoTraduzir === true, (v) => { c.autoTraduzir = v; A.cfg.salvar(); }), T('A tradução aparece embaixo da mensagem, com o original a um clique.', 'The translation shows under the message, with the original one click away.')),
+      on('traducao') && opcao(T('Traduzir as minhas mensagens', 'Translate my messages'), sel(c.minhasPara || '', opcoes(T('Não traduzir', 'Don\'t translate')), (v) => { c.minhasPara = v; A.cfg.salvar(); }), T('O que você escreve vai traduzido para essa língua.', 'What you type is sent translated into this language.')),
+      on('horario') && opcao(T('Mostrar o meu horário', 'Show my local time'), U.chave(c.mostrarFuso === true, mostrarFuso), T('Seus amigos veem que horas são aí, ao lado do seu nome.', 'Your friends see what time it is for you, next to your name.')),
+    ].filter(Boolean);
   }
 
   A.idiomas = { LINGUAS, traduzir, bloco, traduzirMsg, antesDeEnviar, dicionario, palavrasDe, relogio, secao, nomeLingua };

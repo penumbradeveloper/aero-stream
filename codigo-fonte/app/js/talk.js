@@ -1188,7 +1188,7 @@
           c.tipo === 'grupo' ? TK.avatarGrupo(TK.raizDe(c), 44) : U.avatar(pess, 44, U.estadoDe(pess.codigo)),
           h('div', {}, c.tipo === 'grupo' ? h('b', {}, titulo) : h('b', { dados: { nomeCod: pess.codigo } }, titulo, A.aparelhos ? A.aparelhos.vivo(pess.codigo) : null), c.tipo === 'grupo' ? h('div', { class: 'peq suave' }, (c.membros || []).map((m) => m.apelido || m.nome).join(', ')) : h('div', { class: 'peq suave tk-cab-st', dados: { estadoCod: pess.codigo, st: U.estadoDe(pess.codigo), topo: '1' } }, U.textoTopo(pess.codigo, U.estadoDe(pess.codigo))))),
         h('div', { class: 'tk-cab-botoes' }, ...botoesCab(c, (...a) => alternarMembros(...a), pess)));
-      if (pess && A.idiomas && A.perfil) A.perfil.buscar(pess.codigo).then((p) => { const r = p && A.idiomas.relogio(p.fz), b = cab.querySelector('.tk-cab-quem b'); if (r && b) b.append(r); }).catch(() => {}); // (1.0.2) que horas são para a pessoa
+      if (pess && A.idiomas && A.perfil && A.integ && A.integ.ligada('horario')) A.perfil.buscar(pess.codigo).then((p) => { const r = p && A.idiomas.relogio(p.fz), b = cab.querySelector('.tk-cab-quem b'); if (r && b) b.append(r); }).catch(() => {}); // (1.0.2) que horas são para a pessoa
       // (0.8.6) o "visto por último" da pessoa (se as duas deixam) aparece embaixo do nome quando ela está off-line
       if (pess && A.perfil && A.perfil.buscar) A.perfil.buscar(pess.codigo).then((p) => { U.lembrarVisto(pess.codigo, p && p.visto, p && p.vm); U.atualizarVivos(); }).catch(() => {});
       cx = A.chatUI.criar({
@@ -1445,10 +1445,10 @@
     let sepConv = null;
     function separarConversa(c) {
       if (sepConv) { sepConv.api.focar(); return; }
-      const api = A.separar.abrir('talk', painel, { titulo: TK.titulo(c), aviso: T('Esta conversa está numa janela separada', 'This chat is in a separate window'), aoVoltar: () => { sepConv = null; } });
+      const api = A.separar.abrir('talk', painel, { titulo: TK.titulo(c), aviso: T('Esta conversa está numa janela separada', 'This chat is in a separate window'), aoVoltar: () => { const sc = sepConv; sepConv = null; if (sc && !sc.semReabrir && atual && atual.id === sc.cid && painel.isConnected) abrir(atual); } }); // (1.0.2) de volta: a conversa abre de novo, carregando direito (o chat tinha ficado preso à outra janela)
       if (api) sepConv = { cid: c.id, api };
     }
-    function fecharConversa() { if (sepConv) sepConv.api.fechar(); A.store.gravar('aero-talk-ultima', ''); atual = null; TK.aberta = null; A.evt.emit('onde'); raiz.classList.remove('com-conversa'); painel.textContent = ''; painel.append(vazioConv); pintarLista(); }
+    function fecharConversa() { if (sepConv) { sepConv.semReabrir = true; sepConv.api.fechar(); } A.store.gravar('aero-talk-ultima', ''); atual = null; TK.aberta = null; A.evt.emit('onde'); raiz.classList.remove('com-conversa'); painel.textContent = ''; painel.append(vazioConv); pintarLista(); }
 
     const opcoesChat = TK.opcoesChat;
     // ---------- procurar na conversa (0.6.0, inspirado na busca do Discord) ----------

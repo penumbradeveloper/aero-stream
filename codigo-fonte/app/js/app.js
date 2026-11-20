@@ -62,10 +62,13 @@
   A.evt.on('sala:fechada', voltarHome);
   // transmitindo: o fundo animado (bolhas, aurora) para, caso o Aero apareça na captura (imagem difícil de comprimir)
   // (0.7.10) e assistindo também: num PC fraco a placa divide o tempo entre o desfoque do fundo e o vídeo
-  const marcarTransmissao = () => { const on = !!(A.sala && A.sala.ativa && A.sala.local && (A.sala.local.tela || [...A.sala.remotas.values()].some((r) => r.tela))) || !!(A.chamada && A.chamada.compartilhando && A.chamada.compartilhando()) || !!(A.chamada && A.chamada.telaRemota && A.chamada.telaRemota()); document.documentElement.dataset.transmitindo = on ? '1' : '';
+  const marcarTransmissao = () => { const on = !!(A.sala && A.sala.ativa && A.sala.local && (A.sala.local.tela || [...A.sala.remotas.values()].some((r) => r.tela))) || !!(A.chamada && A.chamada.compartilhando && A.chamada.compartilhando()) || !!(A.chamada && A.chamada.telaRemota && A.chamada.telaRemota() && document.documentElement.hasAttribute('data-cham-max')); document.documentElement.dataset.transmitindo = on ? '1' : '';
     // (0.9.6) quem só ASSISTE uma tela (sem compartilhar a sua): o fundo e os enfeites somem de vez, para o aparelho só receber e mostrar o vídeo
     const vendo = !!(A.sala && A.sala.ativa && A.sala.local && !A.sala.local.tela && [...A.sala.remotas.values()].some((r) => r.tela)) || !!(A.chamada && A.chamada.telaRemota && A.chamada.telaRemota() && !(A.chamada.compartilhando && A.chamada.compartilhando()));
-    document.documentElement.dataset.assistindo = vendo ? '1' : ''; };
+    // (1.0.2) só com a chamada maximizada (a tela na sua frente): com a chamada na janelinha ou minimizada, você está usando o resto do app e o
+    // fundo continua lá (as bolhas ficam paradas pelo data-transmitindo, sem pesar)
+    const naFrente = !A.chamada || !A.chamada.telaRemota || !A.chamada.telaRemota() || document.documentElement.hasAttribute('data-cham-max');
+    document.documentElement.dataset.assistindo = vendo && naFrente ? '1' : ''; };
   // (0.6.9) o app vai fechar ou reiniciar: sai da sala e da chamada DIREITO (avisa o servidor e os outros). Antes a tela de quem compartilhava
   // continuava aparecendo para os outros, e ao voltar para a chamada a pessoa aparecia duas vezes
   let saiu = false;
@@ -93,7 +96,7 @@
     document.addEventListener('focusin', () => setTimeout(medir, 50)); document.addEventListener('focusout', () => setTimeout(medir, 50));
   }
   if (window.aero && window.aero.aoSair) window.aero.aoSair(sairDeTudo);
-  A.evt.on('sala:local', marcarTransmissao); A.evt.on('sala:fechada', marcarTransmissao); A.evt.on('chamada:tela', marcarTransmissao); A.evt.on('chamada:fim', marcarTransmissao); A.evt.on('sala:stream', marcarTransmissao); A.evt.on('sala:stream-fim', marcarTransmissao); // (0.6.8) compartilhando na chamada também
+  A.evt.on('sala:local', marcarTransmissao); A.evt.on('sala:fechada', marcarTransmissao); A.evt.on('chamada:tela', marcarTransmissao); A.evt.on('chamada:fim', marcarTransmissao); A.evt.on('chamada:modo', marcarTransmissao); A.evt.on('sala:stream', marcarTransmissao); A.evt.on('sala:stream-fim', marcarTransmissao); // (0.6.8) compartilhando na chamada também
   A.evt.on('sala:fim', (m) => {
     const txt = { removido: T('Você foi removido da sala.', 'You were removed from the room.'), recusado: T('O host não aceitou sua entrada.', 'The host did not accept your request.'), rede: T('A conexão com a sala caiu.', 'The room connection dropped.'), 'outro-aparelho': T('Você entrou nesta sala por outro aparelho. Só um aparelho por conta fica na sala.', 'You joined this room from another device. Only one device per account stays in the room.') }[m.motivo] || m.msg;
     if (txt) U.toast(txt, { tipo: 'erro', ms: 6000 });

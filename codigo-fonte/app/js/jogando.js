@@ -29,7 +29,7 @@
   J.de = (cod) => {
     const eu = (A.api && A.api.eu) || {};
     if (!cod) return null;
-    if (cod === eu.codigo) return meu;
+    if (cod === eu.codigo && meu) return meu; // (1.0.0) sem nada aqui, a atividade de outro aparelho seu
     const ds = A.hub && A.hub.dispositivosDe ? A.hub.dispositivosDe(cod) : [];
     let m = null; for (const d of ds) if (d.jog && d.jog.n && (!m || (d.jog._rx || 0) > (m._rx || 0))) m = d.jog;
     return m;

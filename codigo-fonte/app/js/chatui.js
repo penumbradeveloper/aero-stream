@@ -83,6 +83,7 @@
   const meChama = (texto) => { const eu = A.api.eu; if (!eu || !texto) return false; if (mencoes(texto).includes(eu.codigo) || /<@todos>/i.test(texto)) return true; return /<@aqui>/i.test(texto) && (!A.hub || A.hub.estado === 'online'); };
   A.chatMeChama = meChama;
   // ---------- embeds (0.6.0): YouTube como no Discord, GIFs (Klipy) e convites de grupo ----------
+  const integOn = (id) => !!(A.integ && A.integ.ligada && A.integ.ligada(id)); // (1.0.0) o que virou integração só aparece com ela instalada e ligada
   const ehSpotify = (u) => /^https?:\/\/(?:open\.)?spotify\.com\/(?:intl-[a-z-]+\/)?(?:embed\/)?(track|album|playlist|episode)\/[A-Za-z0-9]{22}/i.test(u); // (1.0.2)
   const idYoutube = (u) => { const m = /^https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/.exec(u); return m ? m[1] : null; };
   const ehGif = (u) => /^https:\/\/([a-z0-9-]+\.)*(klipy\.com|klipy\.co)\/[^\s]+\.(gif|webp)(\?[^\s]*)?$/i.test(u);
@@ -969,7 +970,7 @@
     async function enviar() {
       let texto = comMencoes(A.extras && A.extras.trocarEmojis ? A.extras.trocarEmojis(converterTexto(inp.value.trim())) : converterTexto(inp.value.trim())); // (1.0.0) :nome: dos seus emojis vira o emoji
       if ((!texto && !anexos.length) || enviando) return;
-      if (texto && A.idiomas && A.cfg.v.chat && A.cfg.v.chat.minhasPara) { enviando = true; try { texto = await A.idiomas.antesDeEnviar(texto); } finally { enviando = false; } } // (1.0.2) traduz o que você escreveu, se escolheu
+      if (texto && A.idiomas && integOn('traducao') && A.cfg.v.chat && A.cfg.v.chat.minhasPara) { enviando = true; try { texto = await A.idiomas.antesDeEnviar(texto); } finally { enviando = false; } } // (1.0.2) traduz o que você escreveu, se escolheu
       const lista0 = anexos.slice(), resp0 = resp, bruto = inp.value;
       if (lista0.length) {
         inp.value = ''; semente = Math.floor(Math.random() * 1e9); ultimoAviso = 0; marcados.clear(); autoAltura(); responder(null); anexos = []; pintarAnexos(); guardarRascunho(); if (!emojiPainel.hidden) alternarEmojis(false);
@@ -1251,8 +1252,8 @@
       if (o.encaminhar && !m.pendente && !m.trancada) it.push({ texto: T('Encaminhar', 'Forward'), icone: 'encaminhar', onclick: () => o.encaminhar(m) });
       if (m.texto && !m.trancada && A.idiomas) { // (1.0.2) traduzir e o dicionário (a palavra selecionada, ou escolhe entre as da mensagem)
         const sel = String(window.getSelection ? window.getSelection() : '').trim(), pal = sel && sel.split(/\s+/).length <= 3 ? sel : '';
-        it.push({ texto: T('Traduzir', 'Translate'), icone: 'traduzir', onclick: () => { const x = els.get(m.id); if (x) A.idiomas.traduzirMsg(m, x.el); } });
-        if (A.idiomas.palavrasDe(m.texto).length) it.push({ texto: pal ? T('Dicionário: ', 'Dictionary: ') + (pal.length > 18 ? pal.slice(0, 18) + '…' : pal) : T('Dicionário', 'Dictionary'), icone: 'livro', onclick: () => A.idiomas.dicionario(pal, m.texto) });
+        if (integOn('traducao')) it.push({ texto: T('Traduzir', 'Translate'), icone: 'traduzir', onclick: () => { const x = els.get(m.id); if (x) A.idiomas.traduzirMsg(m, x.el); } });
+        if (integOn('dicionario') && A.idiomas.palavrasDe(m.texto).length) it.push({ texto: pal ? T('Dicionário: ', 'Dictionary: ') + (pal.length > 18 ? pal.slice(0, 18) + '…' : pal) : T('Dicionário', 'Dictionary'), icone: 'livro', onclick: () => A.idiomas.dicionario(pal, m.texto) });
       }
       if (m.texto) it.push({ texto: T('Copiar texto', 'Copy text'), icone: 'copiar', onclick: () => U.copiar(m.texto.replace(/<@([A-Z0-9]{6})>/gi, (_, c) => '@' + (o.nomeDe ? o.nomeDe(c.toUpperCase()) : c))) });
       if (o.fixar && !m.pendente) it.push({ texto: o.fixada && o.fixada(m) ? T('Desafixar mensagem', 'Unpin message') : T('Fixar mensagem', 'Pin message'), icone: 'alfinete', onclick: () => o.fixar(m) });
@@ -1368,18 +1369,19 @@
         const soGif = urls.length === 1 && so === urls[0] && (ehGif(so) || ehPaginaKlipy(so)), soFig = /^<fig:[A-Z0-9]{6}:[0-9a-f]{10}>$/i.test(so);
         const soDiscord = urls.length === 1 && so === urls[0] && !!tipoDiscord(so); // (0.6.9) só o link de um anexo do Discord: vira a mídia, sem o texto
         const ehAero = (u) => !!(o.ehLinkMidia && o.ehLinkMidia(u)), soAero = urls.length === 1 && so === urls[0] && ehAero(so); // (0.8.3) link de mídia do Aero
-        const soEmbed = urls.length === 1 && so === urls[0] && (!!idYoutube(so) || !!idTweet(so) || ehSpotify(so) || ehReddit(so) || ehLoja(so)); // (0.9.6) só o link do YouTube/X: fica só o cartão (o link vai no botão direito)
+        const soEmbed = urls.length === 1 && so === urls[0] && (!!idYoutube(so) || !!idTweet(so) || !!(A.perfil && A.perfil.codigoDoLink && A.perfil.codigoDoLink(so)) || (integOn('cartoes') && (ehSpotify(so) || ehReddit(so) || ehLoja(so)))); // (0.9.6) só o link do YouTube/X: fica só o cartão (o link vai no botão direito)
         if (soGif) partes.push(ehPaginaKlipy(so) ? gifDePagina(so, m) : midiaGif(so));
         else if (!soDiscord && !soAero && !soEmbed) partes.push(h('div', { class: 'cx-txt' + (soFig ? ' so-figurinha' : '') }, ...comLinks(m.texto, o)));
-        if (!soGif && !soDiscord && !soAero && !soEmbed && !soFig && A.idiomas) { const tr = A.idiomas.bloco(m, o.ehMeu(m)); if (tr) partes.push(tr); } // (1.0.2) a tradução embaixo do texto
+        if (!soGif && !soDiscord && !soAero && !soEmbed && !soFig && A.idiomas && integOn('traducao')) { const tr = A.idiomas.bloco(m, o.ehMeu(m)); if (tr) partes.push(tr); } // (1.0.2) a tradução embaixo do texto
         partes.push(...midias);
         for (const u of [...new Set(urls)].slice(0, 3)) {
           if (ehAero(u)) { partes.push(midiaDeLink(u, m, soAero)); continue; }
+          if (A.perfil && A.perfil.codigoDoLink && A.perfil.codigoDoLink(u)) { partes.push(A.perfil.cartaoLink(A.perfil.codigoDoLink(u), { menu: menuLink(u, T('Perfil', 'Profile'), () => itensMsg(m)) })); continue; } // (1.0.0) o cartão do perfil
           const yt = idYoutube(u); if (yt) { partes.push(embedYoutube(yt, u, () => itensMsg(m))); continue; }
           if (idTweet(u)) { partes.push(embedTweet(u, grudar, soEmbed, () => itensMsg(m))); continue; }
-          if (ehReddit(u)) { partes.push(embedReddit(u, grudar, soEmbed, () => itensMsg(m))); continue; } // (1.0.2)
-          if (ehLoja(u) && A.embeds) { partes.push(A.embeds.loja(u, { dados: dadosEmbed, menu: menuLink(u, T('Loja', 'Store'), () => itensMsg(m)), grudar, soLink: soEmbed })); continue; } // (1.0.2) preço, imposto, fotos e avaliações
-          if (ehSpotify(u) && A.embeds) { partes.push(A.embeds.spotify(u, { dados: dadosEmbed, menu: menuLink(u, 'Spotify', () => itensMsg(m)), grudar })); continue; } // (1.0.2) com o trecho para ouvir
+          if (integOn('cartoes') && ehReddit(u)) { partes.push(embedReddit(u, grudar, soEmbed, () => itensMsg(m))); continue; } // (1.0.2)
+          if (integOn('cartoes') && ehLoja(u) && A.embeds) { partes.push(A.embeds.loja(u, { dados: dadosEmbed, menu: menuLink(u, T('Loja', 'Store'), () => itensMsg(m)), grudar, soLink: soEmbed })); continue; } // (1.0.2) preço, imposto, fotos e avaliações
+          if (integOn('cartoes') && ehSpotify(u) && A.embeds) { partes.push(A.embeds.spotify(u, { dados: dadosEmbed, menu: menuLink(u, 'Spotify', () => itensMsg(m)), grudar })); continue; } // (1.0.2) com o trecho para ouvir
           if (!soGif && ehGif(u)) { partes.push(midiaGif(u)); continue; }
           if (!soGif && ehPaginaKlipy(u)) { partes.push(gifDePagina(u, m)); continue; }
           const td = tipoDiscord(u); if (td) { partes.push(midiaDiscord(u, td, m)); continue; }

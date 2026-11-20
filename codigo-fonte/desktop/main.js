@@ -1010,7 +1010,7 @@ function criarJanela() {
   janela.webContents.setWindowOpenHandler(({ url, frameName }) => {
     // (1.0.2) a janela separada do próprio Aero (uma conversa com a chamada): em branco, do mesmo app, sem menu e sem navegar para fora
     if (url === 'about:blank' && /^aero-sep-[\w-]{1,40}$/.test(frameName || '')) {
-      return { action: 'allow', overrideBrowserWindowOptions: { width: 560, height: 780, minWidth: 360, minHeight: 420, autoHideMenuBar: true, backgroundColor: '#0f2433', icon: [path.join(__dirname, 'build', 'icon.png'), path.join(__dirname, 'build', 'icon.ico')].find((p) => fs.existsSync(p)), title: 'Aero' } };
+      return { action: 'allow', overrideBrowserWindowOptions: { useContentSize: true, minWidth: 360, minHeight: 420, autoHideMenuBar: true, backgroundColor: '#0f2433', icon: [path.join(__dirname, 'build', 'icon.png'), path.join(__dirname, 'build', 'icon.ico')].find((p) => fs.existsSync(p)), title: 'Aero' } };
     }
     if (/^https:\/\/[^\s]+$/i.test(url)) shell.openExternal(url).catch(() => {}); return { action: 'deny' };
   });

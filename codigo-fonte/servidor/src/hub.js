@@ -29,6 +29,8 @@ const msgPresenca = (a) => ({
   tipo: 'presenca', codigo: a.codigo, nome: a.nome, tag: a.tag, av: a.av, dispositivo: a.dev,
   maquina: a.esconder ? '' : a.maquina, so: a.esconder ? '' : a.so, ap: a.semAp ? undefined : a.ap || undefined, sov: a.mostraSo ? a.sov || undefined : undefined, estado: a.estado, sala: a.sala, comp: !!a.comp, ins: a.ins || undefined, stc: a.stc ? { t: a.stc.t, c: a.stc.c, i: a.stc.i } : undefined, ouv: ouvPublico(a), jog: jogPublico(a), ass: assPublico(a),
 });
+// (1.0.0) para a própria pessoa (os outros aparelhos dela e este): tudo dela, com o aparelho e o sistema mesmo se ela esconde dos amigos
+const msgPropria = (a) => ({ ...msgPresenca(a), ap: a.ap || undefined, sov: a.sov || undefined, maquina: a.maquina, so: a.so, eu: true });
 // (1.0.0) "Ouvindo agora" (como o do Discord): a música que toca no PC da pessoa. O servidor guarda quando ela começou (ini) e manda aos
 // amigos quanto já tocou (dt, contado aqui): cada um calcula a barra pelo próprio relógio, sem depender do relógio de ninguém
 const FONTES_OUV = ['spotify', 'ytmusic', 'deezer'];
@@ -1063,6 +1065,7 @@ export class Hub {
       if (info.estado !== 'aceita') continue;
       this.ctx.getWebSockets('c:' + oid).forEach((f) => { const a = f.deserializeAttachment(); if (a && !invisivel(a)) presencas.push(msgPresenca(a)); });
     }
+    this.ctx.getWebSockets('c:' + id).forEach((f) => { const a = f.deserializeAttachment(); if (a) presencas.push(msgPropria(a)); }); // (1.0.0) os seus aparelhos
     for (const ws of alvos || this.ctx.getWebSockets('c:' + id)) {
       enviar(ws, { tipo: 'amigos', lista });
       presencas.forEach((p) => enviar(ws, p));
@@ -1070,7 +1073,7 @@ export class Hub {
   }
 
   // Avisa os amigos aceitos sobre este aparelho (entrou, mudou de estado, abriu uma sala).
-  async anunciar(ws, extra) {
+  async anunciar(ws, extra, paraMim) {
     const a = ws.deserializeAttachment();
     if (!a) return;
     const conta = await this.get('c:' + a.conta);
@@ -1079,10 +1082,13 @@ export class Hub {
     for (const [oid, info] of Object.entries(conta.amigos)) {
       if (info.estado === 'aceita') this.ctx.getWebSockets('c:' + oid).forEach((f) => enviar(f, m));
     }
+    // (1.0.0) a própria pessoa vê os aparelhos dela (e a atividade), até no invisível
+    const mim = paraMim || extra || msgPropria(a);
+    this.ctx.getWebSockets('c:' + a.conta).forEach((f) => { if (!(extra && !paraMim && f === ws)) enviar(f, mim); }); // (o próprio aparelho já sabe da atividade dele)
   }
 
   // mudou de online/ausente/invisível: para os amigos, ficar invisível é sair; voltar é entrar
-  async anunciarEstado(ws, era) { const a = ws.deserializeAttachment(); if (!a) return; if (invisivel(a) && era !== 'invisivel') await this.anunciar(ws, { tipo: 'offline', codigo: a.codigo, dispositivo: a.dev }); else await this.anunciar(ws); }
+  async anunciarEstado(ws, era) { const a = ws.deserializeAttachment(); if (!a) return; if (invisivel(a) && era !== 'invisivel') await this.anunciar(ws, { tipo: 'offline', codigo: a.codigo, dispositivo: a.dev }, msgPropria(a)); else await this.anunciar(ws); }
 
   async mudou(ids) {
     const unicos = [...new Set(ids)];

@@ -19,8 +19,9 @@
   const K = () => A.integCat;
   const deCatalogo = (c) => ({ id: c.id, versao: c.versao, icone: c.icone, tipo: c.cat, cena: c.cena, gen: c.tipo, cat: c,
     nome: K().texto(c.nome), resumo: K().texto(c.resumo), desc: K().texto(c.desc), onde: c.onde ? K().texto(c.onde) : '', curto: c.curto ? K().texto(c.curto) : '',
-    seguro: c.seguro && c.seguro.length ? c.seguro.map(K().texto) : null, bloqueio: K().bloqueio(c) });
-  const oficiais = () => (K() ? K().lista().filter(K().nestaPlataforma).map(deCatalogo) : []);
+    seguro: c.seguro && c.seguro.length ? c.seguro.map(K().texto) : null, bloqueio: K().bloqueio(c) || (K().nestaPlataforma(c) ? null : 'plat') });
+  // (1.0.0) todas aparecem em todo aparelho (igual no PC); as que não funcionam aqui ficam com o selo de onde funcionam
+  const oficiais = () => (K() ? K().lista().map(deCatalogo) : []);
   // (0.8.7) os tipos: o que entra nas conversas e nas chamadas, os widgets do perfil e (na Comunidade) temas
   const tipos = () => ({ conversa: [T('Chats e chamadas', 'Chats & calls'), 'chat'], widget: ['Widget', 'pessoa'], tema: [T('Tema', 'Theme'), 'oPaleta'] });
   // (0.8.7) os temas oficiais saíram (o app já deixa mudar tudo isso em Aparência): quem tinha instalado não fica com sobra
@@ -301,9 +302,11 @@
 
   // ---------- (1.0.2) os tipos genéricos do catálogo: os textos deles ficam aqui; os de cada integração vêm do catálogo ----------
   const hostDe = (u) => { try { return new URL(u).host; } catch (e) { return ''; } };
-  const seloBloqueio = (x, grande) => h('span', { class: 'ig-selo breve' + (grande ? ' grande' : '') }, x.bloqueio === 'app' ? T('Atualize o app', 'Update the app')
+  const seloBloqueio = (x, grande) => h('span', { class: 'ig-selo breve' + (grande ? ' grande' : '') }, x.bloqueio === 'app' ? T('Atualize o app', 'Update the app') : x.bloqueio === 'plat' ? ondeFunciona(x)
     : (((A.extras && A.extras.PLANOS && A.extras.PLANOS[x.cat.plano]) || [])[1] || 'Aero Bubble') + '+');
-  const textoBloqueio = (x) => (x.bloqueio === 'app' ? T('Esta integração precisa de uma versão mais nova do Aero. Atualize o app para usar.', 'This integration needs a newer version of Aero. Update the app to use it.')
+  const NOME_PLAT = () => ({ pc: 'PC', web: T('site', 'web'), celular: T('celular', 'phone') });
+  const ondeFunciona = (x) => T('Só no ', 'Only on ') + ((x.cat && x.cat.plataformas) || []).map((p) => NOME_PLAT()[p] || p).join(T(' e no ', ' & '));
+  const textoBloqueio = (x) => (x.bloqueio === 'plat' ? T('Esta integração funciona no ', 'This integration works on ') + ((x.cat && x.cat.plataformas) || []).map((p) => NOME_PLAT()[p] || p).join(T(' e no ', ' and ')) + T('. Instale por lá.', '. Install it there.') : x.bloqueio === 'app' ? T('Esta integração precisa de uma versão mais nova do Aero. Atualize o app para usar.', 'This integration needs a newer version of Aero. Update the app to use it.')
     : T('Disponível para quem assina o plano ', 'Available to subscribers of the ') + ((((A.extras && A.extras.PLANOS && A.extras.PLANOS[x.cat.plano]) || [])[1]) || 'Aero Bubble') + T(' ou acima.', ' plan or above.'));
   const seguroDoTipo = (x) => (x.gen === 'link' ? [T('Só abre ', 'Only opens ') + hostDe(x.cat.url) + T(' no seu navegador, e o Aero pergunta antes.', ' in your browser, and Aero asks first.'), T('Não lê as suas conversas nem manda nada seu para o site.', 'Does not read your chats or send anything of yours to the site.')]
     : x.gen === 'janela' ? [T('Só mostra textos e links numa janela do Aero: não roda código.', 'Only shows text and links in an Aero window: runs no code.'), T('Não lê as suas conversas.', 'Does not read your chats.')]

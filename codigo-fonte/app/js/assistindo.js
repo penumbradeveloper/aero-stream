@@ -55,7 +55,7 @@
   S.de = (cod) => {
     const eu = (A.api && A.api.eu) || {};
     if (!cod) return null;
-    if (cod === eu.codigo) return meu;
+    if (cod === eu.codigo && meu) return meu; // (1.0.0) sem nada aqui, a atividade de outro aparelho seu
     const ds = A.hub && A.hub.dispositivosDe ? A.hub.dispositivosDe(cod) : [];
     let m = null; for (const d of ds) if (d.ass && d.ass.t && (!m || (d.ass._rx || 0) > (m._rx || 0))) m = d.ass;
     if (m && m.d && (m.dt || 0) + (Date.now() - (m._rx || 0)) > m.d + 60000) return null; // o vídeo acabou faz tempo e não veio outro

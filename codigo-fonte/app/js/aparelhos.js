@@ -76,7 +76,7 @@
   // os símbolos de quem está conectado: um por tipo de aparelho (com o sistema dele, se a pessoa deixa aparecer)
   AP.chave = (codigo) => { const ds = (A.hub && A.hub.dispositivosDe) ? A.hub.dispositivosDe(codigo) : []; return ds.map((d) => (d.ap || '') + (d.sov || '')).sort().join(); };
   AP.junto = (codigo, { tam = 14, rotulo = false } = {}) => {
-    if (A.cfg && A.cfg.v.verAparelhos === false) return null;
+    if (A.cfg && A.cfg.v.verAparelhos === false && !(A.api && A.api.eu && A.api.eu.codigo === codigo)) return null;
     const ds = (A.hub && A.hub.dispositivosDe) ? A.hub.dispositivosDe(codigo) : [];
     const vistos = new Map();
     for (const d of ds) { if (!d.ap || !TIPOS[d.ap]) continue; const k = d.ap + ':' + (d.sov || ''); if (!vistos.has(k)) vistos.set(k, d); }

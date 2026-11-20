@@ -11,9 +11,14 @@
     for (const a of [...de.attributes]) if (para.getAttribute(a.name) !== a.value) para.setAttribute(a.name, a.value);
   }
 
-  function abrir(chave, el, { titulo = 'Aero', largura = 560, altura = 780, aviso, aoVoltar } = {}) {
+  function abrir(chave, el, { titulo = 'Aero', largura, altura, aviso, aoVoltar } = {}) {
     if (abertas.has(chave)) { abertas.get(chave).focar(); return abertas.get(chave); }
-    const w = window.open('', 'aero-sep-' + String(chave).replace(/[^\w-]/g, ''), `width=${largura},height=${altura}`);
+    // (1.0.2) a janela nasce do tamanho do elemento e no mesmo lugar da tela em que ele estava
+    const r = el.getBoundingClientRect();
+    const larg = Math.round(largura || Math.max(360, r.width)), alt = Math.round(altura || Math.max(420, r.height));
+    const barra = Math.max(0, (window.outerHeight - window.innerHeight) || 0), borda = Math.max(0, Math.round(((window.outerWidth - window.innerWidth) || 0) / 2));
+    const esq = Math.round((window.screenX || 0) + borda + r.left), topo = Math.round((window.screenY || 0) + barra + r.top);
+    const w = window.open('', 'aero-sep-' + String(chave).replace(/[^\w-]/g, ''), `width=${larg},height=${alt},left=${esq},top=${topo}`);
     if (!w) { A.ui.toast(T('Não deu para abrir outra janela.', 'Could not open another window.'), { tipo: 'erro' }); return null; }
     const d = w.document;
     d.open(); d.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body></body></html>'); d.close();

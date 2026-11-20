@@ -933,6 +933,26 @@
       h('p', { class: 'peq suave', estilo: { margin: 0, 'text-align': 'center' } }, T('Quem abrir o link (ou ler o QR com a câmera) cai direto no perfil de ', 'Whoever opens the link (or scans the QR) lands right on the profile of ') + nome + '.'),
       qr, campo, botoes), { largura: 400 });
   };
+  // (1.0.0) o link do perfil numa conversa vira o cartão da pessoa; clicar abre o perfil completo (com "Adicionar amigo" se ainda não é)
+  P.codigoDoLink = (u) => { const m = /^https:\/\/web\.aerostream\.workers\.dev\/app\/?\?perfil=([\w-]{1,32})\/?$/i.exec(String(u || '').trim()); return m ? decodeURIComponent(m[1]) : ''; };
+  P.cartaoLink = (cod, { menu } = {}) => {
+    const U = A.ui;
+    const el = h('button', { type: 'button', class: 'pf-link vidro carregando', title: T('Abrir o perfil', 'Open profile'), onclick: (e) => { e.stopPropagation(); P.ver(cod); } },
+      h('div', { class: 'pf-link-banner', 'aria-hidden': 'true' }), h('div', { class: 'pf-link-corpo' }, h('div', { class: 'pf-link-av' }), h('div', { class: 'pf-link-txt' }, h('b', {}, T('Perfil do Aero', 'Aero profile')), h('small', { class: 'suave' }, T('Carregando…', 'Loading…')))));
+    if (menu) el.addEventListener('contextmenu', menu);
+    P.buscar(cod).then((p) => {
+      if (!p) return;
+      el.classList.remove('carregando');
+      const ban = el.querySelector('.pf-link-banner'), b = p.bannerV ? urlBanner(p.codigo, p.bannerV) : '';
+      ban.style.background = b ? `url("${b}") center / cover no-repeat` : `linear-gradient(135deg, ${p.cor1 || '#2d9ee0'}, ${p.cor2 || p.cor1 || '#7fd3ff'})`;
+      const H = A.hub || {}, eu = API.eu || {}, est = eu.codigo === p.codigo ? 'eu' : (((H.amigos || []).find((x) => x.codigo === p.codigo) || {}).estado || p.amizade || '');
+      const acao = est === 'eu' ? T('Seu perfil', 'Your profile') : est === 'aceita' ? T('Ver perfil', 'View profile') : est === 'enviado' ? T('Pedido enviado', 'Request sent') : est === 'recebido' ? T('Aceitar pedido', 'Accept request') : T('Adicionar amigo', 'Add friend');
+      el.querySelector('.pf-link-av').replaceChildren(U.avatar(p, 64, U.estadoDe ? U.estadoDe(p.codigo) : undefined));
+      el.querySelector('.pf-link-txt').replaceChildren(h('b', {}, p.nome || ''), h('small', { class: 'suave' }, p.tag ? '#' + p.tag : ''), p.bio ? h('span', { class: 'pf-link-bio' }, p.bio) : null);
+      el.querySelector('.pf-link-corpo').append(h('span', { class: 'pf-link-acao' + (est === 'aceita' || est === 'eu' ? '' : ' novo') }, A.icone(est === 'aceita' || est === 'eu' ? 'pessoa' : 'mais', 14), acao));
+    }).catch(() => { el.classList.remove('carregando'); el.querySelector('.pf-link-txt small').textContent = T('Não deu para carregar este perfil.', 'Could not load this profile.'); });
+    return el;
+  };
   { // abriu o Aero por um link de perfil
     const cod = new URLSearchParams(location.search).get('perfil');
     if (cod && /^[\w-]{1,32}$/.test(cod)) { try { history.replaceState(null, '', location.pathname); } catch (_) { /* ok */ } const tira = A.evt.on('hub:conectou', () => { tira(); setTimeout(() => P.ver(cod), 900); }); }
@@ -1000,7 +1020,7 @@
     acoes.append(U.btn('', { icone: 'link', tipo: 'sec', redondo: true, titulo: T('Compartilhar o perfil', 'Share profile'), onclick: () => P.compartilhar(p) })); // (1.0.2)
     const extras = h('div', { class: 'col', estilo: { gap: '10px', 'margin-top': '12px' } });
     if (vistoTx) extras.append(h('div', { class: 'perfil-visto peq suave' }, A.icone('relogio', 14), vistoTx));
-    if (!souEu && A.aparelhos) extras.append(A.aparelhos.vivo(codigo, { rotulo: true, tam: 15 })); // (1.0.2) os aparelhos conectados agora
+    if (A.aparelhos) extras.append(A.aparelhos.vivo(codigo, { rotulo: true, tam: 15 })); // (1.0.0) os seus também aparecem para você // (1.0.2) os aparelhos conectados agora
     if (amigoOk) {
       extras.append(h('div', { class: 'linha' }, apelido, U.btn(T('Salvar', 'Save'), { peq: true, tipo: 'sec', onclick: async () => { try { P.esquecer(codigo); await API.req('apelido', { codigo, apelido: apelido.value }); U.toast(T('Apelido salvo.', 'Nickname saved.'), { tipo: 'ok', ms: 2000 }); A.talk && A.talk.carregar().catch(() => {}); } catch (e) { U.toast(e.message, { tipo: 'erro' }); } } })));
       if (a) extras.append(h('div', { class: 'opcao curta' }, h('div', { class: 'cresce' }, T('Entra na minha tela sem pedir', 'Joins my screen without asking')), U.chave(a.confia, (v) => API.amigos.confianca(codigo, v).catch((e) => U.toast(e.message, { tipo: 'erro' })))));
@@ -1072,7 +1092,7 @@
       h('button', { type: 'button', class: 'mini-av', title: T('Ver o perfil completo', 'View full profile'), onclick: verCompleto }, av),
       h('div', { class: 'mini-corpo' },
         h('button', { type: 'button', class: 'mini-nome', onclick: verCompleto }, A.ui.aplicarNome(h('span', {}, p.apelido || p.nome), p.nm), p.apelido ? h('small', { class: 'suave' }, ' (' + p.nome + ')') : null),
-        h('div', { class: 'mini-tag' }, p.tag ? '#' + p.tag : '', ' ', A.aparelhos ? A.aparelhos.vivo(codigo) : null, !souEu && A.idiomas ? A.idiomas.relogio(p.fz) : null, ' ', U.insignias && !(p.pf && p.pf.si === false) ? U.insignias(p.ins, p.sl, p.pf && p.pf.so) : null),
+        h('div', { class: 'mini-tag' }, p.tag ? '#' + p.tag : '', ' ', A.aparelhos ? A.aparelhos.vivo(codigo) : null, !souEu && A.idiomas && A.integ && A.integ.ligada('horario') ? A.idiomas.relogio(p.fz) : null, ' ', U.insignias && !(p.pf && p.pf.si === false) ? U.insignias(p.ins, p.sl, p.pf && p.pf.so) : null),
         // (0.7.9) não existe imagem da sala aqui: mandar a tela de alguém para quem só abriu o perfil vazaria o que ela mostra só para quem está na sala
         sala ? h('div', { class: 'mini-sala' + (sala.comp ? ' ao-vivo' : '') },
           h('div', { class: 'mini-sala-info' }, h('span', { class: 'mini-sala-ic' }, A.icone(sala.comp ? 'tela' : 'olho', 20)), h('div', { class: 'cresce' }, h('b', {}, onde), sala.comp ? h('span', { class: 'mini-sala-vivo' }, T('AO VIVO', 'LIVE')) : h('small', {}, T('Está na sala, sem transmitir', 'In the room, not sharing')))),

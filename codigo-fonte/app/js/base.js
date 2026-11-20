@@ -3,7 +3,7 @@
 (() => {
   'use strict';
   const A = (window.Aero = window.Aero || {});
-  A.versao = '0.9.9';
+  A.versao = '1.0.0';
   A.autor = 'Ryan Victtor';
 
   // ---------- plataforma ----------

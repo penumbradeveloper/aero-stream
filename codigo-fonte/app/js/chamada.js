@@ -1068,7 +1068,17 @@
     par.tile.querySelector('.cham-quadro').append(h('span', { class: 'cham-tile-ms', 'aria-live': 'off' })); pintarMsPar(par); // (0.8.7) o ms dela, na janelinha dela
     // volume desta pessoa só para você (fica guardado pela conta dela)
     par.tile.addEventListener('contextmenu', (ev) => { ev.preventDefault(); volumePessoa(par, par.tile); });
-    par.tile.querySelector('.cham-quadro').addEventListener('click', () => CH.focar(par.chave)); // como no Discord: um clique põe a pessoa em destaque
+    // (1.0.0) quem está mostrando a tela (e ela não está grande) ganha o botão "Assistir": ele põe a tela no palco; o clique no resto do
+    // quadro só destaca a pessoa. Com a tela dela já grande, o clique só fixa ela ali (nada pula de lugar)
+    const bAssistir = h('button', { type: 'button', class: 'cham-assistir', title: T('Assistir a tela', 'Watch the screen') }, A.icone('tela', 15), h('span', {}, T('Assistir', 'Watch')));
+    bAssistir.addEventListener('click', (ev) => { ev.stopPropagation(); if (!ch) return; ch.foco = null; CH.focar(par.chave); });
+    par.tile.querySelector('.cham-quadro').append(bAssistir);
+    par.tile.querySelector('.cham-quadro').addEventListener('click', () => {
+      if (!ch) return;
+      const p = ch.ui && ch.ui.palcoAtual, telaDela = !!(p && p.tipo === 'tela' && p.chave === par.chave);
+      if (telaDela && !p.foco) { ch.foco = par.chave; ch.focoPessoa = false; ch.semAuto = false; pintarTudo(); return; }
+      CH.focar(par.chave, { pessoa: !telaDela && !!(par.tela && temVideo(par.midia.tela)) });
+    });
     return par.tile;
   }
   function volumePessoa(par, ancora) {
@@ -1119,15 +1129,17 @@
   //  - a pessoa que você clicou (como no Discord): a tela dela se estiver compartilhando, senão a câmera, senão a foto; clicar de novo volta;
   //  - sem ninguém escolhido: a tela compartilhada mais recente (de alguém, ou a sua se só você compartilha).
   CH.juntos = (v) => { A.cfg.v.chamJuntos = !!v; A.cfg.salvar(); if (ch && ch.ui) { pintarTudo(); CH.ajustarJanela(); } };
-  CH.focar = (chave) => {
+  // (1.0.0) { pessoa: true }: a pessoa (câmera ou foto) em vez da tela dela; sem isso, a tela dela se estiver compartilhando
+  CH.focar = (chave, { pessoa = false } = {}) => {
     if (!ch) return;
-    ch.foco = ch.foco === chave ? null : chave; ch.semAuto = false; zoomReset();
+    const mesmo = ch.foco === chave && !!ch.focoPessoa === !!pessoa;
+    ch.foco = mesmo ? null : chave; ch.focoPessoa = !mesmo && !!pessoa; ch.semAuto = false; zoomReset();
     A.som.tocar(ch.foco ? 'abrir' : 'fechar'); pintarTudo();
   };
   const temVideo = (st) => !!(st && st.getVideoTracks().some((t) => t.readyState === 'live'));
   function quemNoPalco() {
-    const doPar = (par) => {
-      if (par.tela && temVideo(par.midia.tela)) return { st: par.midia.tela, nome: T('Tela de ', 'Screen of ') + nomeDe(par.codigo), tipo: 'tela', chave: par.chave };
+    const doPar = (par, soPessoa) => {
+      if (!soPessoa && par.tela && temVideo(par.midia.tela)) return { st: par.midia.tela, nome: T('Tela de ', 'Screen of ') + nomeDe(par.codigo), tipo: 'tela', chave: par.chave };
       if (par.cam && temVideo(par.midia.cam)) return { st: par.midia.cam, nome: nomeDe(par.codigo), tipo: 'cam', chave: par.chave, aj: par.aj };
       return { st: null, pessoa: pessoaDe(par.codigo), nome: nomeDe(par.codigo), tipo: 'foto', chave: par.chave };
     };
@@ -1138,7 +1150,7 @@
       return { st: null, pessoa: eu(), nome: T('Você', 'You'), tipo: 'foto', eu: true };
     };
     if (ch.foco === 'eu') return { ...meu(), foco: true };
-    if (ch.foco && ch.pares.has(ch.foco)) return { ...doPar(ch.pares.get(ch.foco)), foco: true };
+    if (ch.foco && ch.pares.has(ch.foco)) return { ...doPar(ch.pares.get(ch.foco), ch.focoPessoa), foco: true };
     if (ch.foco) ch.foco = null; // a pessoa saiu da chamada
     if (ch.semAuto) return null;
     const remotas = [...ch.pares.values()].filter((p) => p.tela && temVideo(p.midia.tela)).sort((a, b) => b.telaDesde - a.telaDesde);
@@ -1278,19 +1290,25 @@
     if (sumiu && p && p.foco) { ch.foco = null; p = quemNoPalco(); }
     if (sumiu && (!p || p.tipo === 'foto') && ui.palco.classList.contains('cheio') && CH._telaCheia) CH._telaCheia(false);
     ui.palcoAtual = p;
+    const idPalco = p ? (p.eu ? 'eu' : p.chave) + ':' + p.tipo : '';
+    if (p && ui.idPalco && idPalco !== ui.idPalco) { ui.palco.classList.remove('trocou'); void ui.palco.offsetWidth; ui.palco.classList.add('trocou'); } // (1.0.0) troca suave
+    ui.idPalco = idPalco;
     // alguém começou a compartilhar a tela: o chat abre no canto sozinho (uma vez por compartilhamento; dá para fechar)
     if (p && !p.foco && !ui.el.classList.contains('com-palco') && ch.modo === 'max' && ui.abrirChat && !ui.chatAberto() && !A.plat.celular && !matchMedia('(max-width: 760px)').matches) ui.abrirChat(true); // (0.9.0) só quando alguém compartilha a tela, e nunca no celular (lá o chat cobria a chamada)
     if (p && !ui.el.classList.contains('com-palco')) ui.el.classList.add('palco-quieto'); // (1.0.2) a tela entrou: os controles por cima dela só aparecem com o mouse em cima
     ui.el.classList.toggle('com-palco', !!p);
     ui.el.classList.toggle('com-foco', !!(p && p.foco));
     const chaveFoco = ch.foco;
-    for (const par of ch.pares.values()) if (par.tile) par.tile.classList.toggle('em-foco', par.chave === chaveFoco);
+    for (const par of ch.pares.values()) if (par.tile) {
+      par.tile.classList.toggle('em-foco', par.chave === chaveFoco);
+      par.tile.classList.toggle('tela-fora', !!(par.tela && temVideo(par.midia.tela)) && !(p && p.tipo === 'tela' && p.chave === par.chave)); // (1.0.0) o "Assistir"
+    }
     ui.euTile.classList.toggle('em-foco', chaveFoco === 'eu');
     // (0.7.9) outra pessoa em destaque: você aparece na fila com os outros, para dar para voltar para você com um clique
     // (1.0.2) "todo mundo junto": você fica no meio com os outros, sem a linha; só vai para a fila de baixo (com todos) quando alguém está no palco
     const juntos = A.cfg.v.chamJuntos === true && ch.modo === 'max';
     ui.el.classList.toggle('juntos', juntos); ui.euTile.classList.toggle('juntos-eu', juntos);
-    const euNaFila = juntos || !!(p && p.foco && !p.eu);
+    const euNaFila = juntos || !!p; // (1.0.0) com qualquer tela ou pessoa no palco, você fica na fileira de baixo junto com os outros
     if (euNaFila && ui.euTile.parentNode !== ui.pessoas) ui.pessoas.append(ui.euTile);
     else if (!euNaFila && ui.euTile.parentNode === ui.pessoas) ui.pessoas.nextElementSibling.after(ui.euTile);
     if (p) {
@@ -1440,7 +1458,7 @@
     };
     CH._telaCheia = telaCheia;
     const zb = (icone, titulo, f) => { const b = A.ui.btn('', { icone, tipo: 'sec', redondo: true, peq: true, titulo }); b.onclick = (e) => { e.stopPropagation(); f(); }; return b; };
-    const palcoCtl = h('div', { class: 'cham-palco-ctl' }, h('span', { class: 'cham-zoom-grupo' }, zb('menos', T('Diminuir', 'Zoom out'), () => CH.zoom(1 / 1.25)), zoomTxt, zb('mais', T('Aumentar', 'Zoom in'), () => CH.zoom(1.25))), zb('expandir', T('Tela cheia', 'Fullscreen'), telaCheia), zb('fechar', T('Voltar ao normal', 'Back to normal'), () => { if (ch.foco) CH.focar(ch.foco); else { ch.semAuto = true; zoomReset(); pintarTudo(); } }));
+    const palcoCtl = h('div', { class: 'cham-palco-ctl' }, h('span', { class: 'cham-zoom-grupo' }, zb('menos', T('Diminuir', 'Zoom out'), () => CH.zoom(1 / 1.25)), zoomTxt, zb('mais', T('Aumentar', 'Zoom in'), () => CH.zoom(1.25))), zb('expandir', T('Tela cheia', 'Fullscreen'), telaCheia), zb('fechar', T('Voltar ao normal', 'Back to normal'), () => { if (ch.foco) { ch.foco = null; ch.focoPessoa = false; zoomReset(); A.som.tocar('fechar'); pintarTudo(); } else { ch.semAuto = true; zoomReset(); pintarTudo(); } }));
     const canto = h('div', { class: 'cham-canto', hidden: true }); // (1.0.2) as câmeras no cantinho da tela grande
     const palco = h('div', { class: 'cham-palco' }, palcoMidia, palcoNome, palcoCtl, canto);
     // (1.0.2) arrastar câmeras e telas entre a fila de pessoas e o cantinho da tela grande (e mudar a ordem dentro do canto)
@@ -1486,8 +1504,8 @@
       const dx = e.clientX - arraste.x, dy = e.clientY - arraste.y; if (Math.abs(dx) + Math.abs(dy) > 4) arraste.moveu = true;
       if (zoom.z > 1) { const r = palco.getBoundingClientRect(); zoom.x = arraste.zx + (dx / r.width) * 100; zoom.y = arraste.zy + (dy / r.height) * 100; aplicarZoom(); }
     });
-    // um clique (sem arrastar e sem zoom) no palco de alguém em destaque: volta ao normal (como no Discord)
-    palco.addEventListener('pointerup', () => { const a = arraste; arraste = null; if (a && !a.moveu && zoom.z === 1 && ch && ch.foco) CH.focar(ch.foco); });
+    // (1.0.0) clicar no palco não faz mais nada (antes voltava ao normal, com a lupa no cursor); para voltar há o X e o clique na pessoa
+    palco.addEventListener('pointerup', () => { arraste = null; });
     const horizonte = h('div', { class: 'cham-horizonte', 'aria-hidden': 'true' }); // a linha entre quem você chamou (em cima) e você (embaixo)
 
     const estado = h('span', { class: 'cham-estado' });
@@ -1550,7 +1568,7 @@
     const entrarLockCh = () => {
       const alvo = alvoCtl(); if (!alvo || !E.podeEntrar() || !nosso()) return;
       const p = ch.ui.palcoAtual;
-      if (!(p && p.chave === alvo.chave && p.tipo === 'tela')) { ch.foco = alvo.chave; ch.semAuto = false; pintarTudo(); }
+      if (!(p && p.chave === alvo.chave && p.tipo === 'tela')) { ch.foco = alvo.chave; ch.focoPessoa = false; ch.semAuto = false; pintarTudo(); }
       if (ch.modo !== 'max') CH.modo('max');
       zoomReset(); if (!palco.classList.contains('cheio')) telaCheia(true); // o jogo na tela inteira, sem nada por cima
       E.entrarLock(palcoVideo);
@@ -1701,7 +1719,7 @@
     const cab = h('header', { class: 'cham-cab' }, miniAvs, h('div', { class: 'cresce cham-titulo' }, h('b', {}, ch.titulo), estado), bMax, bPip, bMin);
     // pílula (minimizada): microfone, desligar e abrir
     const miniMic = rb('mic', T('Microfone', 'Microphone'), () => CH.mudo());
-    const mini = h('div', { class: 'cham-mini' }, miniMic, rb('desligarTel', T('Desligar', 'Hang up'), () => CH.desligar(), 'perigo'), rb('expandir', T('Abrir a chamada', 'Open the call'), () => CH.modo('max')));
+    const mini = h('div', { class: 'cham-mini' }, miniMic, rb('desligarTel', T('Desligar', 'Hang up'), () => CH.desligar(), 'perigo'), rb('pip', T('Janelinha (com a tela)', 'Small window (with the screen)'), () => CH.modo('pip')), rb('expandir', T('Abrir a chamada', 'Open the call'), () => CH.modo('max')));
     const brilho = h('div', { class: 'cham-ceu', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i'), h('i'));
     const el = h('div', { class: 'cham-janela', role: 'dialog', 'aria-label': T('Chamada com ', 'Call with ') + ch.titulo },
       brilho, cab, palco, pessoas, horizonte, euTile, barra, puxador, mini, chatBox);

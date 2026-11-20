@@ -290,7 +290,7 @@
   function tratar(m) {
     if (m.tipo === 'amigos') {
       H.amigos = m.lista;
-      const ok = new Set(m.lista.filter((a) => a.estado === 'aceita').map((a) => a.codigo));
+      const ok = new Set(m.lista.filter((a) => a.estado === 'aceita').map((a) => a.codigo)); if (A.api && A.api.eu && A.api.eu.codigo) ok.add(A.api.eu.codigo); // (1.0.0) os seus aparelhos ficam
       [...H.presenca].forEach(([dev, p]) => { if (!ok.has(p.codigo)) H.presenca.delete(dev); });
       A.evt.emit('hub:amigos', H.amigos);
     } else if (m.tipo === 'presenca') {

@@ -1,0 +1,17 @@
+{
+  "appId": "com.ryanvicttor.aerostream",
+  "appName": "Aero",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#bfe3fb"
+  },
+  "server": {
+    "androidScheme": "https",
+    "url": "https://web.aerostream.workers.dev/app/",
+    "allowNavigation": [
+      "web.aerostream.workers.dev",
+      "servidor.exemplo.invalid"
+    ]
+  }
+}

@@ -1,0 +1,76 @@
+/* Aero Stream - (1.0.0) "Assistindo agora" (app/js/assistindo.js): a linha das listas, o cartão do perfil e a configuração dos sites
+   na página da integração. Criado por Ryan Victtor. */
+.ass-linha { --ass: #9146ff; display: flex; align-items: center; justify-content: flex-start; gap: 4px; min-width: 0; max-width: 100%; margin-top: 1px; font-size: 12px; font-weight: 600; line-height: 1.25; color: var(--suave); }
+.ass-linha[hidden], .ass-cartao[hidden] { display: none !important; }
+.ass-linha > svg, .ass-linha > .ic, .ass-linha > .ass-ic { flex: none; }
+.ass-linha > span:not(.ass-ic) { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ass-linha b { font-weight: 700; color: var(--texto, inherit); }
+.ass-logo { flex: none; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.25)); }
+.ass-vivo-p { flex: none; padding: 0 4px; border-radius: 4px; font-style: normal; font-size: 9px; font-weight: 800; letter-spacing: .04em; line-height: 14px; color: #fff; background: #e91916; }
+/* uma atividade por vez nas listas (como no Discord): o jogo vence o vídeo, o vídeo vence a música. O perfil mostra todas */
+.com-jogo > .ass-linha, .com-ass > .ouv-linha { display: none !important; }
+
+/* o ícone de um site da pessoa: emoji ou letras na cor escolhida */
+.ass-ic { --c: #5865f2; --t: 14px; display: inline-grid; place-items: center; flex: none; width: var(--t); height: var(--t); border-radius: calc(var(--t) * .28); overflow: hidden; background: var(--c); color: #fff; font-size: calc(var(--t) * .62); font-weight: 800; line-height: 1; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+
+.ass-cartao { --ass: #9146ff; display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 10px 12px 12px; border-radius: 14px; background: rgba(0,0,0,.14); border: 1px solid rgba(255,255,255,.12); text-align: left; animation: ass-entra .35s var(--mola, ease) backwards; }
+.ass-cartao.f-kick, .ass-linha.f-kick { --ass: #53fc18; } .ass-cartao.f-youtube, .ass-linha.f-youtube { --ass: #ff3355; }
+.ass-cab { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; font-weight: 700; letter-spacing: .01em; opacity: .9; }
+.ass-selo { display: inline-flex; flex: none; } .ass-selo > svg, .ass-selo > .ic { width: 15px; height: 15px; }
+.ass-cab-t { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ass-corpo { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ass-mini { position: relative; flex: none; display: grid; place-items: center; width: 112px; height: 63px; border-radius: 10px; overflow: hidden; background: color-mix(in srgb, var(--ass) 18%, rgba(255,255,255,.06)); box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+.ass-mini > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ass-mini.com-img > svg:first-child { visibility: hidden; }
+.ass-selo-mini { position: absolute; left: 5px; bottom: 5px; display: none; } .ass-mini.com-img > .ass-selo-mini { display: flex; }
+.ass-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ass-tit { display: block; max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 700; font-size: 14.5px; text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+button.ass-tit { cursor: pointer; } button.ass-tit:hover, button.ass-tit:focus-visible { text-decoration: underline; outline: none; }
+.ass-l { font-size: 12.5px; color: var(--suave); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ass-cat { font-size: 12px; opacity: .85; }
+.ass-tempo { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--suave); }
+.ass-vivo { flex: none; padding: 1px 6px; border-radius: 5px; font-size: 10px; font-weight: 800; letter-spacing: .05em; color: #fff; background: #e91916; }
+.ass-barra { margin-top: 4px; }
+.ass-cartao.mini { padding: 8px 10px 10px; gap: 6px; }
+.ass-cartao.mini .ass-mini { width: 88px; height: 50px; border-radius: 8px; }
+.ass-cartao.mini .ass-tit { font-size: 13.5px; }
+.perfil-ver .ass-cartao { margin-top: 10px; }
+@keyframes ass-entra { from { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .ass-cartao { animation: none; } }
+html[data-anim="nenhuma"] .ass-cartao { animation: none; }
+@media (max-width: 420px) { .ass-mini { width: 88px; height: 50px; } }
+
+/* a configuração (página da integração) */
+.ig-cfg-modulo:empty { display: none; }
+.ig-cfg-modulo { margin-bottom: 14px; }
+.ass-cfg { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ass-cfg h3 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.ass-cfg h4 { margin: 8px 0 0; font-size: 14px; }
+.ass-cfg p { margin: 0; }
+.ass-cfg-ext { flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; }
+.ass-cfg-estado { flex: 1 1 200px; min-width: 0; } .ass-cfg-estado.ok { color: var(--ok, #1f9d55); }
+.ass-cfg-lista { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ass-cfg-linha { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 7px 4px; border-top: 1px solid rgba(127,127,127,.18); }
+.ass-cfg-linha:first-child { border-top: 0; }
+.ass-cfg-linha > svg, .ass-cfg-linha > .ass-ic { flex: none; }
+.ass-cfg-txt { min-width: 0; } .ass-cfg-txt > b, .ass-cfg-txt > div { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ass-cfg-bts { display: flex; flex: none; gap: 4px; }
+.ass-cfg-linha > :last-child { flex: none; }
+.ass-cfg-add { flex-wrap: wrap; gap: 10px; align-items: center; }
+.ass-cfg-add > span { flex: 1 1 220px; min-width: 0; }
+
+/* o editor de um site */
+.ass-ed { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ass-ed-modelos { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ass-ed-grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ass-ed-campo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ass-ed-campo > .campo, .ass-ed-campo .seg { max-width: 100%; }
+.ass-ed-campo .seg { flex-wrap: wrap; }
+.ass-ed-campo > input[hidden] { display: none; }
+.ass-ed-iccor { gap: 8px; align-items: center; flex-wrap: nowrap; }
+.ass-ed-ic { flex: 1; min-width: 0; }
+.ass-ed-iccor > .campo-cor { flex: none; }
+.ass-ed-erro { min-height: 1.2em; color: var(--erro, #e5484d); font-weight: 600; }
+.ass-ed-erro:empty { min-height: 0; }
+.ass-prev { animation: none; }
+@media (max-width: 520px) { .ass-ed-grade { grid-template-columns: minmax(0, 1fr); } }

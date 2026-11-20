@@ -1,0 +1,25 @@
+# dependências e o que é gerado
+node_modules/
+desktop/dist/
+servidor/public/
+servidor/.wrangler/
+site-dist/
+android/www/
+android/android/app/build/
+android/android/build/
+android/android/.gradle/
+android/android/app/src/main/assets/public/
+android/android/capacitor-cordova-android-plugins/build/
+android/AeroStream-Android.apk
+aur/*/src/
+aur/*/pkg/
+aur/*/*.deb
+aur/*/*.pkg.tar.*
+*.log
+.DS_Store
+# chaves NUNCA entram no repositório (elas ficam em ~/.config/aero-stream-dev/)
+*.pem
+*.keystore
+*.jks
+android.properties
+desktop/extra/

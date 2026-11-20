@@ -1,0 +1,84 @@
+{
+  "manifest_version": 3,
+  "name": "Aero - Ouvindo e assistindo",
+  "short_name": "Aero Atividade",
+  "version": "1.1.0",
+  "description": "Mostra aos seus amigos do Aero a música que você ouve (YouTube Music, Deezer) e o que você assiste (Twitch, Kick, YouTube e os sites que escolher), como no Discord.",
+  "author": "Ryan Victtor",
+  "icons": {
+    "128": "icone.png"
+  },
+  "permissions": [
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:41783/*",
+    "https://music.youtube.com/*",
+    "https://www.deezer.com/*",
+    "https://www.twitch.tv/*",
+    "https://kick.com/*",
+    "https://www.youtube.com/*",
+    "https://m.youtube.com/*"
+  ],
+  "background": {
+    "service_worker": "fundo.js",
+    "scripts": [
+      "fundo.js"
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://music.youtube.com/*",
+        "https://www.deezer.com/*"
+      ],
+      "js": [
+        "pagina.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.twitch.tv/*",
+        "https://kick.com/*",
+        "https://www.youtube.com/*",
+        "https://m.youtube.com/*"
+      ],
+      "js": [
+        "video.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://127.0.0.1:41783/instalar*"
+      ],
+      "js": [
+        "parear.js"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Aero - Ouvindo e assistindo",
+    "default_icon": {
+      "128": "icone.png"
+    }
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "ouvindo@aerostream.app",
+      "strict_min_version": "121.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
+    }
+  },
+  "optional_host_permissions": [
+    "https://*/*"
+  ]
+}

@@ -1,0 +1,35 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Aero Stream Cursores</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<!-- Aero Stream - os cursores coloridos de quem controla, desenhados POR CIMA de tudo na tela de quem transmite (fora do app).
+     Janela transparente, que deixa todo clique passar e fica escondida da transmissão. Recebe a lista pelo preload (aeroCursores). -->
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
+  .c { position: absolute; transform: translate(-2px, -2px); pointer-events: none; transition: left .05s linear, top .05s linear; filter: drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
+  .c svg { width: 26px; height: 26px; display: block; }
+  .c svg path { fill: var(--c); stroke: #fff; stroke-width: 1.6; stroke-linejoin: round; }
+  .c span { position: absolute; left: 22px; top: 20px; padding: 2px 9px; border-radius: 10px; font: 600 12px system-ui, sans-serif; color: #fff; background: var(--c); white-space: nowrap; box-shadow: 0 1px 0 rgba(255,255,255,.4) inset; }
+  .c.clique::after { content: ""; position: absolute; left: -12px; top: -12px; width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--c); animation: onda .5s ease-out forwards; }
+  @keyframes onda { from { transform: scale(.3); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
+</style></head>
+<body>
+<script>
+  const nos = new Map();
+  window.aeroCursores((lista) => {
+    const vivos = new Set();
+    for (const c of lista) {
+      vivos.add(c.id);
+      let n = nos.get(c.id);
+      if (!n) {
+        n = document.createElement('div'); n.className = 'c';
+        n.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4.2 2.6c-.5-.4-1.2 0-1.2.6v16.6c0 .7.8 1 1.3.5l4.1-4.1 2.9 6.6c.2.4.7.6 1.1.4l2.4-1.1c.4-.2.6-.7.4-1.1l-2.9-6.5 5.7-.4c.7 0 1-.9.4-1.3z"/></svg><span></span>';
+        document.body.append(n); nos.set(c.id, n);
+      }
+      n.style.setProperty('--c', c.cor); n.querySelector('span').textContent = c.nome;
+      n.style.left = (c.x * 100).toFixed(3) + '%'; n.style.top = (c.y * 100).toFixed(3) + '%';
+      if (c.ping && c.ping !== n.ping) { n.ping = c.ping; n.classList.remove('clique'); void n.offsetWidth; n.classList.add('clique'); }
+    }
+    for (const [id, n] of nos) if (!vivos.has(id)) { n.remove(); nos.delete(id); }
+  });
+</script>
+</body></html>

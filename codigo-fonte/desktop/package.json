@@ -1,0 +1,150 @@
+{
+  "name": "aero-stream",
+  "version": "0.9.7-beta",
+  "description": "Aero - transmita sua tela, jogue e converse com os amigos",
+  "author": {
+    "name": "Ryan Victtor",
+    "email": "contato@exemplo.invalid"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "teste": "node ../testes/desktop.test.mjs && node ../testes/jogos.test.mjs",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "45.3.2",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2"
+  },
+  "build": {
+    "appId": "com.ryanvicttor.aerostream",
+    "productName": "Aero Stream",
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "grantFileProtocolExtraPrivileges": true
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "cursores-preload.js",
+      "cursores_kwin.js",
+      "cursores.html",
+      "discord.js",
+      "discord-id.json",
+      "jogos.js",
+      "jogos-lista.json",
+      "capas-lista.json",
+      "ponte-rpc.js",
+      "ouvindo.js",
+      "celmic.js",
+      "celmic-pagina/**/*",
+      "nativo.js",
+      "vaapi.js",
+      "perfis.js",
+      "sonda.js",
+      "sonda.html",
+      "sandbox.js",
+      "atualizador.js",
+      "vce3.js",
+      "audio/**/*",
+      "prioridade/**/*",
+      "entrada/**/*",
+      "captura/**/*",
+      "build/icon.png",
+      {
+        "from": "../app",
+        "to": "app"
+      },
+      {
+        "from": "../extensao",
+        "to": "extensao",
+        "filter": [
+          "**/*",
+          "!LEIA-ME.md"
+        ]
+      }
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "extraResources": [
+        {
+          "from": "extra/nativo",
+          "to": "nativo",
+          "filter": [
+            "**/*"
+          ]
+        },
+        {
+          "from": "extra/vigem",
+          "to": "vigem",
+          "filter": [
+            "**/*"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "AeroStream-Windows-Instalador.${ext}",
+      "include": "build/installer.nsh",
+      "shortcutName": "Aero",
+      "uninstallDisplayName": "Aero"
+    },
+    "portable": {
+      "artifactName": "AeroStream-Windows-Portatil.${ext}"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Network",
+      "artifactName": "AeroStream-Linux.${ext}",
+      "desktop": {
+        "entry": {
+          "StartupWMClass": "aero-stream",
+          "Name": "Aero"
+        }
+      },
+      "maintainer": "Ryan Victtor <contato@exemplo.invalid>",
+      "synopsis": "Transmita a sua tela, jogue junto e converse com os amigos"
+    },
+    "protocols": [
+      {
+        "name": "Aero",
+        "schemes": [
+          "aerostream"
+        ]
+      }
+    ],
+    "fileAssociations": [
+      {
+        "ext": "aer",
+        "name": "Skin do Aero",
+        "description": "Skin do Aero",
+        "mimeType": "application/x-aero-skin",
+        "role": "Viewer"
+      }
+    ]
+  },
+  "homepage": "https://web.aerostream.workers.dev",
+  "license": "MIT"
+}

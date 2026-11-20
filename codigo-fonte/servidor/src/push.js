@@ -1,0 +1,126 @@
+// (0.9.1) Notificações push: avisam de mensagem nova quando o Aero está fechado.
+// - O servidor nunca guarda nem manda o texto (as mensagens são cifradas): só "quem mandou" e "em qual conversa", por no máximo 3 dias.
+// - Cada aparelho ganha um token próprio de push, guardado só como SHA-256 e preso à sessão: sair da conta (ou derrubar a sessão) mata o push.
+// - Navegador/site instalado: Web Push com VAPID e SEM conteúdo (o aviso só acorda o app, que busca as novidades com o token dele).
+// - App do Android: o próprio app pergunta as novidades em segundo plano com o mesmo token.
+import { resposta, erro, hex } from './util.js';
+
+const MAX_AVISOS = 30, VIDA_AVISO = 3 * 24 * 3600e3, MAX_APARELHOS = 10;
+// só os serviços de push de verdade (o servidor não faz pedido para endereço qualquer)
+const HOSTS_PUSH = /^(fcm\.googleapis\.com|android\.googleapis\.com|updates\.push\.services\.mozilla\.com|[a-z0-9.-]+\.notify\.windows\.com|[a-z0-9.-]*push\.apple\.com)$/;
+const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const sha = async (s) => hex(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))));
+
+export class Push {
+  constructor(hub) { this.hub = hub; this.st = hub.ctx.storage; }
+
+  async chaves() {
+    if (this._ch) return this._ch;
+    let j = await this.st.get('vapid');
+    if (!j) {
+      const par = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+      j = { priv: await crypto.subtle.exportKey('jwk', par.privateKey), pub: b64u(await crypto.subtle.exportKey('raw', par.publicKey)) };
+      await this.st.put('vapid', j);
+    }
+    this._ch = { pub: j.pub, priv: await crypto.subtle.importKey('jwk', j.priv, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']) };
+    return this._ch;
+  }
+
+  async jwt(aud) {
+    const ch = await this.chaves(), enc = (o) => b64u(new TextEncoder().encode(JSON.stringify(o)));
+    const corpo = enc({ typ: 'JWT', alg: 'ES256' }) + '.' + enc({ aud, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: 'https://web.aerostream.workers.dev' });
+    const ass = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, ch.priv, new TextEncoder().encode(corpo));
+    return corpo + '.' + b64u(ass);
+  }
+
+  // rota sem login: o aparelho (ou o service worker) pergunta as novidades com o token de push dele
+  async rotaPublica(rota, b, ip) {
+    if (rota === 'push/fundo') return this.fundo(b, ip);
+    if (rota !== 'push/novas') return null;
+    if (!this.hub.limitar('pushn:' + ip, 40, 60000)) return erro('Devagar!', 429);
+    const t = typeof b.t === 'string' && /^[A-Za-z0-9]{40}$/.test(b.t) ? b.t : '';
+    if (!t) return resposta({ fim: true });
+    const k = 'pt:' + (await sha(t)), ap = await this.st.get(k);
+    if (!ap) return resposta({ fim: true });
+    if (!(await this.st.get(ap.s))) { await this.tirar(ap.c, k); return resposta({ fim: true }); } // a sessão acabou: o push acaba junto
+    const lista = ((await this.st.get('pn:' + ap.c)) || []).filter((x) => x.t >= (ap.desde || 0) && Date.now() - x.t < VIDA_AVISO);
+    ap.desde = Date.now() + 1; await this.st.put(k, ap);
+    return resposta({ novas: lista.slice(-15) });
+  }
+
+  async rota(conta, rota, metodo, b, chaveSessao) {
+    if (rota === 'push/chave' && metodo === 'GET') return resposta({ chave: (await this.chaves()).pub });
+    if (rota === 'push/registrar' && metodo === 'POST') {
+      if (!this.hub.limitar('pushr:' + conta.id, 10, 3600e3)) return erro('Devagar!', 429);
+      let w = null;
+      if (b.web && typeof b.web.endpoint === 'string' && b.web.endpoint.length < 1000) {
+        try { const u = new URL(b.web.endpoint); if (u.protocol === 'https:' && HOSTS_PUSH.test(u.hostname)) w = u.href; } catch (_) { /* inválido */ }
+        if (!w) return erro('Endereço de push inválido.');
+      }
+      if (typeof b.antigo === 'string' && /^[A-Za-z0-9]{40}$/.test(b.antigo)) await this.tirar(conta.id, 'pt:' + (await sha(b.antigo)));
+      const t = Array.from(crypto.getRandomValues(new Uint8Array(40)), (x) => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'[x % 56]).join('');
+      const k = 'pt:' + (await sha(t));
+      let l = ((await this.st.get('pd:' + conta.id)) || []);
+      while (l.length >= MAX_APARELHOS) { const v = l.shift(); await this.st.delete(v); }
+      l.push(k);
+      await this.st.put({ [k]: { c: conta.id, s: chaveSessao, w, desde: Date.now() }, ['pd:' + conta.id]: l });
+      return resposta({ t });
+    }
+    if (rota === 'push/sair' && metodo === 'POST') {
+      if (typeof b.t === 'string' && /^[A-Za-z0-9]{40}$/.test(b.t)) await this.tirar(conta.id, 'pt:' + (await sha(b.t)));
+      return resposta({ ok: true });
+    }
+    return null;
+  }
+
+  // (0.9.5) o próprio Android avisa que o app foi para o fundo (ou voltou), sem depender da página: ela é congelada logo depois e a
+  // conexão continua parecendo viva, então o servidor achava que o app estava na tela e não guardava o aviso
+  async fundo(b, ip) {
+    if (!this.hub.limitar('pushf:' + ip, 60, 60000)) return erro('Devagar!', 429);
+    const t = typeof b.t === 'string' && /^[A-Za-z0-9]{40}$/.test(b.t) ? b.t : '';
+    if (!t) return resposta({ fim: true });
+    const k = 'pt:' + (await sha(t)), ap = await this.st.get(k);
+    if (!ap) return resposta({ fim: true });
+    const em = Number.isFinite(b.em) ? b.em : Date.now();
+    if (em < (ap.foraEm || 0)) return resposta({ ok: true }); // chegou depois de um aviso mais novo deste aparelho
+    ap.fora = b.sim === true ? Date.now() : 0; ap.foraEm = em; await this.st.put(k, ap);
+    return resposta({ ok: true });
+  }
+
+  async tirar(contaId, k) {
+    await this.st.delete(k);
+    const l = (await this.st.get('pd:' + contaId)) || [];
+    if (l.includes(k)) await this.st.put('pd:' + contaId, l.filter((x) => x !== k));
+  }
+
+  // mensagem nova: vai para cada aparelho com push que não está com o Aero na tela agora (fechado, no fundo ou sem conexão)
+  async avisar(contaId, item) {
+    const l = (await this.st.get('pd:' + contaId)) || [];
+    if (!l.length) return;
+    const agora = Date.now(), naTela = new Set();
+    for (const w of this.hub.ctx.getWebSockets('c:' + contaId)) { let a = null; try { a = w.deserializeAttachment(); } catch (_) { /* ok */ } if (a && a.sid && !a.fundo) naTela.add(a.sid); }
+    const longe = [];
+    for (const k of l) {
+      const ap = await this.st.get(k); if (!ap) continue;
+      const ss = await this.st.get(ap.s); if (!ss) continue;
+      if (ss.sid && naTela.has(ss.sid) && !ap.fora) { if ((ap.desde || 0) <= agora) { ap.desde = agora + 1; await this.st.put(k, ap); } continue; } // já viu dentro do app
+      longe.push([k, ap]);
+    }
+    if (!longe.length) return;
+    const av = ((await this.st.get('pn:' + contaId)) || []).filter((x) => agora - x.t < VIDA_AVISO);
+    av.push({ ...item, t: agora });
+    await this.st.put('pn:' + contaId, av.slice(-MAX_AVISOS));
+    const envios = [];
+    for (const [k, ap] of longe) {
+      if (!ap.w) continue;
+      envios.push((async () => {
+        try {
+          const u = new URL(ap.w), jwt = await this.jwt(u.origin), pub = (await this.chaves()).pub;
+          const r = await fetch(ap.w, { method: 'POST', headers: { Authorization: `vapid t=${jwt}, k=${pub}`, TTL: '86400', Urgency: 'high', 'Content-Length': '0' } });
+          if (r.status === 404 || r.status === 410) await this.tirar(contaId, k); // a inscrição morreu
+        } catch (_) { /* tenta na próxima */ }
+      })());
+    }
+    if (envios.length) { const p = Promise.all(envios); try { this.hub.ctx.waitUntil(p); } catch (_) { await p; } }
+  }
+}

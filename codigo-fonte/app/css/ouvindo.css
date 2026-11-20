@@ -1,0 +1,46 @@
+/* Aero Stream - (1.0.0) "Ouvindo agora" (app/js/ouvindo.js): a notinha nas listas e o cartão do perfil. Criado por Ryan Victtor. */
+.ouv-linha { --ouv: #1db954; display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; margin-top: 1px; font-size: 12px; font-weight: 600; line-height: 1.25; color: var(--suave); }
+.ouv-linha[hidden], .ouv-cartao[hidden] { display: none !important; }
+.ouv-linha.f-ytmusic { --ouv: #ff3355; } .ouv-linha.f-deezer { --ouv: #a238ff; }
+.ouv-linha > .ic, .ouv-linha > svg { flex: none; width: 12px; height: 12px; color: var(--ouv); }
+.ouv-logo { flex: none; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.25)); }
+.ouv-linha > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+.ouv-cartao { --ouv: #1db954; display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 10px 12px 12px; border-radius: 14px; background: rgba(0,0,0,.14); border: 1px solid rgba(255,255,255,.12); text-align: left; animation: ouv-entra .35s var(--mola, ease) backwards; }
+.ouv-cartao.f-ytmusic { --ouv: #ff3355; } .ouv-cartao.f-deezer { --ouv: #a238ff; }
+.ouv-cab { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; letter-spacing: .01em; opacity: .9; }
+.ouv-selo { display: inline-flex; flex: none; color: var(--ouv); } .ouv-selo > svg, .ouv-selo > .ic { width: 15px; height: 15px; }
+.ouv-cab-t { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ouv-corpo { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ouv-capa-bt { flex: none; padding: 0; border: 0; background: none; cursor: pointer; border-radius: 10px; }
+.ouv-capa { position: relative; flex: none; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 10px; overflow: hidden; color: var(--ouv); background: rgba(255,255,255,.08); box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+.ouv-capa > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ouv-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ouv-tit { display: block; max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 700; font-size: 14.5px; text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+button.ouv-tit { cursor: pointer; } button.ouv-tit:hover, button.ouv-tit:focus-visible { text-decoration: underline; }
+.ouv-art { display: flex; align-items: center; gap: 4px; min-width: 0; font-size: 12.5px; color: var(--suave); }
+.ouv-art > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; } .ouv-art > .ic { flex: none; color: var(--ouv); }
+.ouv-tag { display: inline-flex; align-items: center; gap: 3px; flex: none; margin-left: auto; padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--ouv); background: color-mix(in srgb, var(--ouv) 16%, transparent); border: 1px solid color-mix(in srgb, var(--ouv) 35%, transparent); }
+.ouv-cartao.f-spotify .ouv-tag { color: #12a150; }
+.ouv-linha.pod > .ic { width: 11px; height: 11px; color: var(--suave); }
+.ouv-barra { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--suave); }
+.ouv-t { flex: none; }
+.ouv-trilho { position: relative; flex: 1; min-width: 30px; height: 4px; border-radius: 4px; overflow: hidden; background: rgba(255,255,255,.22); }
+.ouv-trilho > i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: inherit; background: currentColor; color: var(--texto, #fff); transition: width 1s linear; }
+.ouv-cartao.mini { padding: 8px 10px 10px; gap: 6px; }
+.ouv-cartao.mini .ouv-capa { width: 52px; height: 52px; border-radius: 8px; }
+.ouv-cartao.mini .ouv-tit { font-size: 13.5px; }
+.perfil-ver .ouv-cartao { margin-top: 10px; }
+.ouv-junto { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.ouv-ouvintes { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 11.5px; font-weight: 600; color: var(--suave); }
+.ouv-ouvintes > span:last-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ouv-ouvintes > .ic { flex: none; color: var(--ouv); }
+.ouv-avs { display: inline-flex; flex: none; } .ouv-avs > * { width: 18px !important; height: 18px !important; margin-left: -5px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(0,0,0,.35); } .ouv-avs > :first-child { margin-left: 0; }
+.ouv-junto-bt { display: inline-flex; align-items: center; gap: 6px; flex: none; margin-left: auto; padding: 6px 12px; border: 0; border-radius: 999px; background: var(--ouv); color: #fff; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; transition: filter .15s, transform .15s; }
+.ouv-cartao.f-spotify .ouv-junto-bt { color: #06210f; }
+.ouv-junto-bt:hover { filter: brightness(1.1); } .ouv-junto-bt:active { transform: scale(.97); }
+.ouv-junto-bt.nele { background: rgba(255,255,255,.14); color: inherit; }
+.ouv-cartao.mini .ouv-junto-bt { padding: 5px 10px; font-size: 12px; }
+@keyframes ouv-entra { from { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .ouv-cartao { animation: none; } .ouv-trilho > i { transition: none; } }
+html[data-anim="nenhuma"] .ouv-cartao { animation: none; } html[data-anim="nenhuma"] .ouv-trilho > i { transition: none; }

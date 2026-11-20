@@ -1,0 +1,54 @@
+/* Aero Stream - (1.0.2) celular como microfone (app/js/celmic.js) e a barrinha "+" das integrações na chamada (app/js/integchamada.js).
+   Criado por Ryan Victtor. */
+
+/* ---------- a barrinha "+" ---------- */
+.cham-integ-pop { padding: 12px 12px 12px; }
+.cham-integ-grade { display: grid; grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr)); gap: 6px; }
+.cham-integ-item {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; padding: 8px 4px 7px; border: 1px solid transparent; border-radius: 14px;
+  background: transparent; color: var(--texto); font: inherit; cursor: pointer; transition: background .15s, border-color .15s, transform .15s var(--mola, ease);
+}
+.cham-integ-item:hover, .cham-integ-item:focus-visible { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.16); outline: none; }
+.cham-integ-item:active { transform: scale(.94); }
+.cham-integ-ic {
+  display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; color: #fff;
+  background: radial-gradient(circle at 35% 28%, rgba(255,255,255,.45), rgba(255,255,255,0) 55%), linear-gradient(180deg, var(--acento, #3ab0ff), color-mix(in srgb, var(--acento, #3ab0ff) 55%, #04203a));
+  box-shadow: 0 4px 12px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.45);
+}
+.cham-integ-item.ativo .cham-integ-ic { background: radial-gradient(circle at 35% 28%, rgba(255,255,255,.45), rgba(255,255,255,0) 55%), linear-gradient(180deg, #4fe08f, #148a4a); }
+.cham-integ-nome { max-width: 100%; font-size: 11.5px; font-weight: 600; line-height: 1.2; text-align: center; overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+
+/* ---------- a janela de conectar ---------- */
+.celmic { gap: 14px; min-width: 0; }
+.celmic-par { display: flex; gap: 18px; align-items: center; min-width: 0; }
+.celmic-qr { flex: none; display: flex; padding: 8px; border-radius: var(--raio-p, 12px); background: #fff; box-shadow: 0 2px 10px rgba(0,30,60,.2); }
+.celmic-qr canvas.qr { display: block; width: 184px; height: 184px; image-rendering: pixelated; }
+.celmic-qr-vazio { display: grid; place-items: center; width: 184px; height: 184px; color: #9bb; }
+.celmic-passos { flex: 1; min-width: 0; }
+.celmic-passos ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.35; }
+.celmic-cod { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end; min-width: 0; padding: 10px 12px; border-radius: var(--raio-p, 12px); background: rgba(0,0,0,.16); border: 1px solid rgba(255,255,255,.1); }
+.celmic-cod > div { min-width: 0; }
+.celmic-url { display: block; font-size: 14px; overflow-wrap: anywhere; user-select: all; }
+.celmic-codigo { display: block; font-size: 26px; letter-spacing: .22em; font-variant-numeric: tabular-nums; user-select: all; }
+.celmic-codigo.vencido { opacity: .4; }
+.celmic-acoes { flex-wrap: wrap; gap: 8px; align-items: center; }
+.celmic-conta { min-width: 140px; }
+.celmic-nota { margin: 0; overflow-wrap: anywhere; }
+.celmic-passos .celmic-nota { margin-top: 10px; }
+.celmic-ok { display: flex; gap: 14px; align-items: center; min-width: 0; }
+.celmic-ok .cresce { min-width: 0; overflow-wrap: anywhere; }
+.celmic-orbe {
+  flex: none; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; color: #fff;
+  background: radial-gradient(circle at 35% 28%, rgba(255,255,255,.5), rgba(255,255,255,0) 55%), linear-gradient(180deg, #5cc2ff, #1a6fc0);
+  box-shadow: 0 6px 16px rgba(26,111,192,.4), inset 0 1px 0 rgba(255,255,255,.5);
+}
+.celmic-pedido p { margin: 0; overflow-wrap: anywhere; }
+.celmic-pedido .linha { gap: 14px; align-items: center; }
+
+@media (max-width: 560px) {
+  .celmic-par { flex-direction: column; align-items: stretch; }
+  .celmic-qr { align-self: center; }
+  .celmic-qr canvas.qr, .celmic-qr-vazio { width: 168px; height: 168px; }
+  .celmic-codigo { font-size: 22px; }
+  .cham-integ-ic { width: 40px; height: 40px; }
+}

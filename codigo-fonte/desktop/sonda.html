@@ -1,0 +1,65 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Aero Stream - teste da placa</title></head>
+<body>
+<script>
+// Teste da placa de vídeo (roda numa cópia ESCONDIDA do app, com uma combinação de opções do Chromium).
+// 1) WebCodecs: pergunta se existe codificador H.264 POR HARDWARE e codifica 30 quadros de verdade com "prefer-hardware".
+// 2) WebRTC: transmite 2 s de vídeo H.264 High entre duas conexões na própria página e lê QUEM codificou (o nome do codificador).
+//    A câmera de mentira do Chromium (--use-fake-device-for-media-stream) libera o nome do codificador nas estatísticas.
+window.__sonda = async () => {
+  const r = { webcodecs: null, wcQuadros: 0, wcMs: 0, webrtcImpl: '', webrtcHw: null, erros: [] };
+  const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  // ---- 1) WebCodecs ----
+  try {
+    const cfg = { codec: 'avc1.640028', width: 1920, height: 1080, framerate: 60, bitrate: 12e6, hardwareAcceleration: 'prefer-hardware', latencyMode: 'realtime', avc: { format: 'annexb' } };
+    const sup = await VideoEncoder.isConfigSupported(cfg);
+    r.webcodecs = !!(sup && sup.supported);
+    if (r.webcodecs) {
+      let n = 0, erro = null;
+      const enc = new VideoEncoder({ output: () => { n++; }, error: (e) => { erro = e; } });
+      enc.configure(cfg);
+      const cv = new OffscreenCanvas(1920, 1080), g = cv.getContext('2d');
+      const t0 = performance.now();
+      for (let i = 0; i < 30; i++) {
+        g.fillStyle = `hsl(${i * 12} 70% 45%)`; g.fillRect(0, 0, 1920, 1080); g.fillStyle = '#fff'; g.fillRect((i * 50) % 1800, 300, 120, 120);
+        const f = new VideoFrame(cv, { timestamp: i * 16667 });
+        enc.encode(f, { keyFrame: i === 0 }); f.close();
+      }
+      await enc.flush(); r.wcMs = Math.round(performance.now() - t0); r.wcQuadros = n; enc.close();
+      if (erro) r.erros.push('webcodecs: ' + erro.message);
+    }
+  } catch (e) { r.erros.push('webcodecs: ' + (e && e.message || e)); if (r.webcodecs) r.webcodecs = false; }
+  // ---- 2) WebRTC ----
+  let cam = null, a = null, b = null;
+  try {
+    cam = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, frameRate: 30 }, audio: false });
+    a = new RTCPeerConnection(); b = new RTCPeerConnection();
+    a.onicecandidate = (e) => e.candidate && b.addIceCandidate(e.candidate).catch(() => {});
+    b.onicecandidate = (e) => e.candidate && a.addIceCandidate(e.candidate).catch(() => {});
+    const t = a.addTransceiver(cam.getVideoTracks()[0], { direction: 'sendonly' });
+    const caps = RTCRtpSender.getCapabilities('video').codecs;
+    const alta = caps.filter((c) => c.mimeType === 'video/H264' && /profile-level-id=(64|4d)/i.test(c.sdpFmtpLine || ''));
+    r.perfisH264 = caps.filter((c) => c.mimeType === 'video/H264').map((c) => (/profile-level-id=(\w+)/.exec(c.sdpFmtpLine || '') || [])[1]);
+    if (alta.length) t.setCodecPreferences([...alta, ...caps.filter((c) => !alta.includes(c))]);
+    // Igual à transmissão de verdade (sala.js): começa já com taxa alta. Sem isso o WebRTC começa em ~0,3 Mbps, baixa a resolução para
+    // menos de 360p e o Chromium troca a placa pelo OpenH264 ("Fallback to SW due to low resolution"), e o teste dizia que a placa não codifica.
+    const inicio = (sdp) => sdp.replace(/^(a=fmtp:\d+ [^\r\n]*profile-level-id=[^\r\n]*)/gm, (l) => (/x-google-start-bitrate/.test(l) ? l : l + ';x-google-start-bitrate=4000'));
+    await a.setLocalDescription(); await b.setRemoteDescription({ type: 'offer', sdp: inicio(a.localDescription.sdp) });
+    await b.setLocalDescription(); await a.setRemoteDescription({ type: 'answer', sdp: inicio(b.localDescription.sdp) });
+    try { const p = t.sender.getParameters(); if (!p.encodings || !p.encodings.length) p.encodings = [{}]; p.encodings[0].maxBitrate = 6e6; p.degradationPreference = 'maintain-framerate'; await t.sender.setParameters(p); } catch (e) { /* ok */ }
+    for (let i = 0; i < 50 && a.connectionState !== 'connected'; i++) await esperar(100);
+    // lê várias vezes: vale se a PLACA codificou em algum momento (a resolução ainda pode estar subindo no começo)
+    for (let i = 0; i < 6; i++) {
+      await esperar(500);
+      (await a.getStats()).forEach((s) => {
+        if (s.type !== 'outbound-rtp' || s.kind !== 'video' || !s.encoderImplementation) return;
+        const hw = s.powerEfficientEncoder === true || /Vaapi|VAAPI|VideoEncodeAccelerator|ExternalEncoder/i.test(s.encoderImplementation);
+        if (!r.webrtcImpl || hw) { r.webrtcImpl = s.encoderImplementation; r.webrtcHw = s.powerEfficientEncoder == null ? null : !!s.powerEfficientEncoder; r.webrtcQuadros = s.framesEncoded || 0; r.webrtcRes = (s.frameWidth || 0) + 'x' + (s.frameHeight || 0); }
+      });
+    }
+  } catch (e) { r.erros.push('webrtc: ' + (e && e.message || e)); }
+  finally { try { a && a.close(); b && b.close(); } catch (e) { /* ok */ } if (cam) cam.getTracks().forEach((x) => x.stop()); }
+  return r;
+};
+</script>
+</body></html>

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aero - Ouvindo e assistindo</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f4f8fb; --txt: #15232d; --suave: #5b6b77; --borda: #c9d6df; --ac: #2d9ee0; --ok: #1f9d55; --erro: #d13c3c; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #16202a; --txt: #e8f1f7; --suave: #9fb1bf; --borda: #2c3c4a; } }
+  body { margin: 0; width: 300px; padding: 14px 16px 16px; font: 13px/1.4 system-ui, sans-serif; background: var(--bg); color: var(--txt); }
+  h1 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 15px; }
+  h1 img { width: 22px; height: 22px; }
+  p { margin: 0 0 10px; color: var(--suave); }
+  label { display: block; margin-bottom: 4px; font-weight: 600; }
+  .linha { display: flex; gap: 6px; }
+  input { flex: 1; min-width: 0; padding: 7px 9px; border: 1px solid var(--borda); border-radius: 8px; background: transparent; color: inherit; font: inherit; }
+  button { padding: 7px 12px; border: 0; border-radius: 8px; background: var(--ac); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+  button[hidden] { display: none; }
+  #estado { margin-top: 10px; font-weight: 600; }
+  #estado.ok { color: var(--ok); } #estado.erro { color: var(--erro); }
+  #sites { margin-top: 12px; } #sites[hidden] { display: none; }
+  #sites-lista { margin: 0; padding: 0; list-style: none; }
+  #sites-lista li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 0; border-top: 1px solid var(--borda); }
+  #sites-lista span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #sites-lista button { flex: none; padding: 4px 10px; } #sites-lista .ok { flex: none; color: var(--ok); }
+</style>
+</head>
+<body>
+  <h1><img src="icone.png" alt="">Aero - Ouvindo e assistindo</h1>
+  <p id="txt-ajuda">Mostra aos seus amigos do Aero a música que você ouve no YouTube Music e no Deezer e o que você assiste na Twitch, na Kick, no YouTube e nos sites que você adicionar no Aero. Ela se conecta sozinha quando você clica em "Instalar no navegador" no Aero (Configurações &gt; Privacidade).</p>
+  <label for="codigo" id="txt-rotulo">Código de pareamento</label>
+  <div class="linha"><input id="codigo" autocomplete="off" spellcheck="false" maxlength="64"><button id="salvar" type="button">Salvar</button></div>
+  <button id="permitir" type="button" hidden style="margin-top:10px;width:100%">Permitir acesso</button>
+  <div id="estado"></div>
+  <div id="sites" hidden><label id="txt-sites">Seus sites (adicionados no Aero &gt; Integrações &gt; Assistindo agora)</label><ul id="sites-lista"></ul></div>
+  <script src="popup.js"></script>
+</body>
+</html>

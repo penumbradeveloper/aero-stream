@@ -1,0 +1,105 @@
+/* Aero Stream - (1.0.0) atividade de jogo: a linha das listas, o cartão do perfil e o editor das atividades personalizadas */
+.jog-linha { --jog: #57c7ff; display: flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; margin-top: 1px; font-size: 12px; font-weight: 600; line-height: 1.25; color: var(--suave); }
+.jog-linha[hidden], .jog-cartao[hidden] { display: none !important; }
+.jog-linha > svg, .jog-linha > .ic { flex: none; width: 12px; height: 12px; color: var(--jog); }
+.jog-linha > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.jog-linha b { font-weight: 700; color: var(--texto, inherit); }
+/* com um jogo aberto, a lista mostra só o jogo (como no Discord); a música continua no perfil */
+.com-jogo > .ouv-linha { display: none !important; }
+
+.jog-cartao { --jog: #57c7ff; display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 10px 12px 12px; border-radius: 14px; background: rgba(0,0,0,.14); border: 1px solid rgba(255,255,255,.12); text-align: left; animation: jog-entra .35s var(--mola, ease) backwards; }
+.jog-cab { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; letter-spacing: .01em; opacity: .9; }
+.jog-selo { display: inline-flex; color: var(--jog); } .jog-selo > svg, .jog-selo > .ic { width: 13px; height: 13px; }
+.jog-corpo { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.jog-imgs { position: relative; flex: none; width: 72px; height: 72px; margin: 0 4px 4px 0; }
+.jog-ig { position: relative; display: grid; place-items: center; width: 72px; height: 72px; border-radius: 12px; overflow: hidden; color: var(--jog); background: rgba(255,255,255,.08); box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+.jog-ig > img, .jog-ip > img, .jog-ip-lista > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.jog-ip { position: absolute; right: -5px; bottom: -5px; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; overflow: hidden; background: var(--fundo-cartao, #0d1b2a); border: 3px solid var(--fundo-cartao, #0d1b2a); }
+.jog-ip > img { border-radius: 50%; }
+.jog-ig.com-img > svg, .jog-ip.com-img > svg, .jog-ip-lista.com-img > svg, .jog-ig.com-img > .ic, .jog-ip.com-img > .ic, .jog-ip-lista.com-img > .ic { visibility: hidden; } /* a imagem chegou: o ícone de reserva sai de trás */
+.jog-ig.com-img, .jog-ip-lista.com-img { background: transparent; }
+.nao-quadrada > img:not(.jog-borrado) { object-fit: contain; } /* imagem larga ou alta: inteira, sem corte */
+.nao-quadrada > .jog-borrado { object-fit: cover; filter: blur(10px) saturate(1.2); transform: scale(1.25); opacity: .55; }
+.jog-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.jog-nome { display: block; font-weight: 700; font-size: 14.5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.jog-nome-link { max-width: 100%; padding: 0; margin: 0; border: 0; background: none; color: inherit; font-family: inherit; text-align: left; cursor: pointer; }
+.jog-nome-link:hover, .jog-nome-link:focus-visible { text-decoration: underline; outline: none; }
+.jog-zerar { align-self: flex-start; margin-top: 2px; }
+.jog-zerar[hidden] { display: none; }
+.jog-l { font-size: 12.5px; color: var(--suave); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.jog-tempo { display: flex; align-items: center; gap: 4px; margin-top: 2px; font-variant-numeric: tabular-nums; color: var(--jog); font-weight: 600; }
+.jog-tempo[hidden] { display: none; }
+.jog-tempo > svg, .jog-tempo > .ic { flex: none; width: 11px; height: 11px; }
+.jog-cartao.mini { padding: 8px 10px 10px; gap: 6px; }
+.jog-cartao.mini .jog-imgs, .jog-cartao.mini .jog-ig { width: 56px; height: 56px; }
+.jog-cartao.mini .jog-ig { border-radius: 10px; }
+.jog-cartao.mini .jog-ip { width: 22px; height: 22px; }
+.jog-cartao.mini .jog-nome { font-size: 13.5px; }
+@keyframes jog-entra { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .jog-cartao { animation: none; } }
+
+/* ---------- Configurações > Atividades de jogo ---------- */
+.jog-est { line-height: 1.4; }
+.jog-pers-lista { gap: 8px; }
+.jog-pers-it { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 8px 10px; border-radius: 12px; }
+.jog-ip-lista { position: relative; flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 8px; overflow: hidden; color: var(--jog, #57c7ff); background: rgba(255,255,255,.08); }
+.jog-ell { display: block; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+.jog-editor { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 270px); gap: 18px; align-items: start; }
+.jog-form { gap: 10px; min-width: 0; }
+.jog-lado { position: sticky; top: 0; gap: 6px; min-width: 0; }
+.jog-campo { gap: 4px; min-width: 0; }
+.jog-campo .campo { width: 100%; min-width: 0; }
+.jog-campo .linha > .campo { flex: 1; }
+.jog-campo input[disabled] { opacity: .5; }
+.jog-par { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.jog-aviso { color: var(--aviso, #ffb347); }
+.jog-aviso[hidden] { display: none; }
+/* resultados da busca: uma lista que rola (com folga para a sombra e o contorno não serem cortados) */
+.jog-res { display: flex; flex-direction: column; gap: 4px; max-height: 288px; overflow-y: auto; overflow-x: hidden; padding: 4px; margin: 2px -4px 0; }
+.jog-res:empty { display: none; }
+.jog-res-it { display: flex; align-items: center; gap: 6px; min-width: 0; flex: none; border-radius: 10px; background: rgba(255,255,255,.06); }
+.jog-res-it:hover, .jog-res-it:focus-within { background: rgba(255,255,255,.12); }
+.jog-res-pri { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 6px 8px; border: 0; border-radius: 10px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.jog-res-pri > .jog-ip-lista { width: 40px; height: 40px; }
+.jog-res-tx { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; line-height: 1.25; }
+.jog-res-n { font-weight: 600; }
+.jog-res-tx > small { font-size: 11.5px; }
+.jog-res-capa { flex: none; display: grid; padding: 0; margin-right: 6px; border: 0; border-radius: 6px; background: none; cursor: pointer; opacity: .8; }
+.jog-res-capa:hover, .jog-res-capa:focus-visible { opacity: 1; }
+.jog-ip-capa { position: relative; display: grid; place-items: center; width: 30px; height: 40px; border-radius: 5px; overflow: hidden; color: var(--jog, #57c7ff); background: rgba(255,255,255,.08); }
+.jog-ip-capa > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.jog-ip-capa.com-img > svg, .jog-ip-capa.com-img > .ic { visibility: hidden; }
+.jog-res-msg { padding: 6px 8px; }
+/* ícone grande / pequeno: link ou foto enviada */
+.jog-img-linha { gap: 6px; flex-wrap: nowrap; }
+.jog-img-acoes { flex: none; display: flex; gap: 4px; }
+.jog-campo-img:not(.com-valor) .jog-img-tirar { display: none; }
+.jog-campo-img.com-foto .campo::placeholder { color: var(--jog, #57c7ff); opacity: 1; }
+.jog-img-est.erro { color: var(--aviso, #ffb347); }
+.jog-img-est[hidden] { display: none; }
+.jog-editor .seg.quebra { flex-wrap: wrap; }
+@media (max-width: 720px) {
+  .jog-editor { grid-template-columns: minmax(0, 1fr); }
+  .jog-lado { position: static; order: -1; }
+  .jog-par { grid-template-columns: minmax(0, 1fr); }
+}
+.jog-icone-bloco { gap: 6px; min-width: 0; }
+.jog-icones { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.jog-dica-img { margin-top: -4px; }
+/* a galeria de imagens do jogo (capas, logos e telas de cada console) */
+.jog-gal { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: rgba(255,255,255,.05); min-width: 0; }
+.jog-gal[hidden] { display: none; }
+.jog-gal-cab { gap: 8px; min-width: 0; }
+.jog-gal-cab > b { flex: 1; min-width: 0; }
+.jog-gal-opc { gap: 8px; flex-wrap: wrap; align-items: center; }
+.jog-gal .seg.quebra { flex-wrap: wrap; }
+.jog-gal-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; max-height: 300px; overflow-y: auto; overflow-x: hidden; padding: 4px; margin: -4px; }
+.jog-gal-grade > .jog-res-msg { grid-column: 1 / -1; }
+.jog-gal-it { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 4px; border: 2px solid transparent; border-radius: 10px; background: rgba(255,255,255,.06); color: inherit; font: inherit; cursor: pointer; }
+.jog-gal-it:hover, .jog-gal-it:focus-visible { background: rgba(255,255,255,.14); }
+.jog-gal-it.sel { border-color: var(--jog, #57c7ff); }
+.jog-gal-it > img { width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 6px; background: rgba(0,0,0,.18); }
+.jog-gal-it > small { font-size: 10.5px; text-align: center; opacity: .8; }
+/* o editor abre por cima de "Atividades de jogo": a janela de baixo some enquanto isso (o vidro não deixa o texto dela aparecer através) */
+#modais > .fundo-modal:has(~ .fundo-modal .jog-editor) > .modal { visibility: hidden; }

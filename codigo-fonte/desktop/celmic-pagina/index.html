@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="same-origin">
+<meta name="theme-color" content="#0a2a44">
+<title>Aero · microfone</title>
+<link rel="stylesheet" href="/celular.css">
+</head>
+<body>
+<main class="cartao" id="cartao">
+  <div class="topo">
+    <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>
+    <div>
+      <h1 id="titulo">Celular como microfone</h1>
+      <p class="suave" id="sub">Use este celular como microfone na chamada do Aero.</p>
+    </div>
+  </div>
+
+  <section id="passoCodigo">
+    <label for="codigo">Código que aparece no PC</label>
+    <input id="codigo" class="campo codigo" inputmode="text" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="7" placeholder="ABC123">
+    <label for="nome">Nome deste celular <span class="suave">(opcional)</span></label>
+    <input id="nome" class="campo" maxlength="32" autocomplete="off" placeholder="Meu celular">
+    <button id="conectar" class="btn" type="button">Conectar</button>
+  </section>
+
+  <section id="passoAo" hidden>
+    <div class="medidor" aria-hidden="true"><i id="nivel"></i></div>
+    <div class="linha">
+      <button id="mudo" class="btn sec" type="button">Silenciar</button>
+      <button id="sair" class="btn perigo" type="button">Desconectar</button>
+    </div>
+    <p class="suave peq">Deixe esta página aberta e a tela ligada enquanto estiver na chamada.</p>
+  </section>
+
+  <p id="estado" class="estado" role="status" aria-live="polite"></p>
+  <p class="suave peq rodape">Só o áudio do microfone vai para o PC, pela sua rede Wi-Fi. Nada sai para a internet.</p>
+</main>
+<script src="/celular.js"></script>
+</body>
+</html>

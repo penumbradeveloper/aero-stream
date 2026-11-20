@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Aero</title>
+<!-- Aero Stream - tocador do trecho de 30 s da música do perfil. Fica no servidor (não no app) para o YouTube saber de qual site vem
+     o pedido: no app do PC (file://) e no celular ele recusa tocar sem isso. O app abre esta página escondida e recebe avisos por
+     postMessage ({ aeroYt: 1, ev: 'tocando' | 'tempo' | 'fim' | 'erro' }). Se um vídeo não deixa tocar fora do YouTube, tenta o próximo.
+     Criado por Ryan Victtor. -->
+<style>html, body { margin: 0; background: transparent; overflow: hidden; }</style></head>
+<body><div id="p"></div>
+<script>
+(() => {
+  // (0.6.0) UM tocador só, reaproveitado: o app deixa esta página aberta (escondida e parada, sem gastar nada) e troca a música por
+  // mensagem ("carregar:ids@inicio@pre"). Trocar o vídeo num tocador do YouTube já aberto leva meio segundo; criar um novo levava vários.
+  const q = new URLSearchParams(location.search);
+  const limpar = (s) => String(s || '').split(',').filter((v) => /^[A-Za-z0-9_-]{11}$/.test(v)).slice(0, 3);
+  let ids = limpar(q.get('v')), ini = Math.max(0, parseInt(q.get('s'), 10) || 0), fim = ini + 30;
+  let i = 0, f = null, vol = Math.max(0, Math.min(100, parseInt(q.get('vol'), 10) || 45));
+  let querTocar = q.get('pre') !== '1' && ids.length > 0, pronto = false, carregado = '';
+  const comando = (func, args = []) => { try { f && f.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args }), '*'); } catch (e) { /* ok */ } };
+  const aplicarVol = () => comando('setVolume', [vol]);
+  const avisar = (o) => { try { parent.postMessage(Object.assign({ aeroYt: 1 }, o), '*'); } catch (e) { /* ok */ } };
+  function criar() {
+    if (f) { f.remove(); f = null; } pronto = false;
+    if (i >= ids.length) { avisar({ ev: 'erro' }); return; }
+    f = document.createElement('iframe');
+    f.allow = 'autoplay; encrypted-media'; f.width = '200'; f.height = '200'; f.setAttribute('frameborder', '0');
+    f.src = 'https://www.youtube-nocookie.com/embed/' + ids[i] + '?enablejsapi=1&autoplay=' + (querTocar ? 1 : 0) + '&controls=0&disablekb=1&playsinline=1&rel=0&start=' + ini + '&end=' + fim + '&origin=' + encodeURIComponent(location.origin);
+    f.onload = () => { try { f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*'); } catch (e) { /* ok */ } aplicarVol(); };
+    carregado = ids[i] + '@' + ini;
+    document.getElementById('p').append(f);
+  }
+  // troca de música: no tocador já pronto, só manda carregar o outro vídeo (rápido); senão cria
+  function carregar(novos, inicio, tocar) {
+    ids = novos; ini = inicio; fim = ini + 30; i = 0; querTocar = tocar;
+    if (!ids.length) return;
+    if (f && pronto) { const opts = { videoId: ids[0], startSeconds: ini, endSeconds: fim }; carregado = ids[0] + '@' + ini; comando(tocar ? 'loadVideoById' : 'cueVideoById', [opts]); if (tocar) aplicarVol(); }
+    else criar();
+  }
+  addEventListener('message', (e) => {
+    if (e.source === parent) {
+      const d = e.data;
+      if (d === 'parar') { querTocar = false; comando('pauseVideo'); return; }
+      if (typeof d === 'string' && d.startsWith('carregar:')) { const [v, s0, pre] = d.slice(9).split('@'); const l = limpar(v), s = Math.max(0, parseInt(s0, 10) || 0); if (carregado === (l[0] || '') + '@' + s && f && pronto) { if (pre !== 'pre') { querTocar = true; comando('seekTo', [s, true]); aplicarVol(); comando('playVideo'); } return; } carregar(l, s, pre !== 'pre'); return; }
+      if (d === 'tocar') { querTocar = true; if (pronto) { comando('seekTo', [ini, true]); aplicarVol(); comando('playVideo'); } else if (!f) criar(); return; }
+      // (0.8.3) pular para um ponto do trecho (segurando o braço do vinil): segundos desde o começo do trecho
+      if (typeof d === 'string' && d.startsWith('pular:')) { const t = Math.max(0, Math.min(29.5, parseFloat(d.slice(6)) || 0)); if (pronto) comando('seekTo', [ini + t, true]); return; }
+      if (typeof d === 'string' && d.startsWith('vol:')) { vol = Math.max(0, Math.min(100, parseInt(d.slice(4), 10) || 0)); aplicarVol(); }
+      return;
+    }
+    if (!f || e.source !== f.contentWindow) return;
+    let d; try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch (x) { return; }
+    if (!d) return;
+    if (d.event === 'onError') { i++; criar(); return; }
+    if (d.event === 'onReady') { pronto = true; aplicarVol(); if (querTocar) comando('playVideo'); else avisar({ ev: 'pronto' }); }
+    const estado = d.event === 'onStateChange' ? d.info : d.event === 'infoDelivery' && d.info ? d.info.playerState : undefined;
+    if (d.event === 'infoDelivery' && d.info && typeof d.info.currentTime === 'number' && querTocar) avisar({ ev: 'tempo', t: Math.max(0, d.info.currentTime - ini) });
+    if (estado === 1) { if (!querTocar) { comando('pauseVideo'); return; } if (!f.volOk) { f.volOk = true; aplicarVol(); } avisar({ ev: 'tocando' }); }
+    if (estado === 0 && querTocar) { querTocar = false; avisar({ ev: 'fim' }); }
+  });
+  if (ids.length) criar();
+})();
+</script>
+</body></html>

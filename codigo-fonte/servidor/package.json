@@ -1,0 +1,15 @@
+{
+  "name": "aero-servidor",
+  "version": "0.9.6-beta",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sincronizar": "node ../scripts/sincronizar.mjs",
+    "deploy": "node ../scripts/sincronizar.mjs && wrangler deploy",
+    "dev": "node ../scripts/sincronizar.mjs && wrangler dev",
+    "site": "node ../scripts/site.mjs && wrangler pages deploy ../site-dist --project-name aerostream --branch main --commit-dirty=true"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

@@ -3,7 +3,7 @@
 (() => {
   'use strict';
   const A = (window.Aero = window.Aero || {});
-  A.versao = '0.9.7';
+  A.versao = '0.9.8';
   A.autor = 'Ryan Victtor';
 
   // ---------- plataforma ----------
@@ -135,7 +135,7 @@
     volMidia: 0.55, // (0.5.9-8) volume dos áudios e vídeos do chat (lembrado) // (0.5.9-7) volume da música dos perfis (antes não estava aqui e se perdia ao fechar o app)
     chamTela: { c: [], f: [], q: [], imagem: null, escuro: 35, bolhas: true, ac: [] }, // (1.0.2) a tela da sua chamada (extras.js): cor, imagem, bolhas e acessórios
     chat: { fonte: 100, foto: 'normal', lado: '' }, // (1.0.2) lado: '' (automático), 'esquerda' ou 'direita' // (0.5.9-6) tamanho das mensagens (%) e das fotos nos chats ('grande', 'normal', 'pequena' ou 'nao')
-    atualizar: { auto: true, novidades: false, vista: '' }, // (0.5.9-6) procurar atualização a cada minuto e perguntar antes de instalar; (1.0.0) mostrar as novidades depois de atualizar e a última versão aberta
+    atualizar: { auto: true, novidades: false, vista: '', teste: false }, // (0.5.9-6) procurar atualização a cada minuto e perguntar antes de instalar; (1.0.0) mostrar as novidades depois de atualizar e a última versão aberta
     introFeita: false,
     // (0.9.7) do Aero Bubble e das skins: também se perdiam ao reiniciar (não estavam aqui)
     iconeApp: '', pacoteSons: '', toqueExtra: '', toquesAmigo: {}, somEntrarOutros: true, skin: '', bolhaArte: null, camAjuste: null, sincronizar: true, sincPartes: {},

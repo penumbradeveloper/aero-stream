@@ -252,7 +252,7 @@ function escolher({ rpcs = [], det = [], pers = [], abertos = new Map(), visto =
 }
 
 // ---------- o serviço ----------
-function criarJogos({ log = () => {}, pastaDados, lerPers = () => [], plataforma = process.platform, pidsProprios = () => [process.pid], listarProcessos = null, buscar = (u, o) => fetch(u, o), varrerMs = VARRER_MS, listaEmbutida = path.join(__dirname, 'jogos-lista.json'), aoMudar = null } = {}) {
+function criarJogos({ log = () => {}, pastaDados, lerPers = () => [], lerIgnorados = () => [], plataforma = process.platform, pidsProprios = () => [process.pid], listarProcessos = null, buscar = (u, o) => fetch(u, o), varrerMs = VARRER_MS, listaEmbutida = path.join(__dirname, 'jogos-lista.json'), aoMudar = null } = {}) {
   let base = null, listaEm = 0, ligado = false, timer = 0, varrendo = false, baixando = false;
   let det = [], abertos = new Map(), nomesAbertos = [];
   const visto = new Map(); // quando cada jogo/atividade apareceu (o tempo conta daí se o processo não disser quando abriu)
@@ -377,12 +377,46 @@ function criarJogos({ log = () => {}, pastaDados, lerPers = () => [], plataforma
     return ligado;
   }
 
+  // (1.0.2) o que a pessoa escolheu NÃO mostrar (ex.: o Dolphin aberto o dia todo): cada jogo tem as suas chaves (o aplicativo do
+  // Discord, o emulador e, na atividade que o jogo manda, o jogo detectado pelo mesmo processo). Uma chave na lista basta para esconder
+  const chavesDet = (d) => (d.app ? ['a:' + d.app.id] : []).concat(d.emu ? ['e:' + norm(d.emu)] : []);
+  const detDoRpc = (r) => det.find((x) => x.pid && x.pid === r.pid) || (r.app && det.find((x) => x.app && x.app.id === r.app.id)) || (/^\d{15,25}$/.test(r.clientId || '') && det.find((x) => x.app && x.app.id === r.clientId)) || null;
+  const chavesRpc = (r) => {
+    const ks = new Set();
+    if (/^\d{15,25}$/.test(r.clientId || '')) ks.add('a:' + r.clientId);
+    if (r.app && r.app.id) ks.add('a:' + r.app.id);
+    if (!ks.size && r.at && r.at.n) ks.add('n:' + norm(r.at.n));
+    const d = detDoRpc(r); if (d) for (const k of chavesDet(d)) ks.add(k);
+    return [...ks];
+  };
+  function ignorados() {
+    const s = new Set();
+    for (const x of lerIgnorados() || []) for (const k of (x && Array.isArray(x.ks) ? x.ks : [])) if (typeof k === 'string') s.add(k);
+    return s;
+  }
   function agora() {
     if (!ligado) return null;
     const pers = (lerPers() || []).filter((p) => p && typeof p === 'object');
     for (const p of pers) if (p.ativo !== false && (!p.proc || abertos.has(p.proc)) && !visto.has('pers:' + p.id)) visto.set('pers:' + p.id, Date.now());
     for (const p of pers) if (p.proc && !abertos.has(p.proc)) visto.delete('pers:' + p.id);
-    return escolher({ rpcs: [...rpcs.values()], det, pers, abertos, visto, porNome: iconeParecido });
+    const ign = ignorados(), fora = (ks) => ks.some((k) => ign.has(k));
+    const rs = [...rpcs.values()].filter((r) => !fora(chavesRpc(r)));
+    return escolher({ rpcs: rs, det: det.filter((d) => !fora(chavesDet(d))), pers, abertos, visto, porNome: iconeParecido });
+  }
+  // (1.0.2) os jogos, emuladores e atividades que o Aero está vendo agora (para a pessoa escolher o que aparece). Os que mandam a
+  // própria atividade e foram detectados pelo processo viram um item só
+  function detectados() {
+    if (!ligado) return [];
+    const out = [];
+    for (const d of det) out.push({ ks: chavesDet(d), n: d.app ? d.app.n : d.emu, ic: iconeApp(d.app) || '', tipo: d.app ? 'jogo' : 'emu', _d: d });
+    for (const r of rpcs.values()) {
+      if (!r.at) continue;
+      const ks = chavesRpc(r), d = detDoRpc(r), ja = d && out.find((x) => x._d === d);
+      if (ja) { for (const k of ks) if (!ja.ks.includes(k)) ja.ks.push(k); continue; }
+      if (out.some((x) => x.ks.some((k) => ks.includes(k)))) continue;
+      out.push({ ks, n: (r.app && r.app.n) || r.at.n || 'Jogo', ic: iconeApp(r.app) || (/^https:/.test(r.at.li || '') ? r.at.li : ''), tipo: r.origem === 'sdk' ? 'sdk' : 'discord' });
+    }
+    return out.map(({ _d, ...x }) => x).slice(0, 40);
   }
 
   // o ícone do jogo da lista do Discord com o nome mais parecido (o mesmo nome, um começando pelo outro ou a sigla). Tenta cada nome na
@@ -431,7 +465,7 @@ function criarJogos({ log = () => {}, pastaDados, lerPers = () => [], plataforma
   }
 
   return {
-    ligar, agora, aoRpc, procurar, varrer,
+    ligar, agora, aoRpc, procurar, varrer, detectados,
     imagens: (q) => imagensConsole(String(q || '').slice(0, 100)),
     abertos: () => nomesAbertos.slice(0, 600),
     estado: () => ({ ligado, jogos: base ? base.todos.length : 0, listaEm }),

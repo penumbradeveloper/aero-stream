@@ -78,7 +78,8 @@ function criarAtualizador({ app, log = () => {}, buscar = (u) => globalThis.fetc
 
   let baixando = null;
   // servidor: o endereço do servidor do Aero (o mesmo da conta). Devolve { ok, versao?, nada?, precisaInstalador?, erro? }
-  function verificarEBaixar(servidor) {
+  // canal (1.0.2): 'teste' quando veio do canal de versões de teste (fica anotado, para dar para voltar à normal)
+  function verificarEBaixar(servidor, canal = 'normal') {
     if (baixando) return baixando;
     baixando = (async () => {
       const s = String(servidor || '').replace(/\/+$/, '');
@@ -102,7 +103,7 @@ function criarAtualizador({ app, log = () => {}, buscar = (u) => globalThis.fetc
         fs.writeFileSync(destino, buf);
       }
       fs.writeFileSync(path.join(tmp, 'aero-manifesto.json'), JSON.stringify({ dados: assinado.dados, assinatura: assinado.assinatura }));
-      fs.writeFileSync(path.join(tmp, 'aero-versao.json'), JSON.stringify({ versao: d.versao, electronMin: d.electronMin || '', verificado: true, quando: Date.now() }));
+      fs.writeFileSync(path.join(tmp, 'aero-versao.json'), JSON.stringify({ versao: d.versao, electronMin: d.electronMin || '', verificado: true, quando: Date.now(), canal: canal === 'teste' ? 'teste' : 'normal' }));
       // troca: a nova vira "atual" e TODO o resto (versões antigas, sobras) é apagado
       fs.rmSync(atual(), { recursive: true, force: true });
       fs.renameSync(tmp, atual());
@@ -132,7 +133,14 @@ function criarAtualizador({ app, log = () => {}, buscar = (u) => globalThis.fetc
     } catch (e) { return { ok: false, erro: String(e.message || e) }; }
   }
 
-  return { delegar, confirmarAbriu, verificarEBaixar, checar, versaoRodando, infoAtual };
+  // (1.0.2) apaga a versão baixada (a de teste): ao reiniciar, o app abre a versão instalada e a normal chega pela atualização de sempre
+  function descartar() {
+    try { fs.rmSync(atual(), { recursive: true, force: true }); fs.rmSync(arqTent(), { force: true }); conferida = undefined; log('atualização: versão baixada descartada (voltando para a normal)'); return true; }
+    catch (e) { log('atualização: não deu para descartar (' + e.message + ')'); return false; }
+  }
+  const canal = () => { const i = globalThis.__aeroVersaoAtualizada ? infoAtual() : null; return i && i.canal === 'teste' ? 'teste' : 'normal'; };
+
+  return { delegar, confirmarAbriu, verificarEBaixar, checar, versaoRodando, infoAtual, descartar, canal };
 }
 
 module.exports = { criarAtualizador, verificarManifesto, comparar, caminhoOk, CHAVE_PUBLICA };

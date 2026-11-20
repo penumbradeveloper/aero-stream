@@ -19,7 +19,7 @@
     donator: { pt: 'Aero Bubble Donator', en: 'Aero Bubble Donator', svg: '<path fill="#fff" d="M3.2 8.2 7.6 11.4 12 4.6l4.4 6.8 4.4-3.2-1.6 9.6H4.8z"/><rect x="4.8" y="18.4" width="14.4" height="2.2" rx="1.1" fill="#fff"/><path fill="#7c3aed" fill-opacity=".75" d="M12 10.6l2.2 2.4L12 16.2 9.8 13z"/><circle cx="3.2" cy="8.2" r="1.3" fill="#fff"/><circle cx="20.8" cy="8.2" r="1.3" fill="#fff"/><circle cx="12" cy="4.2" r="1.3" fill="#fff"/>' },
     supporter: { pt: 'Aero Bubble Supporter', en: 'Aero Bubble Supporter', svg: '<path fill="#fff" d="M12 20.6 4.2 13.2A4.9 4.9 0 0 1 12 6.9a4.9 4.9 0 0 1 7.8 6.3z"/><ellipse cx="8.6" cy="9.8" rx="1.6" ry="1" fill="#e11d48" fill-opacity=".35" transform="rotate(-35 8.6 9.8)"/>' },
     // (1.0.2) quem testou o Aero desde o começo: um frasco de laboratório com bolhas (o selo é dado pelo servidor, pelo ID da conta)
-    tester: { pt: 'Tester Oficial do Aero', en: 'Official Aero Tester', svg: '<path fill="#fff" d="M9 2.8h6a.9.9 0 0 1 0 1.8h-.6v4.1l4.9 8.4a2.3 2.3 0 0 1-2 3.5H6.7a2.3 2.3 0 0 1-2-3.5l4.9-8.4V4.6H9a.9.9 0 0 1 0-1.8z"/><path fill="#d97706" fill-opacity=".55" d="M7.6 14.6h8.8l1.7 2.9a.8.8 0 0 1-.7 1.2H6.6a.8.8 0 0 1-.7-1.2z"/><circle cx="10.6" cy="16.6" r="1" fill="#fff"/><circle cx="13.6" cy="15.6" r=".7" fill="#fff"/><circle cx="12.4" cy="11.6" r=".6" fill="#d97706" fill-opacity=".6"/>' },
+    tester: { pt: 'Tester Oficial do Aero', en: 'Official Aero Tester', svg: '<path fill="#fff" d="M9 2.8h6a.9.9 0 0 1 0 1.8h-.6v4.1l4.9 8.4a2.3 2.3 0 0 1-2 3.5H6.7a2.3 2.3 0 0 1-2-3.5l4.9-8.4V4.6H9a.9.9 0 0 1 0-1.8z"/><path fill="#3f6212" fill-opacity=".55" d="M7.6 14.6h8.8l1.7 2.9a.8.8 0 0 1-.7 1.2H6.6a.8.8 0 0 1-.7-1.2z"/><circle cx="10.6" cy="16.6" r="1" fill="#fff"/><circle cx="13.6" cy="15.6" r=".7" fill="#fff"/><circle cx="12.4" cy="11.6" r=".6" fill="#3f6212" fill-opacity=".6"/>' },
     fundador: { pt: 'Fundador 1.0: apoiou o Aero no lançamento', en: 'Founder 1.0: supported Aero at launch', svg: '<path fill="#fff" d="M5 20.5h14v-2H5zM6.5 17h11l1.5-9-4 3-3-6-3 6-4-3z"/><text x="12" y="15" text-anchor="middle" font-size="5.5" font-weight="900" fill="#1e3a8a">1.0</text>' },
   };
   // (1.0.0) fidelidade: 1, 2, 3 e 6 meses (uma luazinha com o número) e 1, 2, 3, 4, 5, 7, 8, 9 e 10 anos (louros com o número; a partir de 5 anos
@@ -38,6 +38,8 @@
     if (!l.length) return null;
     return h('span', { class: 'selos' }, ...l.map((x) => { const d = SELOS[x], t = A.T(d.pt, d.en), el = h('span', { class: 'selo-of selo-' + x, title: t, role: 'img', 'aria-label': t }); el.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">' + d.svg + '</svg>'; return el; }));
   };
+  // (1.0.2) os selos junto do nome (no chat): só os que a pessoa deixou aparecendo no perfil. O servidor já filtra os dos outros; o seu vem completo
+  U.selosVisiveis = (p) => { const sl = (p && p.sl) || [], pf = (p && p.pf) || {}; if (pf.si === false) return []; return Array.isArray(pf.so) && pf.so.length ? sl.filter((x) => !pf.so.includes('s:' + x)) : sl; };
   // (1.0.0) cada insígnia e cada selo tem uma chave ("s:" + selo, "i:" + texto); "oc" é a lista das que a pessoa escondeu do perfil
   U.chaveIns = (x) => 'i:' + String((x && x.t) || '').slice(0, 40);
   U.insignias = (lista, sl, oc) => {

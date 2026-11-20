@@ -86,6 +86,9 @@
     const tenta = () => {
       const at = document.activeElement;
       if (origem && at !== origem && at && at !== document.body) return; // a pessoa já foi para outro lugar
+      // (1.0.2) espera a aba terminar de deslizar: o foco rolava a tela para "alcançar" o painel que ainda vinha de lado, e a troca parecia emperrar
+      const deslizando = document.querySelector('.conteudo > .painel.saindo') || [...document.querySelectorAll('.conteudo > .painel:not(.guardado)')].some((p) => p.getAnimations().some((x) => x.playState === 'running' && x.effect && x.effect.target === p));
+      if (deslizando && performance.now() - t0 < 1200) { setTimeout(tenta, 50); return; }
       if (entrarZona(nome)) return;
       if (performance.now() - t0 < 2000) setTimeout(tenta, 60);
     };
@@ -340,9 +343,18 @@
   }
   function cursorPintar() {
     cur.x = A.limitar(cur.x, 2, innerWidth - 2); cur.y = A.limitar(cur.y, 2, innerHeight - 2);
-    cur.el.style.transform = `translate3d(${cur.x}px, ${cur.y}px, 0)`;
+    // (1.0.2) "translate" e não "transform": o "scale" de quando está em cima de algo clicável multiplicava a POSIÇÃO também (a bolinha
+    // aparecia até 32% mais para baixo e para a direita de onde o clique caía: mirando numa DM de baixo, abria uma de cima)
+    cur.el.style.translate = `${cur.x}px ${cur.y}px`;
     const sob = document.elementFromPoint(cur.x, cur.y);
-    pedirDicas(); cur.sob = sob; cur.el.classList.toggle('clicavel', !!(sob && sob.closest && sob.closest(FOCAVEL + ',[data-menu],label')));
+    pedirDicas(); cur.sob = sob; cur.el.classList.toggle('clicavel', clicavel(sob));
+  }
+  // (1.0.2) só conta como clicável o que é um controle de verdade (botão, link, campo, item com a mãozinha). Antes valia qualquer coisa com
+  // menu de botão direito ou foco por teclado: a lateral inteira, o topo e cada mensagem acendiam a bolinha mesmo no espaço vazio
+  const CONTROLE = 'summary,button:not([disabled]),[role=button]:not([disabled]),[role=tab],[role=option],[role=radio],[role=checkbox],[role=switch],[role=menuitem],input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],label';
+  function clicavel(sob) {
+    if (!sob || !sob.closest) return false;
+    return !!sob.closest(CONTROLE) || getComputedStyle(sob).cursor === 'pointer'; // (o cursor do CSS é herdado: o filho de algo com a mãozinha também tem)
   }
   function cursorClicar(direito) {
     const alvo = document.elementFromPoint(cur.x, cur.y); if (!alvo) return;
@@ -499,33 +511,59 @@
   const layAtual = () => A.pad._ultimoLayout || (lerPads()[0] ? A.controles.layoutDe(lerPads()[0]) : A.controles.LAYOUTS.xbox);
   function pedirDicas() { if (!dicasRaf) dicasRaf = requestAnimationFrame(() => { dicasRaf = 0; pintarDicas(); }); }
   const par = (botao, texto, lay) => h('span', { class: 'it' }, glifo(botao, lay), texto ? h('span', { class: 'tx' }, texto) : null);
+  // (1.0.2) as marcas (LB, RB, Y, LT, RT, RS) e a dica do item são REAPROVEITADAS: antes eram apagadas e feitas de novo a cada passo do
+  // direcional (e a cada rolagem), e todas piscavam com a animação de entrada. Agora uma marca só aparece quando o botão passa a valer ali
+  // e some quando deixa de valer; no resto ela só desliza para o lugar novo
+  const marcasVivas = new Map(); let marcasUsadas = null;
   function marca(botao, x, y, lay, texto) {
-    const m = h('span', { class: 'marca-pad' + (texto ? ' com-tx' : '') }, glifo(botao, lay), texto ? h('span', { class: 'tx' }, texto) : null);
-    marcasEl.append(m); const mw = m.offsetWidth / 2 + 4, mh = m.offsetHeight / 2 + 4; // nunca sai da tela
-    m.style.left = Math.round(A.limitar(x, mw, innerWidth - mw)) + 'px'; m.style.top = Math.round(A.limitar(y, mh, innerHeight - mh)) + 'px'; return m;
+    const chave = botao + '|' + (texto || '') + '|' + (lay.familia || '') + (lay.confirmar || 0);
+    let m = marcasVivas.get(chave);
+    if (!m) { m = h('span', { class: 'marca-pad' + (texto ? ' com-tx' : '') }, glifo(botao, lay), texto ? h('span', { class: 'tx' }, texto) : null); marcasEl.append(m); marcasVivas.set(chave, m); m._wh = null; }
+    if (marcasUsadas) marcasUsadas.add(chave);
+    if (!m._wh) m._wh = [m.offsetWidth / 2 + 4, m.offsetHeight / 2 + 4]; // nunca sai da tela
+    const l = Math.round(A.limitar(x, m._wh[0], innerWidth - m._wh[0])) + 'px', t = Math.round(A.limitar(y, m._wh[1], innerHeight - m._wh[1])) + 'px';
+    if (m.style.left !== l) m.style.left = l; if (m.style.top !== t) m.style.top = t;
+    return m;
+  }
+  function limparMarcas(todas) { for (const [k, m] of marcasVivas) if (todas || !marcasUsadas || !marcasUsadas.has(k)) { m.remove(); marcasVivas.delete(k); } }
+  // a dica junto do item: só refaz o conteúdo quando os botões ou os textos mudam
+  function dicaCom(lay, pares) {
+    const sig = pares.map((p) => p.join(':')).join('|') + '|' + (lay.familia || '') + (lay.confirmar || 0);
+    if (dicaEl._sig !== sig) { dicaEl._sig = sig; dicaEl.textContent = ''; dicaEl.append(...pares.map(([b, t]) => par(b, t, lay))); }
   }
   function pintarDicas() {
     if (!dicaEl) return;
-    const raiz = document.documentElement, at = document.activeElement;
+    const raiz = document.documentElement;
     const ligado = raiz.dataset.entrada === 'pad' && !bloqueado() && raiz.dataset.lock !== '1' && !usaBarra() && !(A.tecladoVirtual && A.tecladoVirtual.aberto()) && !A.pad.captura;
-    marcasEl.textContent = ''; dicaEl.textContent = '';
-    if (!ligado) { dicaEl.classList.remove('on'); return; }
+    if (!ligado) { dicaEl.classList.remove('on'); limparMarcas(true); return; }
     const lay = layAtual();
+    dicaEl.classList.toggle('segue', cur.on); // com a bolinha, a dica anda colada nela (sem deslizar atrás)
     if (cur.on) { // bolinha: a dica anda junto com ela
-      dicaEl.append(par('a', T('Clicar', 'Click'), lay), par('x', T('Botão direito', 'Right click'), lay), par('b', T('Sair', 'Exit'), lay));
+      limparMarcas(true);
+      dicaCom(lay, [['a', T('Clicar', 'Click')], ['x', T('Botão direito', 'Right click')], ['b', T('Sair', 'Exit')]]);
       dicaEl.classList.add('on'); colocar(dicaEl, { left: cur.x - 2, right: cur.x + 2, top: cur.y - 2, bottom: cur.y + 2, width: 4, height: 4 }, false);
       return;
     }
+    marcasUsadas = new Set();
+    try { pintarDicasItem(lay); } finally { limparMarcas(false); marcasUsadas = null; }
+  }
+  function pintarDicasItem(lay) {
+    const at = document.activeElement;
     const temFoco = at && at !== document.body && at.getBoundingClientRect && candidatos().includes(at);
     if (temFoco) {
       const z = zonaDe(at), modal = !!document.querySelector('#modais .fundo-modal:not(.fechando)');
       const verbo = ehTexto(at) ? null : at.type === 'range' ? T('Ajustar', 'Adjust') : at.tagName === 'SELECT' ? T('Mudar', 'Change') : z && z.dataset.zonaConfirmar && !modal ? T('Entrar', 'Enter') : T('Confirmar', 'Confirm');
-      if (verbo) dicaEl.append(par('a', verbo, lay));
-      if (ehTexto(at)) dicaEl.append(par('y', T('Teclado', 'Keyboard'), lay));
-      if (at.closest('[data-menu]')) dicaEl.append(par('x', T('Opções', 'Options'), lay));
-      dicaEl.append(par('b', z && z.dataset.zonaVoltar && !modal ? T('Abas', 'Tabs') : T('Voltar', 'Back'), lay));
-      dicaEl.append(par('voltar', T('Ajuda', 'Help'), lay)); // (1.0.2) era só "?" ao lado do nome do botão ("View ?"): ninguém entendia
+      const pares = [];
+      if (verbo) pares.push(['a', verbo]);
+      if (ehTexto(at)) pares.push(['y', T('Teclado', 'Keyboard')]);
+      if (at.closest('[data-menu]')) pares.push(['x', T('Opções', 'Options')]);
+      pares.push(['b', z && z.dataset.zonaVoltar && !modal ? T('Abas', 'Tabs') : T('Voltar', 'Back')]);
+      pares.push(['voltar', T('Ajuda', 'Help')]); // (1.0.2) era só "?" ao lado do nome do botão ("View ?"): ninguém entendia
+      dicaCom(lay, pares);
+      const surgiu = !dicaEl.classList.contains('on'); // aparecendo agora: nasce já no lugar (só desliza de um item para outro)
+      if (surgiu) dicaEl.classList.add('segue');
       dicaEl.classList.add('on'); colocar(dicaEl, at.getBoundingClientRect(), true);
+      if (surgiu) { void dicaEl.offsetWidth; dicaEl.classList.remove('segue'); }
     } else dicaEl.classList.remove('on');
     if (!baseLivre()) return;
     const tela = document.querySelector('.tela.ativa');
@@ -553,14 +591,14 @@
   // Coloca a dica sem cobrir o resto: dentro da ponta direita do item quando ele é largo (a conversa, a mensagem, o campo);
   // senão logo abaixo, acima, à direita ou à esquerda dele, onde couber na tela.
   function colocar(el, r, dentroOk) {
-    el.style.left = el.style.top = '0px';
     const w = el.offsetWidth, hh = el.offsetHeight, m = 8, W = innerWidth, H = innerHeight;
     const cabe = (x, y) => x >= m && y >= m && x + w <= W - m && y + hh <= H - m;
     const op = [];
     if (dentroOk && r.width >= w + 40 && r.height >= hh + 6) op.push([r.right - w - 8, r.top + (r.height - hh) / 2]);
     op.push([r.right - w, r.bottom + 6], [r.left, r.bottom + 6], [r.right - w, r.top - hh - 6], [r.right + 8, r.top + (r.height - hh) / 2], [r.left - w - 8, r.top + (r.height - hh) / 2]);
     let p = op.find(([x, y]) => cabe(x, y)) || [A.limitar(r.right - w, m, W - w - m), A.limitar(r.bottom + 6, m, H - hh - m)];
-    el.style.left = Math.round(p[0]) + 'px'; el.style.top = Math.round(p[1]) + 'px';
+    const l = Math.round(p[0]) + 'px', t = Math.round(p[1]) + 'px';
+    if (el.style.left !== l) el.style.left = l; if (el.style.top !== t) el.style.top = t;
   }
   function abrirAjuda() {
     if (ajudaEl) return;

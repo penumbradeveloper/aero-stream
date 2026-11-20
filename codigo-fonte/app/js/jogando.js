@@ -181,8 +181,18 @@
   J.abrir = async () => {
     const p = ponte(); if (!p) return;
     const est = h('div', { class: 'peq suave jog-est' });
-    const lista = h('div', { class: 'col jog-pers-lista' });
+    const lista = h('div', { class: 'col jog-pers-lista jog-rolar' });
     const prev = h('div', { class: 'jog-prev-agora' });
+    // (1.0.2) uma buscazinha em cada lista; cada lista rola sozinha depois de um tamanho (quem tem muita coisa detectada ou configurada)
+    const semAcento = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const filtrar = (el, q) => {
+      const k = semAcento(q).trim(), its = [...el.querySelectorAll(':scope > .jog-pers-it')];
+      let vis = 0; for (const it of its) { const ok = !k || (it.dataset.busca || '').includes(k); it.hidden = !ok; if (ok) vis++; }
+      let nada = el.querySelector(':scope > .jog-nada');
+      if (k && its.length && !vis) { if (!nada) { nada = h('div', { class: 'peq suave jog-nada' }, T('Nada encontrado.', 'Nothing found.')); el.append(nada); } } else if (nada) nada.remove();
+    };
+    const busca = (el, ph) => { const i = h('input', { class: 'campo jog-busca', type: 'search', maxlength: 60, placeholder: ph, 'aria-label': ph, oninput: () => filtrar(el, i.value) }); i.addEventListener('keydown', (e) => e.stopPropagation()); return i; };
+    const buscaPers = busca(lista, T('Procurar nas atividades...', 'Search activities...'));
     const pintarEst = async () => {
       let e = {}; try { e = await p.estado(); } catch (x) { /* ok */ }
       est.textContent = !J.ligado() ? T('Desligado em Privacidade.', 'Off in Privacy.') : [
@@ -195,13 +205,47 @@
     };
     const pintarLista = async () => {
       let l = []; try { l = await p.pers(); } catch (x) { /* ok */ }
-      lista.replaceChildren(...(l.length ? l.map((x) => h('div', { class: 'jog-pers-it vidro interno' },
+      lista.replaceChildren(...(l.length ? l.map((x) => h('div', { class: 'jog-pers-it vidro interno', 'data-busca': semAcento([x.nome, x.proc, x.det, x.vb].filter(Boolean).join(' ')) },
         imagem(x.li, '', 'jog-ip-lista', true),
         h('div', { class: 'cresce', estilo: { 'min-width': 0 } }, h('b', { class: 'jog-ell' }, x.nome), h('div', { class: 'peq suave jog-ell' }, x.modo === 'manual' ? T('Manual: fica até você desligar', 'Manual: stays until you turn it off') : x.proc ? T('Quando abrir ', 'When ') + x.proc + T('', ' is open') : T('Sempre', 'Always'))),
         x.modo === 'manual' ? U().btn('', { icone: 'girar', tipo: 'sec', redondo: true, peq: true, titulo: T('Zerar o contador', 'Reset the timer'), onclick: async () => { x.ini = Date.now(); try { await p.pers(l); } catch (e) { return; } A.som.tocar('sucesso'); setTimeout(async () => { await olhar(); pintarEst(); }, 50); } }) : null,
         U().chave(x.ativo !== false, async (v) => { x.ativo = v; await p.pers(l); setTimeout(olhar, 50); }),
         U().btn('', { icone: 'lapis', tipo: 'sec', redondo: true, peq: true, titulo: T('Editar', 'Edit'), onclick: () => editar(l, x, pintarLista) })))
         : [h('div', { class: 'peq suave' }, T('Nenhuma ainda. Crie uma para mostrar o que quiser quando um app ou jogo estiver aberto.', 'None yet. Create one to show whatever you want while an app or game is open.'))]));
+      filtrar(lista, buscaPers.value);
+    };
+    // (1.0.2) os jogos e emuladores que o Aero está vendo agora: a pessoa escolhe quais os amigos veem (ex.: o Dolphin aberto o dia todo).
+    // Os desligados continuam na lista, mesmo fechados, para dar para ligar de novo
+    const detLista = h('div', { class: 'col jog-pers-lista jog-det-lista jog-rolar' });
+    const buscaDet = busca(detLista, T('Procurar nos jogos detectados...', 'Search detected games...'));
+    const temDet = !!(p.detectados && p.ignorados);
+    const TIPO = { jogo: ['Jogo reconhecido', 'Recognized game'], emu: ['Emulador', 'Emulator'], discord: ['Mandado pelo jogo', 'Sent by the game'], sdk: ['Pelo SDK do Aero', 'Through the Aero SDK'] };
+    let assDet = '';
+    const pintarDet = async (forcar) => {
+      if (!temDet || !detLista.isConnected && !forcar) return;
+      let vivos = [], ign = [];
+      try { [vivos, ign] = await Promise.all([p.detectados(), p.ignorados()]); } catch (e) { return; }
+      vivos = Array.isArray(vivos) ? vivos : []; ign = Array.isArray(ign) ? ign : [];
+      const mesmo = (a, b) => a.ks.some((k) => b.ks.includes(k));
+      const itens = vivos.map((x) => ({ ...x, aberto: true }));
+      for (const g of ign) if (!itens.some((x) => mesmo(x, g))) itens.push({ ...g, aberto: false });
+      const escondido = (x) => ign.some((g) => mesmo(x, g));
+      const ass = JSON.stringify(itens.map((x) => [x.ks, x.n, x.ic, x.aberto, escondido(x)]));
+      if (ass === assDet && !forcar) return; assDet = ass;
+      const mudar = async (x, mostrar) => {
+        let l = []; try { l = await p.ignorados(); } catch (e) { return; }
+        l = (Array.isArray(l) ? l : []).filter((g) => !mesmo(x, g));
+        if (!mostrar) l.push({ ks: x.ks, n: x.n, ic: x.ic || '', tipo: x.tipo });
+        try { await p.ignorados(l); } catch (e) { return; }
+        assDet = ''; pintarDet(); setTimeout(async () => { await olhar(); pintarEst(); }, 50);
+      };
+      detLista.replaceChildren(...(itens.length ? itens.map((x) => h('div', { class: 'jog-pers-it vidro interno' + (escondido(x) ? ' jog-det-off' : ''), 'data-busca': semAcento(x.n) },
+        imagem(x.ic, '', 'jog-ip-lista', true),
+        h('div', { class: 'cresce', estilo: { 'min-width': 0 } }, h('b', { class: 'jog-ell' }, x.n),
+          h('div', { class: 'peq suave jog-ell' }, T(...(TIPO[x.tipo] || TIPO.jogo)) + ' · ' + (x.aberto ? T('aberto agora', 'open now') : T('fechado', 'closed')) + (escondido(x) ? ' · ' + T('os amigos não veem', 'friends do not see it') : ''))),
+        U().chave(!escondido(x), (v) => mudar(x, v))))
+        : [h('div', { class: 'peq suave' }, T('Nenhum jogo aberto agora. Quando o Aero reconhecer um jogo ou emulador, ele aparece aqui e você escolhe se os amigos veem.', 'No game open right now. When Aero recognizes a game or emulator, it shows up here and you choose whether friends see it.'))]));
+      filtrar(detLista, buscaDet.value);
     };
     const m = U().modal(T('Atividades de jogo', 'Game activities'), h('div', { class: 'col jog-cfg', estilo: { gap: '12px' } },
       est, prev,
@@ -211,11 +255,17 @@
       h('div', { class: 'opcao' }, h('div', { class: 'cresce' }, h('div', { estilo: { 'font-weight': '600' } }, T('SDK do Aero para jogos e apps', 'Aero SDK for games and apps')),
         h('div', { class: 'peq suave' }, T('Jogos e programas mandam a atividade direto para o Aero (o canal "aero-ipc-0", igual ao do Discord).', 'Games and programs send their activity straight to Aero (the "aero-ipc-0" channel, same as Discord\'s).'))),
       U().chave(cfg().sdk !== false, (v) => { salvarCfg({ sdk: v }); setTimeout(pintarEst, 900); })),
+      temDet ? h('div', { class: 'col', estilo: { gap: '8px', 'margin-top': '4px' } },
+        h('h3', { estilo: { margin: 0 } }, T('Jogos detectados', 'Detected games')),
+        h('div', { class: 'peq suave' }, T('O que o Aero reconheceu aberto neste computador. Desligue o que você não quer que os amigos vejam: o Aero continua reconhecendo, só não mostra.', 'What Aero recognized open on this computer. Turn off what you do not want friends to see: Aero still recognizes it, it just does not show it.')),
+        buscaDet, detLista) : null,
       h('div', { class: 'linha entre', estilo: { 'margin-top': '4px' } }, h('h3', { estilo: { margin: 0 } }, T('Atividades personalizadas', 'Custom activities')),
         U().btn(T('Nova', 'New'), { icone: 'mais', tipo: 'ok', peq: true, onclick: async () => { let l = []; try { l = await p.pers(); } catch (x) { /* ok */ } editar(l, null, pintarLista); } })),
-      lista), { largura: 560, classe: 'jog-modal' });
+      buscaPers, lista), { largura: 640, classe: 'jog-modal' });
     void m;
-    pintarEst(); pintarLista();
+    pintarEst(); pintarLista(); pintarDet(true);
+    // enquanto a janela está aberta, a lista acompanha o que abre e fecha
+    if (temDet) { const tk = setInterval(() => { if (!detLista.isConnected) { clearInterval(tk); return; } pintarDet(); }, 3000); }
   };
 
   // ---------- o editor de uma atividade personalizada ----------

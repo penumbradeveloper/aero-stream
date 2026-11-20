@@ -73,7 +73,7 @@
       h('section', { class: 'cred-bloco' },
         h('div', { class: 'cred-rot' }, T('Testers oficiais', 'Official testers')),
         h('div', { class: 'cred-testers' }, ...TESTERS.map((n) => h('span', { class: 'cred-tester' }, U.selos ? U.selos(['tester']) : null, n)))),
-      h('p', { class: 'cred-fim peq suave' }, T('E todo mundo que usa, apoia e manda feedback. Obrigado!', 'And everyone who uses, supports and sends feedback. Thank you!')));
+      h('p', { class: 'cred-fim peq suave' }, T('O Aero é feito por uma pessoa só, então bugs vão aparecer. Ele só fica melhor com todo mundo que usa, apoia e manda feedback. Obrigado!', 'Aero is made by one person, so bugs will show up. It only gets better thanks to everyone who uses it, supports it and sends feedback. Thank you!')));
     U.modal(T('Créditos', 'Credits'), corpo, { largura: 460, classe: 'cred-modal' });
   };
 })();

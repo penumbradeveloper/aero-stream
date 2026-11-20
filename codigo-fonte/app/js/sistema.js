@@ -14,7 +14,13 @@
   const novaMaior = (a, b) => { const p = (v) => String(v).replace('-', '.').split('.').map((n) => parseInt(n, 10) || 0); const x = p(a), y = p(b); for (let i = 0; i < 4; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
   const U = () => A.ui;
   const ADIAR_MS = 3 * 3600000; // "Depois": pergunta de novo em 3 horas (ou quando abrir o app de novo)
-  let perguntando = false, adiada = { versao: '', ate: 0 }, avisouInstalador = '', ultima = null;
+  let perguntando = false, adiada = { versao: '', ate: 0 }, avisouInstalador = '', ultima = null, origem = null;
+  // (1.0.2) versões de teste: quem tem permissão (testers, supporters e o desenvolvedor) pode receber as versões novas do app do PC antes
+  // de todo mundo. É só um endereço com os pacotes assinados (sem contas): a conta, os amigos e as conversas continuam no servidor de
+  // sempre. O app pergunta aos dois e fica com a versão mais nova que respondeu certo; se o de teste cair ou estiver atrás, vale o normal
+  A.TESTE_ATUALIZACAO = 'https://canal-de-teste.exemplo.invalid';
+  const podeTeste = () => { const eu = A.api && A.api.eu; if (!eu) return false; const sl = Array.isArray(eu.sl) ? eu.sl : []; return eu.cargo === 'dev' || sl.includes('dev') || sl.includes('tester') || sl.includes('supporter'); };
+  const testeLigado = () => desktop() && podeTeste() && !!(A.cfg.v.atualizar && A.cfg.v.atualizar.teste);
 
   function quandoSairDaSala(fn) { if (!naSala()) { fn(); return; } const off = A.evt.on('sala:fechada', () => { off(); setTimeout(fn, 800); }); }
   const reiniciar = () => { if (desktop() && window.aero.reiniciar) window.aero.reiniciar(); else location.reload(); };
@@ -33,7 +39,8 @@
   async function instalar(versao, pronta) {
     if (!desktop() || !window.aero.atualizacao) { reiniciar(); return; }
     const t = pronta ? null : U().toast(T('Baixando a versão ' + versao + '...', 'Downloading version ' + versao + '...'), { ms: 0 });
-    const r = pronta ? { pronta: true } : await window.aero.atualizacao.verificar(A.api.servidor || location.origin).catch((e) => ({ erro: String(e.message || e) }));
+    const o = origem || { base: A.api.servidor || location.origin, canal: 'normal' };
+    const r = pronta ? { pronta: true } : await window.aero.atualizacao.verificar(o.base, o.canal).catch((e) => ({ erro: String(e.message || e) }));
     if (t) t.fechar();
     if (r && (r.pronta || r.nada)) { U().toast(T('Atualizado! Reiniciando o Aero...', 'Updated! Restarting Aero...'), { tipo: 'ok', ms: 2500 }); setTimeout(reiniciar, 1200); }
     else U().toast(T('Não consegui atualizar agora: ', 'Could not update now: ') + ((r && r.erro) || '?'), { tipo: 'erro', ms: 9000 });
@@ -46,7 +53,13 @@
     try {
       let r;
       if (desktop() && window.aero.atualizacao) {
-        if (window.aero.atualizacao.checar) r = await window.aero.atualizacao.checar(base);
+        if (window.aero.atualizacao.checar && testeLigado()) {
+          // os dois canais ao mesmo tempo: fica a versão mais nova que respondeu certo (assinatura conferida pelo app do PC)
+          const [n, t] = await Promise.all([window.aero.atualizacao.checar(base).catch((e) => ({ erro: String(e.message || e) })), window.aero.atualizacao.checar(A.TESTE_ATUALIZACAO).catch((e) => ({ erro: String(e.message || e) }))]);
+          if (t && t.erro) A.log.aviso('versões de teste: sem resposta, usando o canal normal', t.erro);
+          const usarTeste = t && t.ok && t.versao && (!(n && n.ok && n.versao) || novaMaior(t.versao, n.versao));
+          r = usarTeste ? t : n; origem = usarTeste ? { base: A.TESTE_ATUALIZACAO, canal: 'teste' } : { base, canal: 'normal' };
+        } else if (window.aero.atualizacao.checar) { r = await window.aero.atualizacao.checar(base); origem = { base, canal: 'normal' }; }
         else { const x = await window.aero.atualizacao.verificar(base); r = x && x.pronta ? { ok: true, nova: true, pronta: true, versao: x.versao } : x && x.precisaInstalador ? { ok: true, nova: true, precisaInstalador: true, versao: x.versao } : { ok: !(x && x.erro), erro: x && x.erro }; }
         if (r && r.erro) { A.log.aviso('atualização', r.erro); return (ultima = { nova: null, erro: r.erro }); }
       } else {
@@ -136,6 +149,16 @@
       if (desktop() && window.aero.vce3) setTimeout(() => verificarDriver({ silencioso: false }), 9000);
     },
     verificarAtualizacao, ultimaVerificacao: () => ultima,
+    podeTeste, testeLigado,
+    // (1.0.2) desligou as versões de teste: se a que está rodando veio do canal de teste e é mais nova que a normal, oferece voltar já
+    async sairDoTeste() {
+      if (!desktop() || !window.aero.atualizacao || !window.aero.atualizacao.normal) return;
+      let canal = 'normal'; try { canal = window.aero.atualizacao.canal ? await window.aero.atualizacao.canal() : 'normal'; } catch (e) { /* ok */ }
+      if (canal !== 'teste') return;
+      const ok = await U().confirmar(T('Você está numa versão de teste (' + A.versao + '). Quer voltar para a versão normal agora? O Aero reinicia.', 'You are on a test version (' + A.versao + '). Go back to the regular version now? Aero will restart.'), { titulo: T('Versões de teste', 'Test versions'), sim: T('Voltar agora', 'Go back now'), nao: T('Depois', 'Later') });
+      if (!ok) return;
+      quandoSairDaSala(async () => { try { await window.aero.atualizacao.normal(); } catch (e) { /* ok */ } reiniciar(); });
+    },
   };
 
   // ---------- selo de não lidas (0.6.0): bolhinha de vidro com o número no ícone da bandeja e da barra de tarefas ----------

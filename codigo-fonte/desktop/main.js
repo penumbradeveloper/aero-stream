@@ -5,7 +5,8 @@ const { app, BrowserWindow, ipcMain, session, desktopCapturer, screen, powerMoni
 try { const ud = app.getPath('userData'), sd = app.getPath('sessionData'); app.setName('Aero'); app.setPath('userData', ud); app.setPath('sessionData', sd); } catch (e) { /* fica o nome antigo */ }
 // Atualização automática (atualizador.js): se uma versão mais nova (assinada) já foi baixada, ela assume daqui e este arquivo para.
 const atualizador = require('./atualizador').criarAtualizador({ app, log: (...a) => { try { console.log('[aero]', ...a); } catch (e) { /* ok */ } } });
-if (atualizador.delegar()) return; // eslint-disable-line no-useless-return
+// (1.0.2) rodando da pasta do código (npm start, sem instalar): roda sempre o código da pasta, nunca uma atualização baixada
+if (app.isPackaged && atualizador.delegar()) return; // eslint-disable-line no-useless-return
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -661,7 +662,7 @@ app.on('will-quit', () => { try { ouvindo.parar(); } catch (e) { /* ok */ } });
 // Detecta os jogos abertos (lista do Discord + emuladores), recebe a atividade que os jogos mandam (SDK do Aero no canal aero-ipc-0 e a
 // ponte no canal do Discord, que repassa tudo ao Discord de verdade) e junta com as atividades personalizadas da pessoa.
 const ponteRpc = require('./ponte-rpc');
-const jogos = require('./jogos').criarJogos({ log, pastaDados: app.getPath('userData'), lerPers: () => { const l = lerCfg().jogoPers; return Array.isArray(l) ? l : []; }, pidsProprios: () => pidsProprios(),
+const jogos = require('./jogos').criarJogos({ log, pastaDados: app.getPath('userData'), lerPers: () => { const l = lerCfg().jogoPers; return Array.isArray(l) ? l : []; }, lerIgnorados: () => { const l = lerCfg().jogoIgn; return Array.isArray(l) ? l : []; }, pidsProprios: () => pidsProprios(),
   aoMudar: () => { if (janela && !janela.isDestroyed()) janela.webContents.send('jogo-mudou'); } }); // mudou o jogo: o app manda na hora
 const ponteJogos = ponteRpc.criarPonte({ aoAtividade: (x) => jogos.aoRpc(x), log, caminhosDiscord: () => require('./discord').caminhos() });
 function caminhosDoDiscord() { // o Discord de verdade, para o discord.js (nunca a própria ponte)
@@ -690,6 +691,20 @@ handle('jogo-pers', (lista) => {
   if (lista === undefined || lista === null) return Array.isArray(c.jogoPers) ? c.jogoPers : [];
   c.jogoPers = require('./jogos').limparPers(lista); gravarCfg(c); return c.jogoPers;
 });
+handle('jogo-detectados', async () => { await jogos.varrer(); return jogos.detectados(); }); // (1.0.2) os jogos que o Aero está vendo agora
+// (1.0.2) os jogos que a pessoa escolheu não mostrar: { ks: chaves do jogo, n: nome, ic: ícone } (o nome e o ícone só para a lista)
+handle('jogo-ignorados', (lista) => {
+  const c = lerCfg();
+  if (lista === undefined || lista === null) return Array.isArray(c.jogoIgn) ? c.jogoIgn : [];
+  const ok = (k) => typeof k === 'string' && /^[aen]:[a-z0-9]{1,80}$/.test(k);
+  c.jogoIgn = (Array.isArray(lista) ? lista : []).slice(0, 200).map((x) => ({
+    ks: (x && Array.isArray(x.ks) ? x.ks : []).filter(ok).slice(0, 8),
+    n: String((x && x.n) || '').slice(0, 128),
+    ic: typeof (x && x.ic) === 'string' && /^https:\/\//.test(x.ic) ? x.ic.slice(0, 400) : '',
+    tipo: ['jogo', 'emu', 'sdk', 'discord'].includes(x && x.tipo) ? x.tipo : 'jogo',
+  })).filter((x) => x.ks.length);
+  gravarCfg(c); return c.jogoIgn;
+});
 const pararJogos = () => { try { jogos.parar(); } catch (e) { /* ok */ } try { ponteJogos.parar(); } catch (e) { /* ok */ } try { if (sdkJogos) sdkJogos.parar(); } catch (e) { /* ok */ } };
 app.on('will-quit', pararJogos);
 for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(sig, pararJogos); // devolve o nome do canal do Discord antes de sair
@@ -713,7 +728,10 @@ handle('audio-capturar', (o) => {
 handle('audio-parar', () => audio.parar());
 
 // ---------- atualização automática do app (veja atualizador.js) ----------
-handle('atualizacao-verificar', (servidor) => atualizador.verificarEBaixar(servidor));
+handle('atualizacao-verificar', (servidor, canal) => atualizador.verificarEBaixar(servidor, canal === 'teste' ? 'teste' : 'normal'));
+// (1.0.2) desligou as versões de teste: a versão de teste baixada sai e, ao reiniciar, o app volta para a instalada (e depois para a normal)
+handle('atualizacao-normal', () => atualizador.descartar());
+handle('atualizacao-canal', () => atualizador.canal());
 handle('atualizacao-checar', (servidor) => atualizador.checar(servidor));
 
 // ---------- bug do kernel que trava a placa AMD ao codificar (veja vce3.js) ----------

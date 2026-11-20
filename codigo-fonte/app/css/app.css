@@ -4860,6 +4860,9 @@ input[type=color]::-moz-color-swatch { background-image: radial-gradient(circle 
 [data-cxlado=direita] .cx-msg.eu .cx-reacoes { justify-content: flex-end; }
 [data-cxlado=direita] .cx-msg.eu .cx-acoes { right: auto; left: 10px; }
 [data-cxlado=direita] .cx-msg.eu[data-bc=gibi] .cx-txt:not(.so-figurinha) { border-radius: 18px 18px 4px 18px; }
+/* (1.0.2) à direita, o canto reto da bolha fica do lado da sua foto (em cima, à direita), espelhando o dos outros. Peso baixo: os modelos com formato próprio continuam valendo */
+:where([data-cxlado=direita] .cx-msg.eu) .cx-txt:not(.so-figurinha) { border-radius: 17px 5px 17px 17px; }
+[data-cxlado=direita] .cx-msg.eu[data-bc=cristal] .cx-txt:not(.so-figurinha) { border-radius: 18px 6px 18px 6px; }
 [data-cxlado=direita] .cx-msg:not(.eu) .cx-bal { max-width: min(82%, 680px); }
 /* à esquerda (também no celular): a sua mensagem é igual à dos outros, com foto e nome */
 @media (max-width: 760px) {
@@ -5489,8 +5492,9 @@ i.px-mo-coroa { border: 3px solid #f5c542; box-shadow: 0 0 10px rgba(245,197,66,
 .px-fx { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; opacity: 0; visibility: hidden; }
 .px-fx > i { position: absolute; display: block; pointer-events: none; border-radius: 50%; }
 .px-fx > .fx-tela { position: absolute; inset: -50%; width: 200%; height: 200%; display: block; pointer-events: none; }
-.avatar.an-on > .px-fx { opacity: 1; visibility: visible; animation: px-fx-entra .34s cubic-bezier(.2, .9, .3, 1.25) both; }
-.avatar.an-sai > .px-fx { visibility: visible; animation: px-fx-sai .45s ease-in forwards; }
+/* (1.0.2) "inherit", nunca "visible": dentro de algo escondido (a faixa da chamada de outra aba), o anel de quem fala aparecia solto na tela */
+.avatar.an-on > .px-fx { opacity: 1; visibility: inherit; animation: px-fx-entra .34s cubic-bezier(.2, .9, .3, 1.25) both; }
+.avatar.an-sai > .px-fx { visibility: inherit; animation: px-fx-sai .45s ease-in forwards; }
 .avatar:not(.an-on):not(.an-sai) > .px-fx *, .avatar:not(.an-on):not(.an-sai) > .px-fx *::before, .avatar:not(.an-on):not(.an-sai) > .px-fx *::after { animation: none !important; }
 @keyframes px-fx-entra { from { opacity: 0; transform: scale(.82); } }
 @keyframes px-fx-sai { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(.88); } }
@@ -5626,8 +5630,8 @@ i.px-mo-coroa { border: 3px solid #f5c542; box-shadow: 0 0 10px rgba(245,197,66,
 /* um ano ou mais: o brilho passa pelo selo */
 :is(.selo-fiel12, .selo-fiel24, .selo-fiel36, .selo-fiel48, .selo-fiel60, .selo-fiel84, .selo-fiel96, .selo-fiel108, .selo-fiel120)::before { content: ''; position: absolute; inset: 0; z-index: 2; background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,.75) 50%, transparent 65%) no-repeat; background-size: 100% 100%; inset: 0 auto 0 0; width: 250%; animation: selo-reflexo 3.2s ease-in-out infinite; pointer-events: none; }
 .selo-fundador { background: radial-gradient(circle at 30% 25%, #e0e7ff, #6366f1 48%, #1e3a8a); }
-/* (1.0.2) Tester Oficial: vidro âmbar, com um brilho que passa devagar no perfil */
-.selo-tester { background: radial-gradient(circle at 30% 25%, #fff3c4, #f59e0b 50%, #9a3412); box-shadow: 0 0 0 1px rgba(255,214,120,.55), 0 0 8px rgba(245,158,11,.45); }
+/* (1.0.2) Tester Oficial: vidro verde-limão (bem diferente do dourado do Dev), com um brilho que passa devagar no perfil */
+.selo-tester { background: radial-gradient(circle at 30% 25%, #f4ffb0, #a3e635 46%, #3f6212); box-shadow: 0 0 0 1px rgba(214,255,120,.55), 0 0 8px rgba(163,230,53,.45); }
 .perfil-nome .selo-tester::before { content: ''; position: absolute; inset: 0; z-index: 2; border-radius: 50%; pointer-events: none; background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,.75) 50%, transparent 65%); background-size: 260% 100%; background-position: 120% 0; animation: seloTesterBrilho 4.5s ease-in-out infinite; }
 @keyframes seloTesterBrilho { 0%, 62% { background-position: 120% 0; } 100% { background-position: -40% 0; } }
 @media (prefers-reduced-motion: reduce) { .perfil-nome .selo-tester::before { animation: none; display: none; } }
@@ -5937,6 +5941,9 @@ html:not([data-entrada=pad]) #marcas-pad { display: none; }
 @keyframes padAparece { from { opacity: 0; } }
 .marca-pad { position: absolute; transform: translate(-50%, -50%); display: inline-flex; align-items: center; gap: 4px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.35)); animation: padAparece .25s ease backwards; }
 .marca-pad .gl { opacity: .92; }
+/* (1.0.2) as marcas e a dica não são refeitas a cada passo: só deslizam para o lugar novo (a dica junto da bolinha anda colada nela) */
+.marca-pad { transition: left .22s cubic-bezier(.22, 1, .36, 1), top .22s cubic-bezier(.22, 1, .36, 1); }
+#dica-pad { transition: left .2s cubic-bezier(.22, 1, .36, 1), top .2s cubic-bezier(.22, 1, .36, 1); } #dica-pad.segue { transition: none; }
 #ajuda-pad { position: fixed; inset: 0; margin: auto; height: fit-content; max-height: calc(100vh - 24px); overflow: auto; z-index: 2147483001; width: min(560px, calc(100vw - 24px)); box-sizing: border-box; padding: 18px 20px; border-radius: 26px; display: flex; flex-direction: column; gap: 12px; align-items: center; text-align: center; animation: popin .3s var(--mola) backwards; }
 #ajuda-pad.fechando { animation: esmaecer .2s ease reverse both; }
 .ajuda-pad-tit { font-size: 17px; }

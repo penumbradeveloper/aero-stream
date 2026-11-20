@@ -68,8 +68,10 @@ contextBridge.exposeInMainWorld('aero', {
   aoAbrirAer: (cb) => { ipcRenderer.on('abrir-aer', (_e, d) => { try { cb(d); } catch (e) { /* ok */ } }); chamar('aer-inicial').then((d) => { if (d) cb(d); }).catch(() => {}); }, // (1.0.0) skins .aer
   aoConvite: (cb) => { const f = (_e, sala) => { try { cb(String(sala)); } catch (e) { /* ok */ } }; ipcRenderer.on('convite', f); return () => ipcRenderer.removeListener('convite', f); },
   atualizacao: {
-    verificar: (servidor) => chamar('atualizacao-verificar', String(servidor || '')), // baixa e confere (assinatura) a versão nova, se houver
+    verificar: (servidor, canal) => chamar('atualizacao-verificar', String(servidor || ''), canal === 'teste' ? 'teste' : 'normal'), // baixa e confere (assinatura) a versão nova, se houver
     checar: (servidor) => chamar('atualizacao-checar', String(servidor || '')), // só diz se há versão nova (o app pergunta antes de baixar)
+    normal: () => chamar('atualizacao-normal'), // (1.0.2) tira a versão de teste baixada (volta para a normal ao reiniciar)
+    canal: () => chamar('atualizacao-canal'), // (1.0.2) de qual canal veio a versão que está rodando
   },
   vce3: { // bug do kernel que trava placas AMD Polaris ao codificar (veja desktop/vce3.js)
     diagnosticar: () => chamar('vce3-diagnosticar'),
@@ -122,6 +124,8 @@ contextBridge.exposeInMainWorld('aero', {
     procurar: (q) => chamar('jogo-procurar', String(q || '')),
     imagens: (q) => chamar('jogo-imagens', String(q || '')),
     pers: (lista) => chamar('jogo-pers', lista === undefined ? null : lista),
+    detectados: () => chamar('jogo-detectados'), // (1.0.2) os jogos que o Aero está vendo agora
+    ignorados: (lista) => chamar('jogo-ignorados', lista === undefined ? null : lista), // (1.0.2) os que a pessoa não quer mostrar
     aoMudar: (cb) => { ipcRenderer.on('jogo-mudou', () => { try { cb(); } catch (e) { /* ok */ } }); }, // o que os amigos veem mudou (sem esperar a próxima pergunta)
   },
   celMic: { // (1.0.2) celular como microfone: o servidor local de pareamento (desktop/celmic.js)

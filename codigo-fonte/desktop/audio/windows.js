@@ -156,7 +156,8 @@ function criarWindows({ pastaDados, pidsProprios = () => [process.pid], emitirPC
     if (build() < BUILD_INCLUIR) return { ok: false, erro: 'windows-antigo' };
     const exe = await ajudante(); if (!exe) return { ok: false, erro: 'sem-auxiliar' };
     const r = await resolverAlvos({ ids, excluirAero, excluirDiscord, janela }); if (r.erro) return { ok: false, erro: r.erro };
-    if (r.dinamico && !r.alvos.length && !soIncluir()) return capturar({ ids, excluirAero, excluirDiscord: false, janela }); // nada tocando além do Discord: sem truque (no Windows 10 espera alguém tocar)
+    // (1.0.2) nada tocando além do Discord: espera alguém tocar (como no Windows 10). Antes caía na captura de tudo e o Discord ia junto
+    // ao compartilhar de novo, mesmo com "Não captar o som do Discord" marcado
     const s = { fechado: false, procs: [], mix: null, taxa: 48000, ja: new Set() };
     sessao = s;
     for (const taxa of [48000, 44100]) { // a primeira que o Windows aceitar vale para todos

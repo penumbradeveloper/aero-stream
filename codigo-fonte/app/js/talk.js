@@ -613,7 +613,7 @@
   TK.chatCompacto = (cid) => {
     const c = TK.conversas.find((x) => x.id === cid); if (!c) return null;
     const cx = A.chatUI.criar({
-      ehMeu: (m) => API.eu && m.de === API.eu.codigo, nome: (m) => nomeDe(m.de), avatar: (m) => pessoaDe(m.de), perfilDe: (m) => m.de, bolhaDe: (m) => pessoaDe(m.de).bc, nomeEstiloDe: (m) => pessoaDe(m.de).nm, selosDe: (m) => pessoaDe(m.de).sl,
+      ehMeu: (m) => API.eu && m.de === API.eu.codigo, nome: (m) => nomeDe(m.de), avatar: (m) => pessoaDe(m.de), perfilDe: (m) => m.de, bolhaDe: (m) => pessoaDe(m.de).bc, nomeEstiloDe: (m) => pessoaDe(m.de).nm, selosDe: (m) => (A.ui.selosVisiveis ? A.ui.selosVisiveis(pessoaDe(m.de)) : pessoaDe(m.de).sl),
       aceitar: '*', limite: TK.limiteAnexo, dicaLimite, placeholder: T('Mensagem para ', 'Message ') + TK.titulo(c),
       urlAnexo: (m) => TK.urlViva(m.anexo), urlDe: (a) => TK.urlViva(a), multiAnexo: true, aoMontar: (m) => { if ((m.anexos || [m.anexo]).some((a) => a && TK.urlMorta(a.url))) setTimeout(() => anexo(m), 0); },
       rascunho: c.id, enviar: (d) => TK.enviar(c, d), editar: (m, t) => TK.editar(c, m, t), apagar: (m) => TK.apagar(c, m), encaminhar: (m) => TK.encaminhar(m, c), reagir: (m, e) => TK.reagir(c, m, e), superReacoes: true,
@@ -1176,7 +1176,7 @@
       if (pess && A.perfil && A.perfil.buscar) A.perfil.buscar(pess.codigo).then((p) => { U.lembrarVisto(pess.codigo, p && p.visto, p && p.vm); U.atualizarVivos(); }).catch(() => {});
       cx = A.chatUI.criar({
         ehMeu: (m) => API.eu && m.de === API.eu.codigo,
-        nome: (m) => nomeDe(m.de), avatar: (m) => pessoaDe(m.de), perfilDe: (m) => m.de, bolhaDe: (m) => pessoaDe(m.de).bc, nomeEstiloDe: (m) => pessoaDe(m.de).nm, selosDe: (m) => pessoaDe(m.de).sl,
+        nome: (m) => nomeDe(m.de), avatar: (m) => pessoaDe(m.de), perfilDe: (m) => m.de, bolhaDe: (m) => pessoaDe(m.de).bc, nomeEstiloDe: (m) => pessoaDe(m.de).nm, selosDe: (m) => (A.ui.selosVisiveis ? A.ui.selosVisiveis(pessoaDe(m.de)) : pessoaDe(m.de).sl),
         podeApagar: () => c.tipo === 'grupo' && (c.meuPapel === 'dono' || c.meuPapel === 'admin'),
         aceitar: '*', limite: TK.limiteAnexo, dicaLimite,
         tituloAnexo: (() => { const mb = Math.round(TK.limiteAnexo() / 1048576), lim = mb >= 1024 ? Math.round(mb / 1024) + ' GB' : mb + ' MB'; return T('Enviar um arquivo (até ' + lim + ') · também dá para colar ou arrastar', 'Send a file (up to ' + lim + ') · you can also paste or drag'); })(),

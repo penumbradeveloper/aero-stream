@@ -103,3 +103,11 @@
 .jog-gal-it > small { font-size: 10.5px; text-align: center; opacity: .8; }
 /* o editor abre por cima de "Atividades de jogo": a janela de baixo some enquanto isso (o vidro não deixa o texto dela aparecer através) */
 #modais > .fundo-modal:has(~ .fundo-modal .jog-editor) > .modal { visibility: hidden; }
+/* (1.0.2) a janela das atividades de jogo fica quase opaca (as Configurações atrás atrapalhavam a leitura) e o jogo desligado fica apagadinho */
+.modal.jog-modal { background: rgba(var(--vidro-rgb), .97) !important; }
+[data-tema=escuro] .modal.jog-modal { background: rgba(22, 32, 42, .97) !important; }
+.jog-det-off > .jog-ip-lista, .jog-det-off > .cresce > b { opacity: .5; }
+/* (1.0.2) a busca de cada lista e a rolagem separada de cada uma. A folga (padding + margem negativa) não deixa a sombra dos cartões cortada */
+.jog-busca { height: 34px; padding: 6px 12px; font-size: 13px; max-width: 100%; }
+.jog-rolar { max-height: min(264px, 34vh); overflow-y: auto; overscroll-behavior: contain; padding: 4px 8px 6px 4px; margin: -4px -8px -6px -4px; }
+.jog-rolar > .jog-pers-it[hidden] { display: none; }

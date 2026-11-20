@@ -225,13 +225,23 @@
   document.addEventListener('wheel', () => { rolandoAte = performance.now() + 200; }, { capture: true, passive: true });
   // (0.9.7) enquanto a página rola: as animações enfeite param e o mouse não acende hover (cada hover em cartão de vidro refazia o desfoque
   // no meio da rolagem). A classe entra uma vez no começo e sai 160 ms depois do último passo, sem nada por quadro
-  { const raiz = document.documentElement; let fimRol = 0;
+  // (1.0.2) só a rolagem feita pela pessoa (roda, toque, teclado, barra de rolagem) liga isso. A rolagem automática (o chat descendo até
+  // o fim ao abrir uma conversa, as fotos carregando, as mensagens antigas chegando) também ligava, e os cliques ficavam mortos por segundos
+  // ao trocar de DM. E mexer o mouse desliga na hora: o próximo clique sempre pega
+  { const raiz = document.documentElement; let fimRol = 0, maoAte = 0;
+    const mao = () => { maoAte = performance.now() + 700; };
+    const parar = () => { if (!fimRol) return; clearTimeout(fimRol); fimRol = 0; raiz.classList.remove('rolando'); };
     const rolou = (e) => {
       const alvo = e.target;
-      if (alvo === document || !(alvo instanceof Element) || alvo.closest('.cham-janela, .tela-jogo, [data-lock="1"]')) return;
+      if (performance.now() > maoAte || alvo === document || !(alvo instanceof Element) || alvo.closest('.cham-janela, .tela-jogo, [data-lock="1"]')) return;
       if (!fimRol) raiz.classList.add('rolando'); else clearTimeout(fimRol);
       fimRol = setTimeout(() => { fimRol = 0; raiz.classList.remove('rolando'); }, 160);
     };
+    for (const t of ['wheel', 'touchmove']) document.addEventListener(t, mao, { capture: true, passive: true });
+    document.addEventListener('keydown', (e) => { if (/^(Page(Up|Down)|Home|End|Arrow(Up|Down)| )$/.test(e.key)) mao(); }, { capture: true, passive: true });
+    document.addEventListener('pointerdown', () => { parar(); mao(); }, { capture: true, passive: true }); // segurando a barra de rolagem
+    document.addEventListener('pointerup', () => { maoAte = 0; }, { capture: true, passive: true });
+    document.addEventListener('pointermove', (e) => { if (fimRol && (e.movementX || e.movementY) && !e.buttons) parar(); }, { capture: true, passive: true });
     document.addEventListener('scroll', rolou, { capture: true, passive: true }); }
   // (0.8.3) mais leve com o mesmo desenho: os pontos da borda (e a direção de cada um) são calculados uma vez por tamanho, não a cada quadro;
   // a borda usa menos pontos ligados por curvas suaves (antes eram 110 a 200 pontos retos por quadro, mesmo nas bolhas pequenas)

@@ -331,13 +331,15 @@ export class Hub {
   }
 
   // (0.8.0) os selos que aparecem no perfil: desenvolvedor ou moderador oficial, e o plano do Aero Bubble
+  // (1.0.2) os selos que aparecem junto do nome (chat, listas): só os que a pessoa deixou aparecendo no perfil (Perfil > Insígnias)
+  async selosVisiveis(o) { const sl = await this.selos(o), pf = (o.extra || {}).pf || {}; if (pf.si === false) return []; return Array.isArray(pf.so) && pf.so.length ? sl.filter((x) => !pf.so.includes('s:' + x)) : sl; }
   async selos(o) { const out = [], cg = await this.admin.cargo(o), p = planoDe(o); if (cg) out.push(cg); else if (o.seloMod) out.push('mod'); if (TESTERS.has(o.uid)) out.push('tester'); if (p) out.push(p); const f = seloFiel(o); if (f) out.push(f); if (o.fundador) out.push('fundador'); return out.length ? out : undefined; } // (1.0.0) + o selo da fidelidade e o Fundador 1.0
 
   async lista(conta) {
     const out = [];
     for (const [oid, info] of Object.entries(conta.amigos)) {
       const o = await this.get('c:' + oid);
-      if (o) out.push({ codigo: o.codigo, nome: o.nome, tag: o.tag || '', av: o.avatarV || 0, ins: o.ins || [], sl: await this.selos(o), bc: bcPublico((o.extra || {}).bc, nivelDe(o)), nm: nmPublico((o.extra || {}).nm, nivelDe(o)), np: (o.extra || {}).np || undefined, npV: (o.extra || {}).npV || undefined, bannerV: (o.extra || {}).bannerV || undefined, estado: info.estado, confia: !!info.confia, avisarOnline: !!info.avisarOnline, desde: info.desde || 0, apelido: (conta.apelidos || {})[oid] || '', extra: info.estado === 'aceita' ? this.extraPublico(o) : undefined });
+      if (o) out.push({ codigo: o.codigo, nome: o.nome, tag: o.tag || '', av: o.avatarV || 0, ins: o.ins || [], sl: await this.selosVisiveis(o), bc: bcPublico((o.extra || {}).bc, nivelDe(o)), nm: nmPublico((o.extra || {}).nm, nivelDe(o)), np: (o.extra || {}).np || undefined, npV: (o.extra || {}).npV || undefined, bannerV: (o.extra || {}).bannerV || undefined, estado: info.estado, confia: !!info.confia, avisarOnline: !!info.avisarOnline, desde: info.desde || 0, apelido: (conta.apelidos || {})[oid] || '', extra: info.estado === 'aceita' ? this.extraPublico(o) : undefined });
     }
     return out;
   }

@@ -77,7 +77,7 @@ export class Social {
   // ---------- quem é quem ----------
   async contaPorCodigo(codigo) { const id = await this.get('f:' + String(codigo || '').toUpperCase()); return id ? this.get('c:' + id) : null; }
   amigos(conta, oid) { const r = conta.amigos[oid]; return !!r && r.estado === 'aceita'; }
-  async publico(id) { const c = await this.get('c:' + id); return c ? { codigo: c.codigo, nome: c.nome, tag: c.tag || '', av: c.avatarV || 0, ins: c.ins || undefined, sl: await this.hub.selos(c), bc: bcPublico((c.extra || {}).bc, nivelDe(c)), nm: nmPublico((c.extra || {}).nm, nivelDe(c)) } : null; }
+  async publico(id) { const c = await this.get('c:' + id); return c ? { codigo: c.codigo, nome: c.nome, tag: c.tag || '', av: c.avatarV || 0, ins: c.ins || undefined, sl: await this.hub.selosVisiveis(c), bc: bcPublico((c.extra || {}).bc, nivelDe(c)), nm: nmPublico((c.extra || {}).nm, nivelDe(c)) } : null; }
 
   // avisa os aparelhos online dessas contas
   avisar(ids, msg) { for (const id of new Set(ids)) for (const ws of this.hub.ctx.getWebSockets('c:' + id)) { try { ws.send(JSON.stringify(msg)); } catch (_) { /* fechou */ } } }

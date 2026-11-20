@@ -949,7 +949,10 @@
         } catch (x) { U.toast(x.message, { tipo: 'erro' }); }
         b.disabled = false;
       };
-      return secao(T('Feedback', 'Feedback'), h('div', { class: 'col', estilo: { gap: '8px' } }, h('div', { class: 'linha', estilo: { gap: '6px', 'flex-wrap': 'wrap' } }, tipo, sub), texto, linhaDiag, lista, escolher,
+      return secao(T('Feedback', 'Feedback'), h('div', { class: 'col', estilo: { gap: '8px' } },
+        // (1.0.2) o Aero é feito por uma pessoa só: deixar claro que bugs acontecem e que o feedback é o que faz ele melhorar
+        h('p', { class: 'peq suave fb-umso' }, T('O Aero é feito por uma pessoa só. Pode (e vai) aparecer bug, e o app só fica melhor com vocês contando o que deu errado e o que está faltando. Todo feedback é lido.', 'Aero is made by one person. There can (and will) be bugs, and the app only gets better when you tell us what went wrong and what is missing. Every piece of feedback is read.')),
+        h('div', { class: 'linha', estilo: { gap: '6px', 'flex-wrap': 'wrap' } }, tipo, sub), texto, linhaDiag, lista, escolher,
         h('div', { class: 'linha', estilo: { gap: '6px', 'flex-wrap': 'wrap' } }, U.btn(T('Enviar feedback', 'Send feedback'), { icone: 'enviar', peq: true, onclick: enviar }), btnAnexar),
         h('p', { class: 'peq suave', estilo: { margin: 0 } }, T('A resposta chega aqui no app. Dá para anexar fotos, GIFs, áudios e vídeos.', 'The answer arrives here in the app. You can attach photos, GIFs, audio and video.'))));
     }
@@ -985,8 +988,8 @@
           h('div', { class: 'linha', estilo: { 'margin-top': '10px', 'flex-wrap': 'wrap' } }, btnSons, sonsEstado),
           opcao(T('Toque de chamada', 'Ringtone'), (() => { const t = h('select', { class: 'campo', estilo: { width: 'auto' } }, [['classico', T('Vidro', 'Glass')], ['brisa', T('Brisa', 'Breeze')], ['novo', T('Bolhas', 'Bubbles')], ['marimba', T('Marimba de vidro', 'Glass marimba')]].map(([v, r]) => h('option', { value: v }, r))); t.value = ['classico', 'marimba', 'brisa', 'novo'].includes(A.cfg.v.toque) ? A.cfg.v.toque : 'classico'; t.addEventListener('change', () => { A.cfg.v.toque = t.value; A.cfg.salvar(); });
             const ouvirT = () => A.som.tocar(t.value === 'novo' ? 'chamada-entrada' : 'chamada-entrada-' + t.value); // (1.0.0) a prévia é só pelo alto-falante
-            return h('div', { class: 'linha', estilo: { gap: '8px', 'align-items': 'center' } }, t, A.extras ? ((x) => { x.classList.add('px-ouvir-solto'); return x; })(A.extras.altoFalante(ouvirT)) : null); })())),
-          A.extras ? A.extras.secaoToques() : null,
+            return h('div', { class: 'linha', estilo: { gap: '8px', 'align-items': 'center' } }, t, A.extras ? ((x) => { x.classList.add('px-ouvir-solto'); return x; })(A.extras.altoFalante(ouvirT)) : null); })()),
+          A.extras ? A.extras.secaoToques() : null), // (1.0.2) os toques do Aero Bubble dentro da caixa (soltos, ficavam fora dela e sem a animação da troca de aba)
         secaoDigitar(),
         API.eu ? secaoIndicador() : null,
       ]),
@@ -1016,6 +1019,11 @@
           return h('div', { class: 'col', estilo: { gap: '8px' } },
             opcao(T('Procurar atualizações automaticamente', 'Check for updates automatically'), U.chave(A.cfg.v.atualizar.auto !== false, (v) => { A.cfg.v.atualizar.auto = v; A.cfg.salvar(); }), T('A cada minuto. Quando sai versão nova, o app pergunta antes de atualizar.', 'Every minute. When a new version is out, the app asks before updating.')),
             opcao(T('Mostrar as novidades depois de atualizar', 'Show what\'s new after updating'), U.chave(A.cfg.v.atualizar.novidades === true, (v) => { A.cfg.v.atualizar.novidades = v; A.cfg.salvar(); }), T('Na primeira vez que o app abre numa versão nova, as Novidades dela aparecem sozinhas.', 'The first time the app opens on a new version, its notes show up on their own.')),
+            // (1.0.2) versões de teste: só para testers, supporters e o desenvolvedor, e só no app do PC (mesma conta, mesmo servidor)
+            A.plat.desktop && A.sistema && A.sistema.podeTeste && A.sistema.podeTeste() ? opcao(T('Receber versões de teste', 'Get test versions'), U.chave(A.cfg.v.atualizar.teste === true, (v) => {
+              A.cfg.v.atualizar.teste = v; A.cfg.salvar();
+              if (v) verificar(); else if (A.sistema.sairDoTeste) A.sistema.sairDoTeste();
+            }), T('Você recebe as versões novas do app antes de todo mundo, com a mesma conta, os mesmos amigos e as mesmas conversas. Podem ter bugs: conte pelo Feedback. Se o canal de teste sair do ar ou a versão de teste não abrir, o Aero volta sozinho para a versão normal.', 'You get new app versions before everyone else, with the same account, friends and chats. They may have bugs: tell us through Feedback. If the test channel goes down or the test version does not open, Aero goes back to the regular version by itself.')) : null,
             h('div', { class: 'linha', estilo: { 'flex-wrap': 'wrap', gap: '10px' } }, U.btn(T('Verificar atualização', 'Check for updates'), { icone: 'atualizar', tipo: 'sec', peq: true, onclick: verificar }),
               A.novidades && A.novidades.tem() ? U.btn(T('Novidades', 'What\'s new'), { icone: 'estrela', tipo: 'sec', peq: true, onclick: () => A.novidades.abrir() }) : null, est)); // (0.8.3) o que cada versão trouxe
         })()),

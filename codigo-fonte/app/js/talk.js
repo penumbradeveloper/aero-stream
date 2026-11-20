@@ -12,6 +12,7 @@
     const quem = TK.nomeDe ? TK.nomeDe(m.de) : m.de, s = m.sis || {};
     if (s.tipo === 'chamada') return { sistema: 'chamada', texto: quem + (s.video ? T(' iniciou uma chamada de vídeo.', ' started a video call.') : T(' iniciou uma chamada.', ' started a call.')) };
     if (s.tipo === 'chamada-fim') return { sistema: 'fim', texto: T('A chamada terminou · durou ', 'The call ended · lasted ') + TK.duracao(s.dur || 0) };
+    if (s.tipo === 'fixou') return { sistema: 'fixou', alvo: s.seq, texto: quem + T(' fixou uma mensagem.', ' pinned a message.') }; // (1.0.2)
     if (s.tipo === 'chamada-perdida') return { sistema: 'perdida', texto: T('Chamada perdida de ', 'Missed call from ') + quem };
     return { sistema: 'outro', texto: '' };
   };
@@ -91,6 +92,9 @@
     const eu = API.eu && API.eu.codigo, minha = m.de === eu;
     let t = m.texto || (m.anexo ? '📎 ' + (m.anexo.tipo === 'imagem' ? T('imagem', 'image') : m.anexo.tipo === 'audio' ? T('áudio', 'audio') : m.anexo.tipo === 'video' ? T('vídeo', 'video') : m.anexo.tipo === 'texto' && m.anexo.nome ? String(m.anexo.nome).slice(0, 40) : T('arquivo', 'file')) : '');
     t = t.replace(/<@(todos|aqui)>/gi, (_, x) => '@' + x.toLowerCase()).replace(/<@([A-Z0-9]{6})>/gi, (_, x) => '@' + nomeDe(x.toUpperCase())).replace(/<fig:[^>]+>/gi, T('figurinha', 'sticker')).replace(/<em:[A-Z0-9]{6}:[0-9a-f]{10}:([a-z0-9_]{2,24})>/gi, ':$1:'); // (1.0.0) emoji próprio: :nome:
+    // (1.0.2) mensagem que é só um link de GIF (ou de imagem/vídeo): a prévia diz "GIF" em vez do endereço
+    const so = /^\s*(https?:\/\/\S+)\s*$/i.exec(t);
+    if (so) { const u = so[1].toLowerCase(); if (/(klipy\.com|klipy\.co|tenor\.com|giphy\.com|gfycat\.com)\//.test(u) || /\.gif(\?|#|$)/.test(u)) t = 'GIF'; else if (/\.(png|jpe?g|webp|avif)(\?|#|$)/.test(u)) t = '📎 ' + T('imagem', 'image'); else if (/\.(mp4|webm|mov)(\?|#|$)/.test(u)) t = '📎 ' + T('vídeo', 'video'); }
     const quem = minha ? T('Você: ', 'You: ') : c.tipo === 'grupo' && !m.sistema && m.de ? nomeDe(m.de) + ': ' : '';
     c.previa = quem + t; c.previaSeq = m.seq; c.previaDe = m.de; c.previaT = m.t || Date.now();
   }
@@ -122,7 +126,7 @@
     if (p.anexo && m.anexo) msg.anexo = { ...p.anexo, sid: m.anexo.id, tipo: tipoDe(p.anexo) }; // (0.6.9) áudio baixado com cara de vídeo (.m4a/.mp3 como video/mp4) vira áudio
     // (0.9.5) várias fotos/vídeos numa mensagem só: a lista inteira (o primeiro continua em "anexo")
     if (Array.isArray(p.anexos) && Array.isArray(m.anexos) && p.anexos.length === m.anexos.length && p.anexos.length > 1) {
-      msg.anexos = p.anexos.slice(0, 10).map((an, i) => ({ ...an, sid: m.anexos[i].id, tipo: tipoDe(an) }));
+      msg.anexos = p.anexos.slice(0, 20).map((an, i) => ({ ...an, sid: m.anexos[i].id, tipo: tipoDe(an) }));
       msg.anexo = msg.anexos[0];
     }
     return msg;
@@ -268,7 +272,7 @@
     if (enc) payload.enc = 1; // (0.7.2) encaminhada (vai dentro da mensagem cifrada: o servidor não vê)
     let sid = '', sids = null;
     if (anexos && anexos.length > 1) { // (0.9.5) várias fotos/vídeos juntos: sobem um por vez e vão numa mensagem só
-      const l = []; for (const a of anexos.slice(0, 10)) l.push(await subirUm(c, a));
+      const l = []; for (const a of anexos.slice(0, 20)) l.push(await subirUm(c, a));
       sids = l.map((x) => x.sid); sid = sids[0]; payload.anexo = l[0].info; payload.anexos = l.map((x) => x.info);
     } else if (anexo) { const x = await subirUm(c, anexo); sid = x.sid; payload.anexo = x.info; }
     if (resp) payload.resp = { seq: resp.seq || resp.id, de: resp.de, trecho: (resp.texto || '').slice(0, 120), anexo: !!resp.anexo };
@@ -374,12 +378,20 @@
       } else if (f.size > 2 * 1048576) throw new Error(T('GIF grande demais para figurinha (máximo 2 MB).', 'GIF too large for a sticker (max 2 MB).'));
       const r = await fetch(`${API.servidor}/api/figurinhas`, { method: 'POST', headers: { Authorization: 'Bearer ' + API.token, 'Content-Type': tipo }, body: corpo });
       const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || T('Não consegui criar a figurinha.', 'Could not create the sticker.'));
+      return d.id;
     },
     apagar: (id) => API.req('figurinhas/' + id, null, 'DELETE'),
     // (0.8.5) favoritas: figurinhas de qualquer pessoa, guardadas na conta (a lista vem com o código de quem criou)
     favoritas: async () => figsCache || (figsCache = (await API.req('figurinhas/favoritas')).favoritas || []),
     favoritar: async (codigo, id, sim) => { const r = await API.req('figurinhas/favoritas', { codigo, id, sim }); figsCache = r.favoritas || []; A.som.tocar(sim ? 'bolha' : 'mini-fechar'); A.evt.emit('talk:figs-fav'); },
     eFavorita: (codigo, id) => !!(figsCache && figsCache.some((f) => f.c === codigo && f.id === id)),
+    // (1.0.2) nome (para a busca do painel) e importar um emoji como figurinha
+    nomear: async (codigo, id, n) => { const r = await API.req('figurinhas/nome', { codigo, id, n }); figsCache = r.favoritas || figsCache; },
+    importar: async (url, n) => {
+      const r = await fetch(url); if (!r.ok) throw new Error(T('Não consegui pegar essa imagem.', 'Could not get that image.'));
+      const b = await r.blob(); const id = await TK.figurinhas.criar(b);
+      if (n && id) await TK.figurinhas.nomear('', id, n).catch(() => {});
+    },
   };
   let figsCache = null;
   A.evt.on('hub:figs-fav', () => { figsCache = null; TK.figurinhas.favoritas().then(() => A.evt.emit('talk:figs-fav')).catch(() => {}); });
@@ -967,7 +979,7 @@
       const fonte = [c, ...(c.tipo === 'grupo' ? TK.filhos(c).filter((f) => f.canal !== 'voz') : [])].filter((x) => x.previa).sort((a, b) => (b.previaT || 0) - (a.previaT || 0))[0];
       const prevTxt = fonte ? (fonte !== c ? nomeCanal(fonte) + ' · ' : '') + fonte.previa : '';
       const vis = fonte && API.eu && fonte.previaDe === API.eu.codigo ? TK.statusDe(fonte, { seq: fonte.previaSeq }) : '';
-      const sig = JSON.stringify([TK.titulo(c), prevTxt, vis, num, sel, st, cham ? cham.quem.length : 0, fixada, c.fotoV || 0, c.bannerV || 0, (c.membros || []).map((m) => m.codigo + (m.av || '')).join(), pess ? pess.av || 0 : 0, pess ? JSON.stringify([pess.nm, pess.np, pess.npV, pess.bannerV]) : '', !!c.mudo, !!c.marca, men]);
+      const sig = JSON.stringify([TK.titulo(c), prevTxt, vis, num, sel, st, cham ? cham.quem.length : 0, fixada, c.fotoV || 0, c.bannerV || 0, (c.membros || []).map((m) => m.codigo + (m.av || '')).join(), pess ? pess.av || 0 : 0, pess ? JSON.stringify([pess.nm, pess.np, pess.npV, pess.bannerV]) : '', !!c.mudo, !!c.marca, men, pess && A.aparelhos ? A.aparelhos.chave(pess.codigo) : '']);
       const ja = itensFeitos.get(c.id);
       if (ja && ja.sig === sig) return ja.el;
       const av = c.tipo === 'grupo' ? TK.avatarGrupo(c, 46) : U.avatar(pess, 46, st);
@@ -980,6 +992,7 @@
       let avUsado = av; if (ja && ja.avK === avK && ja.av && av.parentNode === el) { el.replaceChild(ja.av, av); avUsado = ja.av; }
       if (c.tipo === 'grupo' && c.bannerV) { el.classList.add('com-np'); el.style.setProperty('--np', `url("${TK.urlBannerGrupo(c)}") center / cover no-repeat`); } // (0.8.7) o banner do grupo atrás do nome
       if (pess && A.perfil && A.perfil.nameplate) { A.perfil.nameplate(el, pess); const nmEl = h('span', { class: 'tk-item-nm' }); const tn = el.querySelector('.tk-item-nome'); if (tn && pess.nm) { nmEl.append(tn.lastChild); tn.append(nmEl); A.ui.aplicarNome(nmEl, pess.nm); } } // (0.8.0) nameplate e estilo do nome de quem está na conversa
+      if (pess && c.tipo !== 'grupo' && A.aparelhos) { const tn = el.querySelector('.tk-item-nome'); if (tn) tn.append(A.aparelhos.vivo(pess.codigo, { tam: 12 })); } // (1.0.2) os aparelhos conectados
       itensFeitos.set(c.id, { sig, el, avK, av: avUsado });
       marcarDig(avUsado, TK.digitandoEm(c.id).length > 0);
       if (!ja) el.addEventListener('animationend', () => el.classList.add('fixo'), { once: true });
@@ -1138,7 +1151,9 @@
       const extras = [
         !grupo && pess && pess.codigo ? { texto: T('Ver perfil', 'View profile'), icone: 'pessoa', agir: () => A.perfil && A.perfil.ver(pess.codigo) } : null,
         { texto: T('Procurar na conversa', 'Search the conversation'), icone: 'lupa', agir: (alvo) => buscarNa(c, alvo) },
+        A.separar && A.separar.pode() ? { texto: T('Abrir em janela separada', 'Open in a separate window'), icone: 'externo', agir: () => separarConversa(c) } : null, // (1.0.2) a conversa (e a chamada) numa janela só dela
         { texto: T('Mensagens fixadas', 'Pinned messages'), icone: 'alfinete', agir: (alvo) => verFixadas(c, alvo) },
+        { texto: T('Mídias da conversa', 'Chat media'), icone: 'imagem', agir: () => galeriaDe(c) }, // (1.0.2)
         grupo ? { texto: T('Convidar pessoas', 'Invite people'), icone: 'convidar', agir: () => convidar(TK.raizDe(c)) } : null,
         grupo ? { texto: T('Membros', 'Members'), icone: 'pessoas', agir: () => alternarMembros() } : null,
         grupo ? { texto: T('Configurações do grupo', 'Group settings'), icone: 'ajustes', agir: () => configGrupo(TK.raizDe(c)) } : null,
@@ -1158,10 +1173,11 @@
     }
     async function abrir(c) {
       if (!c) return;
-      atual = c; TK.aberta = c.id; raiz.classList.add('com-conversa'); kidAberto = A.cripto && A.cripto.kid;
+      atual = c; TK.aberta = c.id; A.evt.emit('onde'); raiz.classList.add('com-conversa'); kidAberto = A.cripto && A.cripto.kid;
       A.store.gravar('aero-talk-ultima', c.id); // ao voltar para o Aero Talk, abre de novo nesta conversa
       A.evt.emit('talk:abriu', c.id); // (0.8.7) a Música junto passa a tocar a última conversa aberta que está tocando
       pintarLista();
+      if (sepConv && sepConv.cid !== c.id) sepConv.api.fechar(); // (1.0.2) abrir outra conversa traz de volta a que estava separada
       painel.textContent = ''; A.evt.emit('talk:aberta', { cid: c.id });
       const titulo = TK.titulo(c), pess = c.tipo === 'grupo' ? null : outroDaDM(c);
       const voltar = U.btn('', { icone: 'voltar', tipo: 'sec', redondo: true, peq: true, titulo: T('Voltar', 'Back'), onclick: () => fecharConversa() });
@@ -1170,8 +1186,9 @@
       const cab = h('header', { class: 'tk-cab', 'data-area': 'cab' }, voltar,
         h('button', { type: 'button', class: 'tk-cab-quem', onclick: () => (c.tipo === 'grupo' ? configGrupo(TK.raizDe(c)) : A.perfil && A.perfil.ver(pess.codigo)) },
           c.tipo === 'grupo' ? TK.avatarGrupo(TK.raizDe(c), 44) : U.avatar(pess, 44, U.estadoDe(pess.codigo)),
-          h('div', {}, c.tipo === 'grupo' ? h('b', {}, titulo) : h('b', { dados: { nomeCod: pess.codigo } }, titulo), c.tipo === 'grupo' ? h('div', { class: 'peq suave' }, (c.membros || []).map((m) => m.apelido || m.nome).join(', ')) : h('div', { class: 'peq suave tk-cab-st', dados: { estadoCod: pess.codigo, st: U.estadoDe(pess.codigo), topo: '1' } }, U.textoTopo(pess.codigo, U.estadoDe(pess.codigo))))),
+          h('div', {}, c.tipo === 'grupo' ? h('b', {}, titulo) : h('b', { dados: { nomeCod: pess.codigo } }, titulo, A.aparelhos ? A.aparelhos.vivo(pess.codigo) : null), c.tipo === 'grupo' ? h('div', { class: 'peq suave' }, (c.membros || []).map((m) => m.apelido || m.nome).join(', ')) : h('div', { class: 'peq suave tk-cab-st', dados: { estadoCod: pess.codigo, st: U.estadoDe(pess.codigo), topo: '1' } }, U.textoTopo(pess.codigo, U.estadoDe(pess.codigo))))),
         h('div', { class: 'tk-cab-botoes' }, ...botoesCab(c, (...a) => alternarMembros(...a), pess)));
+      if (pess && A.idiomas && A.perfil) A.perfil.buscar(pess.codigo).then((p) => { const r = p && A.idiomas.relogio(p.fz), b = cab.querySelector('.tk-cab-quem b'); if (r && b) b.append(r); }).catch(() => {}); // (1.0.2) que horas são para a pessoa
       // (0.8.6) o "visto por último" da pessoa (se as duas deixam) aparece embaixo do nome quando ela está off-line
       if (pess && A.perfil && A.perfil.buscar) A.perfil.buscar(pess.codigo).then((p) => { U.lembrarVisto(pess.codigo, p && p.visto, p && p.vm); U.atualizarVivos(); }).catch(() => {});
       cx = A.chatUI.criar({
@@ -1424,7 +1441,14 @@
     ouvir('talk:pendente-fim', ({ cid, id }) => { if (atual && atual.id === cid && cx) cx.remover(id, true); });
     ouvir('talk:fechar-se', (cid) => { if (atual && atual.id === cid) fecharConversa(); });
     ouvir('talk:fixadas', () => {});
-    function fecharConversa() { A.store.gravar('aero-talk-ultima', ''); atual = null; TK.aberta = null; raiz.classList.remove('com-conversa'); painel.textContent = ''; painel.append(vazioConv); pintarLista(); }
+    // (1.0.2) a conversa aberta (com a chamada, telas e câmeras) numa janela separada; no lugar fica um aviso, e fechar a janela traz de volta
+    let sepConv = null;
+    function separarConversa(c) {
+      if (sepConv) { sepConv.api.focar(); return; }
+      const api = A.separar.abrir('talk', painel, { titulo: TK.titulo(c), aviso: T('Esta conversa está numa janela separada', 'This chat is in a separate window'), aoVoltar: () => { sepConv = null; } });
+      if (api) sepConv = { cid: c.id, api };
+    }
+    function fecharConversa() { if (sepConv) sepConv.api.fechar(); A.store.gravar('aero-talk-ultima', ''); atual = null; TK.aberta = null; A.evt.emit('onde'); raiz.classList.remove('com-conversa'); painel.textContent = ''; painel.append(vazioConv); pintarLista(); }
 
     const opcoesChat = TK.opcoesChat;
     // ---------- procurar na conversa (0.6.0, inspirado na busca do Discord) ----------
@@ -1515,6 +1539,81 @@
         io.observe(caixa);
       }
       return caixa;
+    }
+    // ---------- (1.0.2) mídias da conversa: fotos e vídeos, áudios, links (sem GIFs) e arquivos, em grade ou lista, com páginas ----------
+    function galeriaDe(c) {
+      const POR = { grade: 30, lista: 15 };
+      const ehGifUrl = (u) => /\.gif(\?|$)|klipy\.co|tenor\.com|giphy\.com/i.test(u);
+      const itens = { midia: [], audio: [], link: [], arquivo: [] };
+      let tipo = 'midia', modo = A.store.ler('aero-galeria-modo') === 'lista' ? 'lista' : 'grade', pag = 0, lendo = true;
+      const corpo = h('div', { class: 'gal-corpo' }), rodape = h('div', { class: 'gal-rodape' }), estado = h('span', { class: 'peq suave' });
+      const anexosDe = (m) => (m.anexos && m.anexos.length ? m.anexos : m.anexo ? [m.anexo] : []);
+      const ir = async (m) => { janela.fechar(); if (atual !== c) await abrir(c); await irParaSeq(m.seq); };
+      const quando = (m) => new Date(m.t).toLocaleDateString(A.idioma() === 'en' ? 'en-US' : 'pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+      const urlDe = async (a) => TK.urlViva(a) || (a.url = await TK.urlAnexo(c.id, a));
+      const ladrilho = (it, k, lista) => {
+        const a = it.a, video = a.tipo === 'video';
+        const b = h('button', { type: 'button', class: 'gal-tile' + (video ? ' video' : ''), title: a.nome || '' });
+        const carregar = async () => {
+          try {
+            const u = await urlDe(a); if (!u) return;
+            b.prepend(video ? h('video', { src: u + '#t=0.1', muted: '', preload: 'metadata', playsinline: '' }) : h('img', { src: u, alt: '', loading: 'lazy', draggable: 'false' }));
+          } catch (e) { b.classList.add('falhou'); }
+        };
+        const io = new IntersectionObserver((ents) => { if (ents.some((e) => e.isIntersecting)) { io.disconnect(); carregar(); } }); io.observe(b);
+        if (video) b.append(h('span', { class: 'gal-play' }, A.icone('play', 18)));
+        b.onclick = async () => {
+          const vis = lista.slice(Math.max(0, k - 40), k + 41);
+          const urls = await Promise.all(vis.map((x) => urlDe(x.a).catch(() => null)));
+          const gal = vis.map((x, j) => ({ url: urls[j], nome: x.a.nome, video: x.a.tipo === 'video' })).filter((x) => x.url);
+          U.verImagem(urls[vis.indexOf(it)] || gal[0].url, { nome: a.nome, galeria: { itens: gal } });
+        };
+        b.addEventListener('contextmenu', (e) => U.menuContexto(e, [{ texto: T('Ir para a mensagem', 'Jump to message'), icone: 'responder', onclick: () => ir(it.m) }]));
+        return modo === 'lista' ? h('div', { class: 'gal-linha' }, b, h('div', { class: 'cresce' }, h('b', {}, nomeDe(it.m.de)), h('div', { class: 'peq suave' }, quando(it.m) + (a.nome ? ' · ' + a.nome : ''))), U.btn('', { icone: 'responder', tipo: 'sec', redondo: true, peq: true, titulo: T('Ir para a mensagem', 'Jump to message'), onclick: () => ir(it.m) })) : b;
+      };
+      const linhaGeral = (it) => {
+        const cab = h('div', { class: 'linha entre gal-cab-it' }, h('b', {}, nomeDe(it.m.de)), h('span', { class: 'peq suave' }, quando(it.m)));
+        if (tipo === 'link') {
+          let dom = ''; try { dom = new URL(it.u).hostname.replace(/^www\./, ''); } catch (e) { /* ok */ }
+          return h('div', { class: 'gal-linha' }, h('span', { class: 'gal-ic' }, A.icone('link', 18)), h('div', { class: 'cresce gal-txt' }, cab, h('a', { href: it.u, onclick: (e) => { e.preventDefault(); U.abrirFora(it.u); } }, dom || it.u), h('div', { class: 'peq suave gal-url' }, it.u)), U.btn('', { icone: 'responder', tipo: 'sec', redondo: true, peq: true, titulo: T('Ir para a mensagem', 'Jump to message'), onclick: () => ir(it.m) }));
+        }
+        if (tipo === 'audio') return h('div', { class: 'gal-linha gal-audio' }, h('div', { class: 'cresce gal-txt' }, cab, previaMsg(c, { ...it.m, anexo: it.a, anexos: null, texto: '' }, it.a.nome || '')), U.btn('', { icone: 'responder', tipo: 'sec', redondo: true, peq: true, titulo: T('Ir para a mensagem', 'Jump to message'), onclick: () => ir(it.m) }));
+        return h('div', { class: 'gal-linha' }, h('span', { class: 'gal-ic' }, A.icone('clipe', 18)), h('div', { class: 'cresce gal-txt' }, cab, h('div', { class: 'gal-url' }, it.a.nome || T('Arquivo', 'File'))),
+          U.btn('', { icone: 'download', tipo: 'sec', redondo: true, peq: true, titulo: T('Baixar', 'Download'), onclick: async () => { try { U.baixar(await urlDe(it.a), it.a.nome); } catch (e) { U.toast(e.message, { tipo: 'erro' }); } } }),
+          U.btn('', { icone: 'responder', tipo: 'sec', redondo: true, peq: true, titulo: T('Ir para a mensagem', 'Jump to message'), onclick: () => ir(it.m) }));
+      };
+      const pintar = () => {
+        const lista = itens[tipo], por = tipo === 'midia' ? POR[modo] : POR.lista, total = Math.max(1, Math.ceil(lista.length / por));
+        pag = Math.min(pag, total - 1);
+        const fatia = lista.slice(pag * por, pag * por + por);
+        corpo.className = 'gal-corpo ' + (tipo === 'midia' && modo === 'grade' ? 'grade' : 'lista');
+        corpo.replaceChildren(...(fatia.length ? fatia.map((it, j) => (tipo === 'midia' ? ladrilho(it, pag * por + j, lista) : linhaGeral(it))) : [h('div', { class: 'suave peq gal-vazio' }, lendo ? T('Procurando…', 'Looking…') : T('Nada por aqui ainda.', 'Nothing here yet.'))]));
+        estado.textContent = lista.length + (lendo ? '+' : '') + ' · ' + T('página ', 'page ') + (pag + 1) + '/' + total;
+        const ant = U.btn(T('Anterior', 'Previous'), { icone: 'setaE', tipo: 'sec', peq: true, onclick: () => { pag--; pintar(); corpo.scrollTop = 0; } }), prox = U.btn(T('Próxima', 'Next'), { icone: 'setaD', tipo: 'sec', peq: true, onclick: () => { pag++; pintar(); corpo.scrollTop = 0; } });
+        ant.disabled = pag === 0; prox.disabled = pag >= total - 1;
+        rodape.replaceChildren(ant, estado, prox);
+        btModo.hidden = tipo !== 'midia';
+      };
+      const abas = U.seg([['midia', T('Fotos e vídeos', 'Photos & videos')], ['audio', T('Áudios', 'Audio')], ['link', 'Links'], ['arquivo', T('Arquivos', 'Files')]], tipo, (v) => { tipo = v; pag = 0; pintar(); });
+      abas.classList.add('quebra');
+      const btModo = U.btn('', { icone: modo === 'grade' ? 'menu' : 'apps', tipo: 'sec', redondo: true, peq: true, titulo: T('Grade ou lista', 'Grid or list'), onclick: () => { modo = modo === 'grade' ? 'lista' : 'grade'; A.store.gravar('aero-galeria-modo', modo); btModo.replaceChildren(A.icone(modo === 'grade' ? 'menu' : 'apps', 18)); pag = 0; pintar(); } });
+      const janela = U.modal(T('Mídias de ', 'Media in ') + TK.titulo(c), h('div', { class: 'gal' }, h('div', { class: 'gal-topo' }, abas, btModo), corpo, rodape), { largura: 760, classe: 'gal-modal' });
+      pintar();
+      let ult = 0;
+      const aoPagina = (lote) => {
+        for (let i = lote.length - 1; i >= 0; i--) {
+          const m = lote[i]; if (m.sistema || m.trancada) continue;
+          for (const a of anexosDe(m)) {
+            if (!a) continue;
+            if (a.tipo === 'imagem' || a.tipo === 'video') { if (a.mime !== 'image/gif') itens.midia.push({ m, a }); }
+            else if (a.tipo === 'audio') itens.audio.push({ m, a }); else itens.arquivo.push({ m, a });
+          }
+          for (const u of new Set((m.texto || '').match(/\bhttps?:\/\/[^\s<>"']+/g) || [])) if (!ehGifUrl(u)) itens.link.push({ m, u });
+        }
+        if (Date.now() - ult > 400) { ult = Date.now(); pintar(); }
+      };
+      TK.todas(c, null, aoPagina, () => corpo.isConnected && itens.midia.length + itens.audio.length + itens.link.length + itens.arquivo.length < 3000)
+        .catch((e) => U.toast(e.message, { tipo: 'erro' })).finally(() => { lendo = false; if (corpo.isConnected) pintar(); });
     }
     // ---------- mensagens fixadas (0.6.0) ----------
     async function verFixadas(c, ancora) {

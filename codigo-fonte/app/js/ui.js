@@ -401,8 +401,17 @@
     return srv ? `${srv}/api/img?u=${encodeURIComponent(x.href.replace(/^http:/, 'https:'))}` : '';
   };
   const blobDe = async (url) => (await fetch(/^(blob:|data:)/.test(url) ? url : (U.imgSegura(url) || url))).blob();
+  // (1.0.2) no app do Android o WebView ignora o "download" dos links: o arquivo vai para o Android salvar (Imagens, Filmes ou Downloads /Aero)
+  const salvarNoAndroid = async (url, nome) => {
+    const N = A.plat.apk && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AeroNotif; if (!N) return false;
+    const b = /^data:/.test(url) ? await (await fetch(url)).blob() : await blobDe(url);
+    const dados = await new Promise((ok, falha) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] || ''); r.onerror = () => falha(r.error); r.readAsDataURL(b); });
+    try { await N.salvarArquivo({ nome: nome || 'arquivo', mime: b.type || 'application/octet-stream', dados }); return true; }
+    catch (e) { if (/permissao/.test(String(e && e.message))) throw e; return false; } // app antigo (sem o salvar): tenta do jeito do navegador
+  };
   U.baixar = async (url, nome) => {
     try {
+      if (A.plat.apk && (await salvarNoAndroid(url, nome))) { A.som.tocar('sucesso'); return; }
       const href = /^blob:|^data:/.test(url) ? url : URL.createObjectURL(await blobDe(url));
       const a = h('a', { href, download: nome || 'arquivo' }); document.body.append(a); a.click(); a.remove();
       if (href !== url) setTimeout(() => URL.revokeObjectURL(href), 30000);
@@ -514,8 +523,19 @@
     const btLink = link || itens ? bt('link', txtLink(), () => link && U.copiar(link)) : null;
     const zoomBts = [bt('zoomMenos', A.T('Diminuir', 'Zoom out'), () => zoom(z / 1.4)), nivel, bt('zoomMais', A.T('Aumentar', 'Zoom in'), () => zoom(z * 1.4)), h('i', { class: 'vi-sep' })];
     const btCopiar = bt('copiar', A.T('Copiar imagem', 'Copy image'), () => U.copiarImagem(url));
+    // (1.0.2) pausar o vídeo e maximizar/minimizar (também no controle: Y pausa, X maximiza, B fecha e o direcional troca de foto)
+    const alternarPausa = () => { if (mid === img) return; if (mid.paused) mid.play().catch(() => {}); else mid.pause(); };
+    const btPausa = bt('pausa', A.T('Pausar / continuar', 'Pause / play'), alternarPausa); btPausa.hidden = !video;
+    let caixaModal = null;
+    const alternarMax = () => {
+      const d = caixaModal && caixaModal.ownerDocument; if (!d) return;
+      if (d.fullscreenElement) d.exitFullscreen().catch(() => {}); else caixaModal.requestFullscreen().catch(() => {});
+    };
+    const btMax = bt('expandir', A.T('Maximizar / minimizar', 'Maximize / minimize'), alternarMax);
+    const aoTelaCheia = () => { const cheio = !!(caixaModal && caixaModal.ownerDocument.fullscreenElement === caixaModal); btMax.replaceChildren(A.icone(cheio ? 'compacto' : 'expandir', 22)); caixaModal && caixaModal.classList.toggle('vi-cheia', cheio); };
+    document.addEventListener('fullscreenchange', aoTelaCheia);
     const barra = h('div', { class: 'vi-barra' }, ...zoomBts, bt('download', A.T('Baixar', 'Download'), () => U.baixar(url, nome)), bt('externo', A.T('Abrir no navegador', 'Open in browser'), () => U.abrirFora(url, nome)),
-      btCopiar, btLink, favoritar ? bt('estrela', A.T('Favoritar GIF', 'Favorite GIF'), favoritar) : null);
+      btCopiar, btLink, favoritar ? bt('estrela', A.T('Favoritar GIF', 'Favorite GIF'), favoritar) : null, btPausa, btMax);
     palco.addEventListener('contextmenu', (e) => U.menuContexto(e, [{ texto: A.T('Baixar', 'Download'), icone: 'download', onclick: () => U.baixar(url, nome) }, { texto: A.T('Abrir no navegador', 'Open in browser'), icone: 'externo', onclick: () => U.abrirFora(url, nome) }, ...(video ? [] : [{ texto: A.T('Copiar imagem', 'Copy image'), icone: 'copiar', onclick: () => U.copiarImagem(url) }]), ...(link ? [{ texto: txtLink(), icone: 'link', onclick: () => U.copiar(link) }] : [])]));
     const partes = [palco, barra];
     let ir = () => {};
@@ -536,7 +556,7 @@
         if (video) { mid = h('video', { src: url, class: 'vi-img vi-video', controls: '', autoplay: '', playsinline: '' }); img.hidden = true; palco.prepend(mid); }
         else { mid = img; img.hidden = false; img.src = url; }
         palco.classList.toggle('video', video);
-        zoomBts.forEach((b) => (b.hidden = video)); btCopiar.hidden = video;
+        zoomBts.forEach((b) => (b.hidden = video)); btCopiar.hidden = video; btPausa.hidden = !video;
         if (btLink) { btLink.hidden = !link; btLink.title = txtLink(); }
         cont.textContent = (pos + 1) + ' / ' + n;
         tiras.forEach((t, j) => t.classList.toggle('ativa', j === pos));
@@ -547,7 +567,21 @@
       addEventListener('keydown', tecla, true);
       requestAnimationFrame(() => mostrar(pos));
     } else if (video) { requestAnimationFrame(() => { mid = h('video', { src: url, class: 'vi-img vi-video', controls: '', autoplay: '', playsinline: '' }); img.hidden = true; palco.prepend(mid); palco.classList.add('video'); zoomBts.forEach((b) => (b.hidden = true)); btCopiar.hidden = true; }); }
-    return U.modal(null, partes, { largura: 1100, classe: 'vi-modal' + (itens && itens.length > 1 ? ' vi-galeria' : ''), prioridade: true });
+    const anterior = A.pad && A.pad.captura;
+    const sair = () => { document.removeEventListener('fullscreenchange', aoTelaCheia); if (document.fullscreenElement === caixaModal) document.exitFullscreen().catch(() => {}); if (A.pad && A.pad.captura === cap) A.pad.captura = anterior || null; };
+    const cap = (nome) => {
+      if (!palco.isConnected) { sair(); return false; }
+      if (document.querySelector('.menu-ctx:not(.estourando)') || (A.tecladoVirtual && A.tecladoVirtual.aberto && A.tecladoVirtual.aberto())) return false; // um menu aberto em cima da imagem: o botão é dele
+      if (nome === 'b') { modal.fechar(); return true; }
+      if ((nome === 'esq' || nome === 'dir') && itens && itens.length > 1) { ir(nome === 'esq' ? -1 : 1); A.som.tocar('foco'); return true; }
+      if (nome === 'y' && video) { alternarPausa(); return true; }
+      if (nome === 'x') { alternarMax(); return true; }
+      return false;
+    };
+    const modal = U.modal(null, partes, { largura: 1100, classe: 'vi-modal' + (itens && itens.length > 1 ? ' vi-galeria' : ''), prioridade: true, aoFechar: sair });
+    caixaModal = modal.el;
+    if (A.pad) A.pad.captura = cap;
+    return modal;
   };
   // ---------- arrastar e redimensionar (0.6.0) ----------
   // arrastar: "el" (position: fixed) segue o mouse/dedo pela "alca"; um clique sem arrastar continua sendo clique. A posição fica lembrada.
@@ -766,16 +800,32 @@
     if (fotosPng.size > 60) fotosPng.clear();
     fotosPng.set(url, p); return p;
   };
+  const contagem = new Map(); // (1.0.2) mensagens novas por pessoa desde a última vez que o app ficou na frente
+  addEventListener('focus', () => contagem.clear()); document.addEventListener('visibilitychange', () => { if (!document.hidden) contagem.clear(); });
   U.notificar = (titulo, texto, { cid, pessoa, nome } = {}) => {
     try {
       if (A.focado()) return;
       const icone = pessoa && pessoa.codigo ? A.avatarUrl(pessoa.codigo, pessoa.av) || '' : '';
       // celular (APK): notificação de verdade do Android; as da mesma pessoa se empilham numa só
       const N = notifCel();
-      if (N && N.mostrar) { if (document.hidden) { A.push && A.push.visto && A.push.visto(); N.mostrar({ grupo: (pessoa && pessoa.codigo) || cid || 'aero', nome: nome || titulo, titulo, texto: String(texto || '').slice(0, 300), icone, cid: cid || '' }).catch(() => {}); } return; }
+      const cv = A.cfg.v;
+      if ((N || A.plat.toque) && cv.notifCel === false) return; // (1.0.2) notificações do celular desligadas
+      const grupo = (pessoa && pessoa.codigo) || cid || 'aero';
+      // (1.0.2) "só o total": em vez do texto, quantas mensagens novas chegaram (como no aviso com o app fechado)
+      if ((N || A.plat.toque) && cv.notifConteudo !== 'texto') { const n = (contagem.get(grupo) || 0) + 1; contagem.set(grupo, n); texto = n === 1 ? A.T('1 mensagem nova', '1 new message') : n + A.T(' mensagens novas', ' new messages'); }
+      if (N && N.mostrar) { if (document.hidden) { A.push && A.push.visto && A.push.visto(); N.mostrar({ grupo, nome: nome || titulo, titulo, texto: String(texto || '').slice(0, 300), icone, cid: cid || '' }).catch(() => {}); } return; }
       if (A.plat.toque && !document.hidden) return; // (0.7.0) celular com o Aero na tela: o "foco" nem sempre é informado (iPhone); a notificação do sistema é só com o app fechado/no fundo
       // (0.7.0) no app do PC, pelo próprio app (no Linux passa pelo "não perturbe" automático de quando a tela está sendo compartilhada)
-      if (window.aero && window.aero.notificar) { const urgente = document.documentElement.dataset.transmitindo === '1'; fotoPng(icone).then((png) => window.aero.notificar({ titulo, texto, cid: cid || '', icone: png || icone, urgente })).catch(() => {}); return; }
+      if (window.aero && window.aero.notificar) {
+        // (1.0.2) Linux: o "não perturbe" (o KDE liga sozinho enquanto a tela é compartilhada) só deixa passar quem você escolheu, e como um
+        // aviso só por pessoa que vai sendo atualizado (antes cada mensagem furava o não perturbe e ficava parada na tela)
+        const transmitindo = document.documentElement.dataset.transmitindo === '1', linux = /Linux/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent);
+        const exclusivo = linux && pessoa && pessoa.codigo && (cv.npExclusivos || []).includes(pessoa.codigo);
+        if (linux && transmitindo && !exclusivo) return;
+        let extra = {};
+        if (exclusivo && transmitindo) { const n = (contagem.get(grupo) || 0) + 1; contagem.set(grupo, n); extra = { urgente: true, grupo, texto: n === 1 ? A.T('Mandou uma mensagem', 'Sent a message') : A.T('Mandou ', 'Sent ') + n + A.T(' mensagens', ' messages') }; }
+        fotoPng(icone).then((png) => window.aero.notificar({ titulo, texto, cid: cid || '', icone: png || icone, urgente: false, ...extra })).catch(() => {}); return;
+      }
       if (!('Notification' in window)) return;
       if (Notification.permission === 'default' && !A.plat.desktop) { Notification.requestPermission().catch(() => {}); return; }
       if (Notification.permission !== 'granted') return;
@@ -1282,11 +1332,12 @@
   // ---------- menu do botão direito (0.5.9-5): uma bolha de vidro que se forma no ponto do clique, item por item ----------
   // itens: [{ texto, icone, perigo, onclick }] ou null (separador). Abre com o som de bolha se formando e fecha estourando.
   U.menuContexto = (ev, itens) => {
+    const doc = (ev && ((ev.ancora && ev.ancora.ownerDocument) || (ev.target && ev.target.ownerDocument) || (ev.currentTarget && ev.currentTarget.ownerDocument))) || document, win = doc.defaultView || window; // (1.0.2) abre na janela de onde veio (a conversa pode estar numa janela separada)
     // (0.6.0) aberto por um botão: clicar nele de novo fecha (antes o menu fechava no toque e o clique abria outra vez)
     const ancora = ev && (ev.ancora || (ev.type === 'click' && ev.currentTarget instanceof Element ? ev.currentTarget : null));
     if (U._menu) U._menu.fechar(true);
     if (ev && ev.preventDefault) ev.preventDefault();
-    const x0 = ev && ev.clientX != null ? ev.clientX : innerWidth / 2, y0 = ev && ev.clientY != null ? ev.clientY : innerHeight / 2;
+    const x0 = ev && ev.clientX != null ? ev.clientX : win.innerWidth / 2, y0 = ev && ev.clientY != null ? ev.clientY : win.innerHeight / 2;
     let i = 0;
     // (0.8.0) item com "sub": abre um submenu ao lado quando o mouse passa por cima (ou com o clique / A do controle)
     let sub = null, subDe = null;
@@ -1297,12 +1348,12 @@
       sub = h('div', { class: 'menu-ctx menu-sub vidro', role: 'menu' }, ...it.sub.map((si) => (!si ? h('div', { class: 'menu-sep' }) : h('button', { type: 'button', role: 'menuitem', class: 'menu-it' + (si.sel ? ' sel' : ''), estilo: { '--i': j++ }, dados: { mudo: '1' }, onclick: (e) => { e.stopPropagation(); fechar(true); try { si.onclick(); } catch (x) { A.log.erro('menu', x); } } }, si.stc ? h('span', { class: 'menu-ponto st-ic i-' + (si.stc.i === 'ocupado' ? 'codigo' : si.stc.i || 'bolinha'), estilo: { '--stc': si.stc.c } }) : si.ponto ? h('span', { class: 'menu-ponto st-' + si.ponto }) : si.icone ? A.icone(si.icone, 16) : h('span', { class: 'menu-ic-vazio' }), h('span', { class: si.tirar ? 'cresce' : null }, si.texto),
         // (0.8.5) item com um X do lado (ex.: tirar o status personalizado)
         si.tirar ? h('span', { class: 'menu-tirar', role: 'button', tabindex: '-1', title: si.tirarTitulo || '', 'aria-label': si.tirarTitulo || '', onclick: (e) => { e.stopPropagation(); fechar(true); try { si.tirar(); } catch (x) { A.log.erro('menu', x); } } }, A.icone('fechar', 12)) : si.sel ? A.icone('check', 14) : null))));
-      document.body.append(sub);
+      doc.body.append(sub);
       sub.querySelectorAll('.menu-it').forEach((x) => x.addEventListener('pointerenter', () => A.som.tocar('menu-item')));
       const rb = b.getBoundingClientRect(), w = sub.offsetWidth, hh = sub.offsetHeight;
-      const x = rb.right + 6 + w <= innerWidth - 8 ? rb.right + 6 : Math.max(8, rb.left - 6 - w);
-      Object.assign(sub.style, { left: x + 'px', top: Math.max(8, Math.min(rb.top - 6, innerHeight - hh - 8)) + 'px', transformOrigin: (x > rb.left ? '0 ' : '100% ') + '12px' });
-      if (document.documentElement.dataset.entrada === 'pad') { const f = sub.querySelector('.menu-it'); if (f) f.focus(); }
+      const x = rb.right + 6 + w <= win.innerWidth - 8 ? rb.right + 6 : Math.max(8, rb.left - 6 - w);
+      Object.assign(sub.style, { left: x + 'px', top: Math.max(8, Math.min(rb.top - 6, win.innerHeight - hh - 8)) + 'px', transformOrigin: (x > rb.left ? '0 ' : '100% ') + '12px' });
+      if (doc.documentElement.dataset.entrada === 'pad') { const f = sub.querySelector('.menu-it'); if (f) f.focus(); }
     };
     const el = h('div', { class: 'menu-ctx vidro', role: 'menu' }, ...itens.map((it) => {
       if (!it) return h('div', { class: 'menu-sep' });
@@ -1312,28 +1363,28 @@
     }));
     // (0.5.9-7) cada opção que o mouse ou o controle alcança faz um "tic" de vidro
     el.querySelectorAll('.menu-it').forEach((b) => { b.dataset.mudo = '1'; const tic = () => A.som.tocar('menu-item'); b.addEventListener('pointerenter', tic); b.addEventListener('focus', tic); });
-    document.body.append(el);
+    doc.body.append(el);
     // (0.7.0) o tamanho de verdade (offsetWidth/Height): o getBoundingClientRect pegava o menu ainda encolhido pela animação de abrir, e um
     // menu perto da borda passava da tela. Como no Discord: ele sobe (ou vai para a esquerda) o quanto precisar, e se for mais alto que a tela, rola
-    el.style.maxHeight = (innerHeight - 16) + 'px'; if (el.scrollHeight > innerHeight - 16) el.style.overflowY = 'auto'; // rola só se for mesmo maior que a tela (antes a barra aparecia à toa)
+    el.style.maxHeight = (win.innerHeight - 16) + 'px'; if (el.scrollHeight > win.innerHeight - 16) el.style.overflowY = 'auto'; // rola só se for mesmo maior que a tela (antes a barra aparecia à toa)
     const r = { width: el.offsetWidth, height: el.offsetHeight };
-    const x = Math.min(x0, innerWidth - r.width - 8), y = Math.min(y0, innerHeight - r.height - 8);
+    const x = Math.min(x0, win.innerWidth - r.width - 8), y = Math.min(y0, win.innerHeight - r.height - 8);
     Object.assign(el.style, { left: Math.max(8, x) + 'px', top: Math.max(8, y) + 'px', transformOrigin: (x0 - x) + 'px ' + (y0 - y) + 'px' });
     A.som.tocar('menu-abrir');
     let fechado = false;
     function fechar(semSom) {
       if (fechado) return; fechado = true; U._menu = null; fecharSub();
-      document.removeEventListener('pointerdown', fora, true); document.removeEventListener('keydown', tecla, true); removeEventListener('blur', fecharJa); removeEventListener('resize', fecharJa);
-      setTimeout(() => document.removeEventListener('click', cliqueAncora, true), porAncora ? 600 : 0); // fechou tocando no botão: o clique que vem depois não reabre
+      doc.removeEventListener('pointerdown', fora, true); doc.removeEventListener('keydown', tecla, true); win.removeEventListener('blur', fecharJa); win.removeEventListener('resize', fecharJa);
+      setTimeout(() => doc.removeEventListener('click', cliqueAncora, true), porAncora ? 600 : 0); // fechou tocando no botão: o clique que vem depois não reabre
       if (!semSom) A.som.tocar('menu-fechar');
       el.classList.add('estourando'); setTimeout(() => el.remove(), 380);
     }
     const fecharJa = () => fechar();
     let porAncora = false;
     const fora = (e) => { if (!el.contains(e.target) && !(sub && sub.contains(e.target))) { porAncora = !!(ancora && ancora.contains(e.target)); fechar(); } };
-    const cliqueAncora = (e) => { if (ancora && ancora.contains(e.target)) { e.stopPropagation(); e.preventDefault(); document.removeEventListener('click', cliqueAncora, true); fechar(); } };
+    const cliqueAncora = (e) => { if (ancora && ancora.contains(e.target)) { e.stopPropagation(); e.preventDefault(); doc.removeEventListener('click', cliqueAncora, true); fechar(); } };
     const tecla = (e) => { if (e.key === 'Escape') { e.stopPropagation(); if (sub) { const b = subDe; fecharSub(); if (b) b.focus(); } else fechar(); } };
-    setTimeout(() => { document.addEventListener('click', cliqueAncora, true); document.addEventListener('pointerdown', fora, true); document.addEventListener('keydown', tecla, true); addEventListener('blur', fecharJa); addEventListener('resize', fecharJa); const b = el.querySelector('.menu-it'); if (b && document.documentElement.dataset.entrada === 'pad') b.focus(); }, 0);
+    setTimeout(() => { doc.addEventListener('click', cliqueAncora, true); doc.addEventListener('pointerdown', fora, true); doc.addEventListener('keydown', tecla, true); win.addEventListener('blur', fecharJa); win.addEventListener('resize', fecharJa); const b = el.querySelector('.menu-it'); if (b && doc.documentElement.dataset.entrada === 'pad') b.focus(); }, 0);
     U._menu = { fechar, ancora };
     return U._menu;
   };
@@ -1382,23 +1433,24 @@
   };
 
   U.popover = (ancora, conteudo, { largura = 340, aoFechar, titulo } = {}) => {
+    const doc = (ancora && ancora.ownerDocument) || document, win = doc.defaultView || window; // (1.0.2) abre na janela de onde veio (a conversa pode estar numa janela separada)
     if (U._pop) U._pop.fechar();
-    let raiz = document.getElementById('popovers');
-    if (!raiz) { raiz = h('div', { id: 'popovers' }); document.body.append(raiz); }
+    let raiz = doc.getElementById('popovers');
+    if (!raiz) { raiz = h('div', { id: 'popovers' }); doc.body.append(raiz); }
     const el = h('div', { class: 'pop vidro', role: 'dialog' }, titulo ? h('div', { class: 'pop-titulo' }, titulo) : null, h('div', { class: 'col pop-corpo' }, conteudo));
     let fechado = false;
     const posicionar = () => {
-      const r = ((ancora.closest && ancora.closest('.par, .cham-par')) || ancora).getBoundingClientRect(), w = Math.min(largura, innerWidth - 16); // centraliza na cápsula inteira (botão + setinha)
+      const r = ((ancora.closest && ancora.closest('.par, .cham-par')) || ancora).getBoundingClientRect(), w = Math.min(largura, win.innerWidth - 16); // centraliza na cápsula inteira (botão + setinha)
       el.style.width = w + 'px';
-      el.style.left = A.limitar(r.left + r.width / 2 - w / 2, 8, Math.max(8, innerWidth - w - 8)) + 'px';
-      const acima = r.top > innerHeight * 0.45;
-      if (acima) { el.style.bottom = Math.max(8, innerHeight - r.top + 10) + 'px'; el.style.top = 'auto'; el.style.maxHeight = Math.max(160, r.top - 24) + 'px'; el.dataset.lado = 'cima'; }
-      else { el.style.top = r.bottom + 10 + 'px'; el.style.bottom = 'auto'; el.style.maxHeight = Math.max(160, innerHeight - r.bottom - 24) + 'px'; el.dataset.lado = 'baixo'; }
+      el.style.left = A.limitar(r.left + r.width / 2 - w / 2, 8, Math.max(8, win.innerWidth - w - 8)) + 'px';
+      const acima = r.top > win.innerHeight * 0.45;
+      if (acima) { el.style.bottom = Math.max(8, win.innerHeight - r.top + 10) + 'px'; el.style.top = 'auto'; el.style.maxHeight = Math.max(160, r.top - 24) + 'px'; el.dataset.lado = 'cima'; }
+      else { el.style.top = r.bottom + 10 + 'px'; el.style.bottom = 'auto'; el.style.maxHeight = Math.max(160, win.innerHeight - r.bottom - 24) + 'px'; el.dataset.lado = 'baixo'; }
     };
     const fechar = () => {
       if (fechado) return; fechado = true;
-      document.removeEventListener('pointerdown', fora, true); document.removeEventListener('keydown', tecla, true); removeEventListener('resize', posicionar);
-      setTimeout(() => document.removeEventListener('click', cliqueAncora, true), 0);
+      doc.removeEventListener('pointerdown', fora, true); doc.removeEventListener('keydown', tecla, true); win.removeEventListener('resize', posicionar);
+      setTimeout(() => doc.removeEventListener('click', cliqueAncora, true), 0);
       el.classList.add('fechando'); setTimeout(() => el.remove(), 200); A.som.tocar('pop-fechar');
       if (U._pop === api) U._pop = null;
       try { ancora.setAttribute('aria-expanded', 'false'); } catch (e) { /* ok */ }
@@ -1408,8 +1460,8 @@
     // (0.6.0) clicar de novo no botão que abriu fecha (o clique não chega ao botão, então ele não abre outra vez)
     const cliqueAncora = (e) => { if (ancora.contains && ancora.contains(e.target)) { e.stopPropagation(); e.preventDefault(); fechar(); } };
     const tecla = (e) => { if (e.key === 'Escape') { e.stopPropagation(); fechar(); } };
-    document.addEventListener('pointerdown', fora, true); document.addEventListener('keydown', tecla, true); addEventListener('resize', posicionar);
-    setTimeout(() => { if (!fechado) document.addEventListener('click', cliqueAncora, true); }, 0);
+    doc.addEventListener('pointerdown', fora, true); doc.addEventListener('keydown', tecla, true); win.addEventListener('resize', posicionar);
+    setTimeout(() => { if (!fechado) doc.addEventListener('click', cliqueAncora, true); }, 0);
     raiz.append(el); posicionar();
     try { ancora.setAttribute('aria-expanded', 'true'); } catch (e) { /* ok */ }
     A.som.tocar('pop-abrir');
@@ -1492,4 +1544,40 @@
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'F4' || (e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp'))) { e.preventDefault(); abrir(s); }
     }, true);
   })();
+})();
+// (1.0.2) várias atividades juntas (jogando, assistindo, ouvindo), como no Discord: a lista mostra só a principal com "+1" e os
+// símbolos das outras no fim; passar o mouse mostra todas
+(() => {
+  const A = window.Aero, U = A.ui, ORDEM = ['jog-linha', 'ass-linha', 'ouv-linha'];
+  const resumir = (pai) => {
+    if (!pai) return;
+    const linhas = ORDEM.map((c) => [...pai.children].find((x) => x.classList.contains(c))).filter((x) => x && !x.hidden);
+    pai.classList.toggle('com-jogo', !!linhas.find((x) => x.classList.contains('jog-linha')));
+    pai.classList.toggle('com-ass', !!linhas.find((x) => x.classList.contains('ass-linha')));
+    for (const x of pai.querySelectorAll(':scope > div > .atv-mais')) x.remove();
+    if (linhas.length < 2) return;
+    const [prim, ...resto] = linhas;
+    const mais = document.createElement('span'); mais.className = 'atv-mais';
+    mais.title = resto.map((x) => x.title || x.textContent).join('\n');
+    const n = document.createElement('b'); n.textContent = '+' + resto.length; mais.append(n);
+    for (const x of resto) { const ic = x.firstElementChild; if (ic) { const c = ic.cloneNode(true); c.classList.add('atv-mais-ic'); c.style.color = getComputedStyle(x).getPropertyValue('--' + x.className.slice(0, 3)) || ''; mais.append(c); } }
+    prim.append(mais);
+  };
+  U.atvMais = (el) => { const pai = el && el.parentElement; if (pai) resumir(pai); else if (el) queueMicrotask(() => resumir(el.parentElement)); };
+})();
+
+// (1.0.2) seções que recolhem (figurinhas, emojis...): o estado fica guardado neste aparelho
+(() => {
+  const A = window.Aero, U = A.ui; if (!U) return;
+  const ler = () => { try { return new Set(JSON.parse(localStorage.getItem('aero-recolhidos') || '[]')); } catch (_) { return new Set(); } };
+  U.recolhido = (k) => ler().has(k);
+  U.recolher = (k, sim) => { const s = ler(); if (sim) s.add(k); else s.delete(k); try { localStorage.setItem('aero-recolhidos', JSON.stringify([...s].slice(-60))); } catch (_) { /* sem guardar */ } };
+  // um título que recolhe: devolve o botão; "aoMudar(recolhido)" esconde/mostra o que for da seção
+  U.tituloRecolhe = (k, texto, aoMudar, extra) => {
+    let rec = U.recolhido(k);
+    const b = A.h('button', { type: 'button', class: 'cx-emoji-tit cx-recolhe' + (rec ? ' rec' : ''), 'aria-expanded': String(!rec) }, A.icone('chevron', 13), A.h('span', null, texto), extra || null);
+    b.addEventListener('click', (e) => { if (e.target.closest('a, input, .nao-recolhe')) return; rec = !rec; U.recolher(k, rec); b.classList.toggle('rec', rec); b.setAttribute('aria-expanded', String(!rec)); aoMudar(rec); });
+    queueMicrotask(() => aoMudar(rec));
+    return b;
+  };
 })();

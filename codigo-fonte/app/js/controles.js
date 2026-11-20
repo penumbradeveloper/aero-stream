@@ -340,6 +340,7 @@
       remap = null; calib = null;
       if (svg) svg.querySelectorAll('.esperando').forEach((x) => x.classList.remove('esperando'));
       btnCancelar.hidden = true; captura(false);
+      if (typeof gravando !== 'undefined' && gravando) { gravando = null; btnGravar.disabled = false; }
       if (tinha && mensagem) dizer(mensagem);
     }
     function checarRemap(g) {
@@ -379,8 +380,48 @@
       }
     }
 
+    // (1.0.2) atalhos e combos: escolha o que fazer e aperte o botão (ou os botões juntos); vale em todo o app, só neste aparelho
+    const ACOES = [['config', T('Abrir as Configurações', 'Open Settings')], ['talk', T('Abrir o Aero Talk', 'Open Aero Talk')], ['conexoes', T('Abrir Conexões', 'Open Connections')], ['integ', T('Abrir Integrações', 'Open Integrations')],
+      ['ligar', T('Ligar na conversa aberta', 'Call the open chat')], ['video', T('Chamada de vídeo na conversa aberta', 'Video call the open chat')], ['mudo', T('Ligar/desligar o microfone na chamada', 'Toggle mic in call')],
+      ['camera', T('Ligar/desligar a câmera na chamada', 'Toggle camera in call')], ['tela', T('Compartilhar a tela na chamada', 'Share screen in call')], ['desligar', T('Sair da chamada', 'Leave the call')],
+      ['teclado', T('Abrir o teclado de bolhas', 'Open the bubble keyboard')], ['cursor', T('Ligar/desligar o cursor', 'Toggle the cursor')], ['prox', T('Próxima aba', 'Next tab')], ['ant', T('Aba anterior', 'Previous tab')], ['voltar', T('Voltar', 'Back')]];
+    const faces = () => { const l = LAYOUTS[idLayout] || LAYOUTS.xbox; return l.confirmar === 1 ? { a: 1, b: 0, x: 3, y: 2 } : { a: 0, b: 1, x: 2, y: 3 }; };
+    const FIXOS = { lb: 4, rb: 5, lt: 6, rt: 7, voltar: 8, start: 9, l3: 10, r3: 11, cima: 12, baixo: 13, esq: 14, dir: 15, home: 16 };
+    const rotulo = (nm) => { const l = LAYOUTS[idLayout] || LAYOUTS.xbox, i = nm in FIXOS ? FIXOS[nm] : faces()[nm]; return (l.rot && l.rot[i]) || nm.toUpperCase(); };
+    const atalhosEl = h('div', { class: 'col ctl-atalhos' });
+    let gravando = null;
+    const salvarAt = (l) => { A.cfg.v.padAtalhos = l; A.cfg.salvar(); pintarAtalhos(); };
+    function pintarAtalhos() {
+      const l = A.pad.atalhos ? A.pad.atalhos() : [];
+      atalhosEl.replaceChildren(...l.map((x, i) => h('div', { class: 'ctl-at' },
+        h('span', { class: 'ctl-at-bts' }, ...x.b.flatMap((b, j) => [j ? h('i', {}, '+') : null, h('kbd', {}, rotulo(b))]).filter(Boolean)),
+        h('span', { class: 'cresce ctl-at-ac' }, (ACOES.find((a) => a[0] === x.acao) || [, x.acao])[1]),
+        U.btn('', { icone: 'lixo', tipo: 'sec', redondo: true, peq: true, titulo: T('Apagar atalho', 'Delete shortcut'), onclick: () => { const n = (A.cfg.v.padAtalhos || []).slice(); n.splice(i, 1); salvarAt(n); } }))),
+        l.length ? '' : h('div', { class: 'peq suave' }, T('Nenhum atalho ainda. Ex.: LB + Y abre as Configurações, LB + A liga na conversa aberta.', 'No shortcuts yet. E.g. LB + Y opens Settings, LB + A calls the open chat.')));
+    }
+    const escolhaAc = h('select', { class: 'campo', 'aria-label': T('O que o atalho faz', 'What the shortcut does') }, ...ACOES.map(([v, t]) => h('option', { value: v }, t)));
+    const btnGravar = U.btn(T('Gravar botões', 'Record buttons'), { icone: 'controle', peq: true, onclick: () => {
+      if (!atual()) { dizer(T('Conecte um controle primeiro.', 'Plug in a controller first.')); return; }
+      cancelar(); gravando = { b: new Set(), viu: false }; captura(true); btnGravar.disabled = true;
+      dizer(T('Aperte o botão, ou segure os botões do combo juntos, e solte.', 'Press the button, or hold the combo buttons together, then release.'));
+    } });
+    function passoGravar(g) {
+      if (!gravando || !A.pad.nomesDe) return;
+      const agora = A.pad.nomesDe(g);
+      for (const b of agora) { gravando.b.add(b); gravando.viu = true; }
+      if (!gravando.viu || agora.size) return;
+      const b = [...gravando.b].slice(0, 4); gravando = null; captura(false); btnGravar.disabled = false;
+      if (b.length === 1 && (b[0] === 'a' || b[0] === 'b')) { dizer(T('Sozinho, esse botão confirma ou volta. Use junto com outro (ex.: LB + ' + rotulo(b[0]) + ').', 'Alone, that button confirms or goes back. Combine it (e.g. LB + ' + rotulo(b[0]) + ').')); return; }
+      const ord = (x) => x.slice().sort().join('+');
+      if (ord(b) === ord(['start', 'voltar', 'rb'])) { dizer(T('Esse combo já é o do cadeado (controle no jogo).', 'That combo is already the lock (controller to the game).')); return; }
+      const l = (A.cfg.v.padAtalhos || []).filter((x) => ord(x.b) !== ord(b));
+      l.push({ acao: escolhaAc.value, b }); salvarAt(l); A.som.tocar('sucesso');
+      dizer(T('Pronto: ', 'Done: ') + b.map(rotulo).join(' + ') + ' → ' + escolhaAc.selectedOptions[0].textContent);
+    }
+
     function laco() {
       const g = atual();
+      if (g && gravando) passoGravar(g);
       if (g && svg) { checarRemap(g); passoCalibracao(g, performance.now()); acender(svg, normalizar(g)); }
       raf = requestAnimationFrame(laco);
     }
@@ -407,7 +448,12 @@
       h('div', { class: 'linha', estilo: { 'flex-wrap': 'wrap', gap: '8px', 'margin-top': '10px' } }, btnCancelar,
         U.btn(T('Calibrar analógicos', 'Calibrate sticks'), { icone: 'atualizar', tipo: 'sec', peq: true, onclick: iniciarCalibracao }),
         U.btn(T('Restaurar botões', 'Reset buttons'), { icone: 'voltar', tipo: 'sec', peq: true, onclick: () => { const g = atual(); cancelar(); if (g) { delete cfg().mapa[chave(g)]; delete cfg().cal[chave(g)]; A.cfg.salvar(); dizer(T('Mapeamento e calibração restaurados.', 'Mapping and calibration restored.')); } } })));
-    el0.append(h('div', { class: 'home col', estilo: { height: '100%', 'min-height': 0 } }, topo, h('div', { class: 'conteudo' }, h('div', { class: 'ctl-corpo painel' }, esquerda, direita))));
+    const atalhosSec = h('section', { class: 'vidro pad ctl-atalhos-sec' },
+      h('h3', {}, T('Atalhos e combos', 'Shortcuts and combos')),
+      h('div', { class: 'peq suave', estilo: { margin: '2px 0 8px' } }, T('Um botão ou vários juntos fazem o que você quiser, em qualquer lugar do app. Ficam só neste aparelho.', 'One button or several together do whatever you want, anywhere in the app. Saved on this device only.')),
+      h('div', { class: 'linha ctl-at-novo' }, escolhaAc, btnGravar), atalhosEl);
+    el0.append(h('div', { class: 'home col', estilo: { height: '100%', 'min-height': 0 } }, topo, h('div', { class: 'conteudo' }, h('div', { class: 'ctl-corpo painel' }, esquerda, direita, atalhosSec))));
+    pintarAtalhos();
 
     pintarLista(); pintarLayouts(); montarSvg(true); laco();
     const refaz = () => { cancelar(); pintarLista(); pintarLayouts(); montarSvg(true); };
@@ -416,7 +462,7 @@
     const tecla = (e) => { if (e.key !== 'Escape') return; if (remap !== null || calib !== null) { e.preventDefault(); e.stopPropagation(); cancelar(T('Cancelado: nada foi alterado.', 'Cancelled: nothing was changed.')); } else if (!document.querySelector('#modais .fundo-modal')) sair(); };
     document.addEventListener('keydown', tecla, true);
     offs.push(() => document.removeEventListener('keydown', tecla, true));
-    return { voltar: sair, limpar() { cancelar(); clearTimeout(tempo); cancelAnimationFrame(raf); offs.forEach((f) => f()); captura(false); } };
+    return { voltar: sair, limpar() { gravando = null; cancelar(); clearTimeout(tempo); cancelAnimationFrame(raf); offs.forEach((f) => f()); captura(false); } };
   }
 
   A.controles = { SLOTS, NOMES_SLOT, LAYOUTS, ORDEM_LAYOUTS, detectar, layoutId, layoutDe, normalizar, apertado, eixo, calibrarPar, desenhar, acender, tela, chave };

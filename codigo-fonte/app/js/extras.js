@@ -506,6 +506,7 @@
     token: (cod, e) => `<em:${cod}:${e.id}:${e.n}>`,
     url: (cod, id) => `${A.api.servidor}/api/emoji/${cod}/${id}`,
   };
+  X.emojisCache = () => { if (!emCache && X.maxEmojis() > 0) X.emojis.listar().catch(() => {}); return emCache; }; // (1.0.2) a busca com ":" no chat
   // ao enviar: cada :nome: de um emoji seu vira o emoji (digitado à mão ou escolhido no painel)
   X.trocarEmojis = (t) => {
     if (X.maxEmojis() === 0) return t;
@@ -532,12 +533,15 @@
         try { await X.emojis.criar(f, campo.value); A.som.tocar('sucesso'); pintar(); } catch (e) { A.ui.toast(e.message, { tipo: 'erro' }); }
       });
       const lista = d.emojis || [];
-      caixa.replaceChildren(arq, h('div', { class: 'cx-emoji-tit px-emojis-tit' }, T('Seus emojis', 'Your emojis'), h('small', { class: 'suave' }, lista.length + '/' + max)),
-        h('div', { class: 'px-emojis-grade' }, ...lista.map((e) => {
+      const gradeE = h('div', { class: 'px-emojis-grade' });
+      const tit = A.ui.tituloRecolhe ? A.ui.tituloRecolhe('emj-seus', T('Seus emojis', 'Your emojis'), (rec) => { gradeE.hidden = rec; }, h('small', { class: 'suave' }, lista.length + '/' + max)) : h('div', { class: 'cx-emoji-tit px-emojis-tit' }, T('Seus emojis', 'Your emojis'));
+      tit.classList.add('px-emojis-tit');
+      caixa.replaceChildren(arq, tit, gradeE);
+      gradeE.append( ...lista.map((e) => {
           const b = h('button', { type: 'button', class: 'px-emoji-b', title: ':' + e.n + ':', onclick: () => inserir(':' + e.n + ':') }, h('img', { src: X.emojis.url(d.codigo, e.id), alt: ':' + e.n + ':', loading: 'lazy', draggable: 'false' }));
           b.addEventListener('contextmenu', (ev) => { ev.preventDefault(); A.ui.menuContexto(ev, [{ texto: T('Apagar emoji', 'Delete emoji'), icone: 'lixo', perigo: true, onclick: async () => { try { await X.emojis.apagar(e.id); pintar(); } catch (er) { A.ui.toast(er.message, { tipo: 'erro' }); } } }]); });
           return b;
-        }), lista.length < max ? h('button', { type: 'button', class: 'px-emoji-b px-emoji-mais', title: T('Criar emoji', 'Create emoji'), onclick: () => arq.click() }, '+') : null));
+        }), lista.length < max ? h('button', { type: 'button', class: 'px-emoji-b px-emoji-mais', title: T('Criar emoji', 'Create emoji'), onclick: () => arq.click() }, '+') : '');
     };
     pintar();
     return caixa;

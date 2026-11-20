@@ -205,6 +205,10 @@ function deRpc(at, { appId = '', assets = null } = {}) {
   o.si = imagemDe(as.small_image, appId, assets); o.st = txt(as.small_text, 128);
   const pt = at.party && Array.isArray(at.party.size) ? at.party.size.map(Number) : null;
   if (pt && pt.length === 2 && pt.every((x) => Number.isInteger(x) && x >= 0 && x < 1e6) && pt[1] > 0) o.p = [Math.min(pt[0], pt[1]), pt[1]];
+  // (1.0.2) os botões do jogo (até 2, só https) e se a partida aceita gente entrando ("Pedir para entrar", como no Discord)
+  const bts = (Array.isArray(at.buttons) ? at.buttons : []).map((b) => b && typeof b === 'object' ? { l: txt(b.label, 32), u: typeof b.url === 'string' && /^https:\/\/[^\s"'<>\\]{3,290}$/.test(b.url) ? b.url : '' } : null).filter((b) => b && b.l && b.u).slice(0, 2);
+  if (bts.length) o.b = bts;
+  if (at.secrets && typeof at.secrets === 'object' && at.secrets.join) o.pj = 1;
   return o;
 }
 // 256: nítido no quadrado de 72 px em tela de alta densidade

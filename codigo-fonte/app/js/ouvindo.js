@@ -58,6 +58,8 @@
     // pausou: some quase na hora (confere de novo 0,4 s depois, para um clique duplo no play não piscar na tela dos amigos)
     if (x && !x.tocando) { if (!pausadoDesde) pausadoDesde = agora; if (agora - pausadoDesde < 350 && enviado && chave(enviado) === chave(x)) { setTimeout(olhar, 400); return; } x = null; } else pausadoDesde = 0;
     if (!x) { if (meu || enviado) { meu = null; enviado = null; mandar(null); O.pintar(); } return; }
+    // (1.0.2) Spotify do Windows: sem o código da música e muitas vezes sem a capa. Procura uma vez por música (sem esperar)
+    if (x.f === 'spotify' && !x.id) { const k = chave(x); if (achados.has(k)) { const v = achados.get(k); if (v) { x.id = v.id; if (v.img) x.img = v.img; } } else achar(x).then((v) => { if (v) setTimeout(olhar, 30); }); }
     const dados = { f: x.f, t: x.t, a: x.a || '', al: x.al || '', img: x.img || '', id: x.id || '', k: x.k === 'ep' ? 'ep' : '', d: x.d || 0, jn: junto && combina(x, O.de(junto.cod)) ? junto.cod : '' };
     const ini = x.em - x.p;
     meu = { ...dados, dt: x.p, _rx: x.em };
@@ -68,6 +70,26 @@
       O.pintar();
     }
   }
+  // (1.0.2) o Windows não conta qual é a música (o código do Spotify) nem, muitas vezes, a capa: sem o código, os amigos não tinham o
+  // "Ouvir junto". O servidor procura no Spotify pelo nome e pelo artista (a mesma busca da música do perfil) e confere a duração
+  const achados = new Map(); // chave -> { id, img } | null (procurando ou não achou)
+  async function achar(x) {
+    const k = chave(x), API = A.api;
+    if (!API || !API.token || !API.servidor) return null;
+    achados.set(k, null); if (achados.size > 100) achados.delete(achados.keys().next().value);
+    try {
+      const art = String(x.a || '').split(/,|&| feat\.? | ft\.? /i)[0].trim();
+      const q = ('track:' + x.t + (art ? ' artist:' + art : '')).slice(0, 100);
+      const r = await fetch(API.servidor + '/api/spotify?q=' + encodeURIComponent(q), { headers: { Authorization: 'Bearer ' + API.token } });
+      if (!r.ok) { if (r.status === 429 || r.status >= 500) setTimeout(() => achados.delete(k), 120000); return null; }
+      const fs = ((await r.json()) || {}).faixas || [];
+      const n = (v) => norm(v).replace(/\s*[-(\[].*$/, '');
+      const ok = (f) => f && f.id && n(f.nome) === n(x.t) && (!art || norm(f.artista).includes(norm(art)));
+      const f = fs.find((f) => ok(f) && (!x.d || !f.duracao || Math.abs(f.duracao - x.d) < 5000)) || fs.find(ok);
+      const v = f ? { id: f.id, img: f.capa || '' } : null; achados.set(k, v); return v;
+    } catch (e) { achados.delete(k); return null; }
+  }
+
   // ---------- (1.0.0) "Ouvir junto" (como a jam do Spotify / o "ouvir junto" do Discord) ----------
   // Quem estava ouvindo lidera: aqui só seguimos. A música dele abre no nosso Spotify (ou no YouTube Music/Deezer do navegador),
   // no mesmo tempo; quando ele troca, pausa, volta ou pula, a gente vai junto. Trocar de música por conta própria sai da jam.
@@ -128,7 +150,8 @@
 
   // a linha das listas: ♫ Artista (verde no Spotify, como no Discord)
   O.linha = (cod) => { const el = h('div', { class: 'ouv-linha', dados: { ouvCod: cod || '' }, hidden: true }); preencherLinha(el); return el; };
-  function preencherLinha(el) {
+  function preencherLinha(el) { preencherLinha0(el); if (A.ui && A.ui.atvMais) A.ui.atvMais(el); } // (1.0.2) "+1" com várias atividades
+  function preencherLinha0(el) {
     const o = O.de(el.dataset.ouvCod), k = o ? chave(o) : '';
     if (el.dataset.k === k) return;
     el.dataset.k = k; el.hidden = !o; el.textContent = '';

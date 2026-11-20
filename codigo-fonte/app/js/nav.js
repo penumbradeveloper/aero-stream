@@ -372,7 +372,13 @@
   }
   function cursorQuadro(st, ativos, n, dt) {
     const novo = (k) => ativos.has(k) && !st.ativos.has(k);
-    if (novo('home') || novo('b')) { cursorLigar(false); return; }
+    if (novo('home') || novo('b')) { // (1.0.2) fechou a bolinha: a seleção vai para o item mais perto de onde ela estava
+      const x = cur.x, y = cur.y; cursorLigar(false);
+      let melhor = null, dm = Infinity;
+      for (const e of candidatos()) { const r = e.getBoundingClientRect(); const dx = Math.max(r.left - x, 0, x - r.right), dy = Math.max(r.top - y, 0, y - r.bottom), d = dx * dx + dy * dy; if (d < dm) { dm = d; melhor = e; } }
+      if (melhor) foco(melhor, false);
+      return;
+    }
     if (['cima', 'baixo', 'esq', 'dir'].some((k) => ativos.has(k) && !st.ativos.has(k) && !(Math.abs(n.a[0]) > 0.6 || Math.abs(n.a[1]) > 0.6))) {
       // direcional: guarda a bolinha e continua do item que estava embaixo dela
       const sob = cur.sob && cur.sob.closest && cur.sob.closest(FOCAVEL); cursorLigar(false);
@@ -393,11 +399,45 @@
   // ---------- botões lógicos (já com layout, remapeamento e calibração) ----------
   function facesDe(lay) { return lay && lay.confirmar === 1 ? { a: 1, b: 0, x: 3, y: 2 } : { a: 0, b: 1, x: 2, y: 3 }; }
   const NOMES_FIXOS = { 4: 'lb', 5: 'rb', 6: 'lt', 7: 'rt', 8: 'voltar', 9: 'start', 10: 'l3', 11: 'r3', 12: 'cima', 13: 'baixo', 14: 'esq', 15: 'dir', 16: 'home' };
+  // (1.0.2) os nomes dos botões apertados agora num controle (os mesmos que a navegação usa): para gravar atalhos e combos
+  A.pad.nomesDe = (g) => {
+    const n = A.controles.normalizar(g), f = facesDe(A.controles.layoutDe(g)), nomes = {}, out = new Set();
+    nomes[f.a] = 'a'; nomes[f.b] = 'b'; nomes[f.x] = 'x'; nomes[f.y] = 'y';
+    for (let i = 0; i < 17; i++) if (n.b & (1 << i)) { const nm = nomes[i] || NOMES_FIXOS[i]; if (nm) out.add(nm); }
+    return out;
+  };
+  // (1.0.2) atalhos e combos do controle (Controles > Atalhos): um botão ou vários juntos fazem o que a pessoa escolheu. O combo mais
+  // longo vence (LB+Y não dispara também o atalho do Y); o atalho troca o que aquele botão fazia. Fica só neste aparelho
+  const ACOES_PAD = {
+    config: [() => A.evt.emit('abrir-aba', 'config')],
+    talk: [() => A.evt.emit('abrir-aba', 'talk')],
+    conexoes: [() => A.evt.emit('abrir-aba', 'conexoes')],
+    integ: [() => A.evt.emit('abrir-aba', 'integ')],
+    ligar: [() => { const TK = A.talk, c = TK && (TK.conversas || []).find((x) => x.id === TK.aberta); if (c) TK.ligar(c, false).catch((e) => A.ui.toast(e.message, { tipo: 'erro' })); else A.ui.toast(A.T('Abra uma conversa para ligar.', 'Open a chat to call.')); }],
+    video: [() => { const TK = A.talk, c = TK && (TK.conversas || []).find((x) => x.id === TK.aberta); if (c) TK.ligar(c, true).catch((e) => A.ui.toast(e.message, { tipo: 'erro' })); }],
+    desligar: [() => { if (A.chamada && A.chamada.ativa) A.chamada.desligar(); }],
+    mudo: [() => { if (A.chamada && A.chamada.ativa) A.chamada.mudo(); }],
+    camera: [() => { if (A.chamada && A.chamada.ativa) A.chamada.camera(); }],
+    tela: [() => { if (A.chamada && A.chamada.ativa) A.chamada.tela(); }],
+    teclado: [() => { if (A.tecladoVirtual) A.tecladoVirtual.abrir(); }],
+    prox: [() => A.evt.emit('pad:rb')], ant: [() => A.evt.emit('pad:lb')],
+    voltar: [() => { if (A.ui.voltar) A.ui.voltar(); }],
+    cursor: [() => cursorLigar(!cur.on)],
+  };
+  A.pad.ACOES = ACOES_PAD;
+  A.pad.atalhos = () => (Array.isArray(A.cfg.v.padAtalhos) ? A.cfg.v.padAtalhos : []).filter((x) => x && ACOES_PAD[x.acao] && Array.isArray(x.b) && x.b.length);
+  const atalhoAgora = (ativos, antes) => {
+    const l = A.pad.atalhos(); if (!l.length || !ativos.size) return null;
+    let melhor = null;
+    for (const x of l) if (x.b.every((b) => ativos.has(b)) && x.b.some((b) => !antes.has(b)) && (!melhor || x.b.length > melhor.b.length)) melhor = x;
+    return melhor;
+  };
 
   function aoBotao(nome) {
     document.documentElement.dataset.entrada = 'pad';
     if (ajudaEl) { fecharAjuda(); return; } // a ajuda aberta: qualquer botão só fecha ela
     A.evt.emit('pad:' + nome);
+    if (A.pad.captura && A.pad.captura(nome)) return; // (1.0.2) quem está na frente (ex.: a imagem aberta) pode pegar o botão
     if (nome === 'cima' || nome === 'baixo' || nome === 'esq' || nome === 'dir') A.pad.mover(nome);
     else if (nome === 'a') confirmar();
     else if (nome === 'b') { const menu = document.querySelector('.menu-ctx:not(.estourando)'), mini = document.querySelector('.mini-perfil:not(.fechando)'); if (menu && A.ui._menu) A.ui._menu.fechar(); else if (mini && A.perfil) A.perfil.fecharMini(); else voltar(); }
@@ -471,6 +511,7 @@
         const combo = ativos.has('start') && ativos.has('voltar') && ativos.has('rb');
         if (combo && !st.combo) { st.combo = true; st.ativos = ativos; st.espera = true; A.evt.emit('pad:combo-cadeado'); continue; }
         if (!combo) st.combo = false;
+        { const at = atalhoAgora(ativos, st.ativos); if (at) { st.ativos = ativos; st.espera = true; try { ACOES_PAD[at.acao][0](); } catch (e) { A.log && A.log.aviso && A.log.aviso('atalho do controle', e); } continue; } }
         // START com a janelinha (picture in picture) aberta fora da sala: volta para a sala em tela grande
         if (ativos.has('start') && !st.ativos.has('start') && !ativos.has('voltar') && A.ui.pip && A.ui.pip.visivel && !(A.ui.telaAtual() && A.ui.telaAtual().nome === 'sala')) { st.ativos = ativos; A.ui.pip.voltar(); continue; }
         // SELECT sozinho (apertou e soltou sem apertar mais nada): evento próprio; assim o combo START+SELECT+RB não dispara isso

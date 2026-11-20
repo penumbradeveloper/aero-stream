@@ -946,12 +946,16 @@ input[type=range].ajustando::-webkit-slider-thumb { transform: scale(1.35); }
 .cham-palco:fullscreen { border-radius: 0; }
 .cham-tile .cham-quadro { cursor: pointer; }
 .cham-janela.modo-max.com-palco .cham-pessoas .cham-tile.eu { display: flex; flex: 0 0 140px; width: auto; } .cham-janela.modo-max.com-palco .cham-pessoas .cham-tile.eu .cham-nome { display: block; } /* (0.7.9) com outra pessoa em destaque, você volta para a fila */
-.cham-tile.em-foco .cham-quadro { box-shadow: 0 0 0 3px #6fd3ff, 0 0 26px rgba(80,190,255,.6), 0 18px 44px rgba(0,0,0,.5); }
+.cham-tile.em-foco .cham-quadro { box-shadow: 0 18px 44px rgba(0,0,0,.5); } /* (1.0.2) sem a borda azul: ela cobria a moldura da pessoa */
 .cham-tile.na-tela .cham-quadro::before { content: 'TELA'; position: absolute; left: 8px; top: 8px; z-index: 1; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 800; letter-spacing: .5px; color: #fff; background: rgba(224,72,72,.9); }
 /* a linha do horizonte: separa quem você chamou (em cima) de você (embaixo); nada fica por cima dela */
 .cham-horizonte { display: none; }
 .cham-janela.modo-max .cham-horizonte { display: block; flex: none; height: 2px; margin: 2px -24px; background: linear-gradient(90deg, transparent, rgba(140,220,255,.55) 30%, rgba(200,240,255,.8) 50%, rgba(140,220,255,.55) 70%, transparent); box-shadow: 0 0 14px rgba(100,200,255,.45); }
 .cham-janela.modo-max.com-palco .cham-horizonte { display: none; }
+/* (1.0.2) "todo mundo junto": você no meio com os outros, do mesmo tamanho e sem a linha */
+.cham-janela.modo-max.juntos .cham-horizonte { display: none; }
+.cham-janela.modo-max .cham-tile.eu.juntos-eu { flex: 0 1 calc((100% - (var(--n, 1) - 1) * 22px) / var(--n, 1)); width: auto; align-self: auto; }
+.cham-janela.modo-max:not(.com-palco):not([data-muitos]) .cham-tile.eu.juntos-eu .cham-quadro { aspect-ratio: 4 / 3; } .cham-janela.modo-max:not(.com-palco):not([data-muitos]) .cham-tile.eu.juntos-eu .cham-nome { display: flex; } .cham-janela.modo-max:not(.com-palco):not([data-muitos]) .cham-tile.eu.juntos-eu .cham-av .avatar { --t: clamp(60px, 8vw, 96px); }
 .cham-palco-nome { position: absolute; left: 12px; top: 12px; padding: 4px 12px; border-radius: 14px; font-size: 13px; font-weight: 650; background: rgba(0,0,0,.5); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 /* a barra de botões flutuante */
 .cham-barra { position: relative; display: flex; align-items: center; justify-content: center; gap: 18px; margin: 0 auto; padding: 8px 18px; border-radius: 40px; background: rgba(3,14,26,.72); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 14px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.1); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
@@ -964,9 +968,8 @@ input[type=range].ajustando::-webkit-slider-thumb { transform: scale(1.35); }
 .cham-tile-ms { position: absolute; top: 8px; left: 8px; z-index: 3; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 16px; color: #fff; background: rgba(0,0,0,.5); pointer-events: auto; white-space: nowrap; } .cham-tile-ms:empty { display: none; }
 .cham-tile-ms::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; vertical-align: 1px; background: #9aa0a6; } .cham-tile-ms[data-nivel=bom]::before { background: #3ba55d; } .cham-tile-ms[data-nivel=medio]::before { background: #f0b232; } .cham-tile-ms[data-nivel=ruim]::before { background: #ed4245; }
 .cham-janela.modo-pip .cham-tile-ms { top: 6px; left: 6px; font-size: 10px; padding: 1px 6px; }
-/* (1.0.2) quem mostra a tela: o selo vermelho fica no canto e o ms desce para logo embaixo dele (antes um ficava atrás do outro) */
-.cham-tile.na-tela .cham-tile-ms { top: 34px; }
-.cham-janela.modo-pip .cham-tile.na-tela .cham-tile-ms { top: 30px; }
+/* (1.0.2) quem mostra a tela: o selo vermelho fica no canto e o ms encaixa do lado direito dele */
+.cham-tile.na-tela .cham-tile-ms, .cham-janela.modo-pip .cham-tile.na-tela .cham-tile-ms { top: 8px; left: 61px; max-width: calc(100% - 69px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; box-sizing: border-box; }
 .cham-tile.na-tela[data-mc] .cham-quadro::before { z-index: 4; }
 .cham-ms { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 42px; white-space: nowrap; } .cham-ms:empty { display: none; }
 .cham-sinal[data-nivel=bom] { color: #5ef08a; } .cham-sinal[data-nivel=medio] { color: #ffd25e; } .cham-sinal[data-nivel=ruim] { color: #ff6b6b; }
@@ -977,12 +980,12 @@ input[type=range].ajustando::-webkit-slider-thumb { transform: scale(1.35); }
 .cham-janela.modo-max { inset: 0; display: flex; flex-direction: column; align-items: stretch; gap: 16px; padding: 18px 24px 20px; }
 .cham-janela.modo-max > .cham-cab { flex: none; }
 .cham-janela.modo-max .cham-pessoas { flex: 1 1 0; min-height: 0; align-items: center; align-content: center; overflow: hidden auto; padding: 6px 0; }
-.cham-janela.modo-max .cham-tile:not(.eu) { flex: 0 1 calc((100% - (var(--n, 1) - 1) * 22px) / var(--n, 1)); max-width: min(520px, calc((100vh - 360px) * 4 / 3)); }
-.cham-janela.modo-max[data-pessoas="1"] .cham-tile:not(.eu) { --n: 1; max-width: min(300px, calc(100vh - 380px)); } .cham-janela.modo-max[data-pessoas="1"] .cham-quadro { aspect-ratio: 1; }
-.cham-janela.modo-max[data-pessoas="2"] .cham-tile:not(.eu) { --n: 2; } .cham-janela.modo-max[data-pessoas="3"] .cham-tile:not(.eu) { --n: 3; }
-.cham-janela.modo-max[data-pessoas="4"] .cham-tile:not(.eu) { --n: 2; max-width: min(400px, calc((50vh - 200px) * 4 / 3)); }
-.cham-janela.modo-max[data-pessoas="5"] .cham-tile:not(.eu), .cham-janela.modo-max[data-pessoas="6"] .cham-tile:not(.eu) { --n: 3; max-width: min(380px, calc((50vh - 200px) * 4 / 3)); }
-.cham-janela.modo-max[data-pessoas="7"] .cham-tile:not(.eu), .cham-janela.modo-max[data-pessoas="8"] .cham-tile:not(.eu), .cham-janela.modo-max[data-pessoas="9"] .cham-tile:not(.eu) { --n: 4; max-width: min(300px, calc((50vh - 200px) * 4 / 3)); }
+.cham-janela.modo-max .cham-tile:is(:not(.eu), .juntos-eu) { flex: 0 1 calc((100% - (var(--n, 1) - 1) * 22px) / var(--n, 1)); max-width: min(520px, calc((100vh - 360px) * 4 / 3)); }
+.cham-janela.modo-max[data-pessoas="1"] .cham-tile:is(:not(.eu), .juntos-eu) { --n: 1; max-width: min(300px, calc(100vh - 380px)); } .cham-janela.modo-max[data-pessoas="1"] .cham-quadro { aspect-ratio: 1; }
+.cham-janela.modo-max[data-pessoas="2"] .cham-tile:is(:not(.eu), .juntos-eu) { --n: 2; } .cham-janela.modo-max[data-pessoas="3"] .cham-tile:is(:not(.eu), .juntos-eu) { --n: 3; }
+.cham-janela.modo-max[data-pessoas="4"] .cham-tile:is(:not(.eu), .juntos-eu) { --n: 2; max-width: min(400px, calc((50vh - 200px) * 4 / 3)); }
+.cham-janela.modo-max[data-pessoas="5"] .cham-tile:is(:not(.eu), .juntos-eu), .cham-janela.modo-max[data-pessoas="6"] .cham-tile:is(:not(.eu), .juntos-eu) { --n: 3; max-width: min(380px, calc((50vh - 200px) * 4 / 3)); }
+.cham-janela.modo-max[data-pessoas="7"] .cham-tile:is(:not(.eu), .juntos-eu), .cham-janela.modo-max[data-pessoas="8"] .cham-tile:is(:not(.eu), .juntos-eu), .cham-janela.modo-max[data-pessoas="9"] .cham-tile:is(:not(.eu), .juntos-eu) { --n: 4; max-width: min(300px, calc((50vh - 200px) * 4 / 3)); }
 .cham-janela.modo-max .cham-tile.eu { flex: none; align-self: center; width: 168px; }
 .cham-janela.modo-max .cham-tile.eu .cham-quadro { aspect-ratio: 16 / 10; } .cham-janela.modo-max .cham-tile.eu .cham-nome { display: none; } .cham-janela.modo-max .cham-tile.eu .cham-av .avatar { --t: 56px; }
 .cham-janela.modo-max .cham-barra { flex: none; align-self: center; }
@@ -991,6 +994,22 @@ input[type=range].ajustando::-webkit-slider-thumb { transform: scale(1.35); }
 .cham-janela.modo-max.com-palco .cham-pessoas { flex: none; flex-wrap: nowrap; justify-content: center; gap: 12px; overflow: auto hidden; padding: 0; }
 .cham-janela.modo-max.com-palco .cham-tile:not(.eu) { flex: 0 0 140px; } .cham-janela.modo-max.com-palco .cham-nome { font-size: 12.5px; } .cham-janela.modo-max.com-palco .cham-av .avatar { --t: 50px; }
 .cham-janela.modo-max.com-palco .cham-tile.eu { display: none; } /* com a tela no palco, a sua prévia sai para sobrar espaço (a sua câmera continua indo para os outros) */
+/* (1.0.2) muita gente (mais de 9): uma grade com o maior quadro que cabe (chamada.js calcula --tw); o nome vai para dentro do quadro */
+.cham-janela.modo-max[data-muitos] .cham-pessoas { gap: 8px; align-content: center; overflow: hidden; }
+.cham-janela.modo-max[data-muitos] .cham-pessoas .cham-tile:is(:not(.eu), .juntos-eu) { flex: 0 0 var(--tw, 120px) !important; width: var(--tw, 120px); max-width: none !important; gap: 0; align-self: auto; }
+.cham-janela.modo-max[data-muitos] .cham-pessoas .cham-tile .cham-quadro { aspect-ratio: 4 / 3; border-radius: 12px; }
+.cham-janela.modo-max[data-muitos] .cham-pessoas .cham-tile .cham-av .avatar { --t: clamp(26px, calc(var(--tw, 120px) * .34), 96px); box-shadow: 0 0 0 2px rgba(255,255,255,.55), 0 6px 16px rgba(0,0,0,.35); }
+.cham-janela.modo-max[data-muitos] .cham-pessoas .cham-tile .cham-nome { position: absolute; left: 6px; bottom: 6px; max-width: calc(100% - 12px); padding: 1px 8px; border-radius: 10px; font-size: 11.5px; background: rgba(0,0,0,.45); flex-direction: row; display: flex; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cham-janela.modo-max[data-muitos] .cham-pessoas .cham-tile .cham-nome > span:first-child { overflow: hidden; text-overflow: ellipsis; } .cham-janela.modo-max[data-muitos] .cham-pessoas .cham-tile .cham-pontos { display: none; }
+.cham-janela.modo-max[data-muitos] .cham-pessoas .cham-tile { position: relative; }
+.cham-janela.modo-max[data-muitos] .cham-tile-ms { font-size: 10px; padding: 1px 6px; top: 5px; left: 5px; }
+/* o "+N" (quem não cabe na janelinha) e a minimizada */
+.cham-mais { display: none; }
+.cham-janela.modo-pip .cham-tile.fora-pequena { display: none; }
+.cham-janela.modo-pip .cham-mais { display: grid; place-items: center; aspect-ratio: 4 / 3; border-radius: 16px; border: 1px solid rgba(255,255,255,.18); font-family: inherit; font-size: 26px; font-weight: 800; line-height: 1; color: #fff; cursor: pointer; background: radial-gradient(circle at 50% 30%, rgba(255,255,255,.18), rgba(255,255,255,.04) 70%), rgba(10,40,64,.6); box-shadow: inset 0 1px 0 rgba(255,255,255,.2); }
+.cham-janela.modo-pip .cham-mais:hover { background-color: rgba(30,90,130,.7); }
+.cham-mini-mais { display: inline-grid; place-items: center; min-width: 30px; height: 30px; padding: 0 6px; margin-left: 2px; box-sizing: border-box; border-radius: 15px; font-size: 12px; font-weight: 800; color: #fff; background: rgba(255,255,255,.18); box-shadow: 0 0 0 2px rgba(255,255,255,.8); }
+.cham-janela.modo-pip.pip-muitos .cham-pessoas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 /* ---- JANELINHA (PiP) ---- */
 .cham-janela.modo-pip { right: 18px; bottom: 18px; width: min(440px, calc(100vw - 24px)); display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 22px; }
 .cham-janela.modo-pip .cham-cab { cursor: grab; }
@@ -1020,12 +1039,13 @@ input[type=range].ajustando::-webkit-slider-thumb { transform: scale(1.35); }
 @media (max-width: 680px) {
   .cham-janela.modo-max { padding: 12px 12px 16px; gap: 12px; }
   .cham-janela.modo-max .cham-pessoas { gap: 12px; }
-  .cham-janela.modo-max .cham-tile:not(.eu) { flex: 1 1 calc(50% - 12px) !important; max-width: none !important; }
-  .cham-janela.modo-max[data-pessoas="1"] .cham-tile:not(.eu) { flex-basis: 70% !important; max-width: 280px !important; }
+  .cham-janela.modo-max .cham-tile:is(:not(.eu), .juntos-eu) { flex: 1 1 calc(50% - 12px) !important; max-width: none !important; }
+  .cham-janela.modo-max[data-pessoas="1"] .cham-tile:is(:not(.eu), .juntos-eu) { flex-basis: 70% !important; max-width: 280px !important; }
   .cham-janela.modo-max .cham-tile.eu { width: 110px; }
   .cham-janela.modo-max.com-palco .cham-palco { width: 100%; max-height: 46vh; align-self: center; }
   .cham-janela.modo-max.com-palco .cham-pessoas { padding: 0; overflow-x: auto; flex-wrap: nowrap; justify-content: flex-start; }
   .cham-janela.modo-max.com-palco .cham-tile:not(.eu) { flex: 0 0 118px !important; }
+  .cham-janela.modo-max.com-palco .cham-pessoas .cham-tile.eu { flex: 0 0 118px !important; max-width: none !important; } /* (1.0.2) você na fileira, do tamanho dos outros */
   .cham-barra { gap: 4px; padding: 6px 8px; max-width: 100%; } .cham-barra .par > .btn.seta { height: 40px; width: 22px; min-width: 22px; } .cham-barra .cham-grupo { gap: 4px; } .cham-barra .btn.redondo { width: 40px; height: 40px; }
   .cham-janela .btn.perigo.cham-fim { width: 56px; } .cham-sinal, .cham-barra .cham-grupo:first-child > .btn:nth-child(2) { display: none; }
   .cham-janela.modo-pip, .cham-janela.modo-mini { right: 10px !important; left: auto !important; top: auto !important; bottom: 86px !important; }
@@ -1594,7 +1614,7 @@ input[type=range].ajustando::-webkit-slider-thumb { transform: scale(1.35); }
   /* (0.9.1) o lado das suas mensagens virou opção (Configurações > Chats): as regras ficam em [data-cxlado], e a sua foto aparece */
   .cx-msg .cx-bal { max-width: 82%; }
   .cx-txt:not(.so-figurinha) { font-size: 15px; padding: 6px 10px 5px; border-radius: 4px 16px 16px 16px; }
-  [data-cxlado=direita] .cx-msg.eu .cx-txt:not(.so-figurinha) { border-radius: 16px 4px 16px 16px; }
+  :is([data-cxlado=direita] .cx-msg.eu, [data-cxlado=todasdir] .cx-msg, [data-cxlado=invertido] .cx-msg:not(.eu)) .cx-txt:not(.so-figurinha) { border-radius: 16px 4px 16px 16px; }
   .cx-msg.junto .cx-txt:not(.so-figurinha) { border-radius: 16px; }
   .cx-hora { font-size: 10px; }
   .cx-acoes { display: none !important; } /* no celular: segurar a mensagem abre o menu; arrastar para a esquerda responde */
@@ -4852,18 +4872,18 @@ input[type=color]::-moz-color-swatch { background-image: radial-gradient(circle 
 /* ===================== (0.9.1) lado das suas mensagens: à esquerda como as dos outros, ou à direita (como no WhatsApp) =====================
    data-cxlado vem de Configurações > Chats (sem escolha: direita no celular, esquerda no computador). À direita a sua foto fica do lado
    de fora da bolha, o nome some (é você), a bolha, as reações, as mídias e o "visto" encostam na direita e a animação nasce dali */
-[data-cxlado=direita] .cx-msg.eu { flex-direction: row-reverse; transform-origin: 100% 100%; }
-[data-cxlado=direita] .cx-msg.eu .cx-cab b, [data-cxlado=direita] .cx-msg.eu .cx-cab .selos { display: none; }
-[data-cxlado=direita] .cx-msg.eu .cx-conteudo { display: flex; flex-direction: column; align-items: flex-end; }
-[data-cxlado=direita] .cx-msg.eu .cx-cab { justify-content: flex-end; }
-[data-cxlado=direita] .cx-msg.eu .cx-bal { display: flex; flex-direction: column; align-items: flex-end; max-width: min(82%, 680px); }
-[data-cxlado=direita] .cx-msg.eu .cx-reacoes { justify-content: flex-end; }
-[data-cxlado=direita] .cx-msg.eu .cx-acoes { right: auto; left: 10px; }
-[data-cxlado=direita] .cx-msg.eu[data-bc=gibi] .cx-txt:not(.so-figurinha) { border-radius: 18px 18px 4px 18px; }
+:is([data-cxlado=direita] .cx-msg.eu, [data-cxlado=todasdir] .cx-msg, [data-cxlado=invertido] .cx-msg:not(.eu)) { flex-direction: row-reverse; transform-origin: 100% 100%; }
+[data-cxlado=direita]:not([data-cxnome]) .cx-msg.eu .cx-cab b, [data-cxlado=direita]:not([data-cxnome]) .cx-msg.eu .cx-cab .selos { display: none; }
+:is([data-cxlado=direita] .cx-msg.eu, [data-cxlado=todasdir] .cx-msg, [data-cxlado=invertido] .cx-msg:not(.eu)) .cx-conteudo { display: flex; flex-direction: column; align-items: flex-end; }
+:is([data-cxlado=direita] .cx-msg.eu, [data-cxlado=todasdir] .cx-msg, [data-cxlado=invertido] .cx-msg:not(.eu)) .cx-cab { justify-content: flex-end; }
+:is([data-cxlado=direita] .cx-msg.eu, [data-cxlado=todasdir] .cx-msg, [data-cxlado=invertido] .cx-msg:not(.eu)) .cx-bal { display: flex; flex-direction: column; align-items: flex-end; max-width: min(82%, 680px); }
+:is([data-cxlado=direita] .cx-msg.eu, [data-cxlado=todasdir] .cx-msg, [data-cxlado=invertido] .cx-msg:not(.eu)) .cx-reacoes { justify-content: flex-end; }
+:is([data-cxlado=direita] .cx-msg.eu, [data-cxlado=todasdir] .cx-msg, [data-cxlado=invertido] .cx-msg:not(.eu)) .cx-acoes { right: auto; left: 10px; }
+:is([data-cxlado=direita] .cx-msg.eu, [data-cxlado=todasdir] .cx-msg, [data-cxlado=invertido] .cx-msg:not(.eu))[data-bc=gibi] .cx-txt:not(.so-figurinha) { border-radius: 18px 18px 4px 18px; }
 /* (1.0.2) à direita, o canto reto da bolha fica do lado da sua foto (em cima, à direita), espelhando o dos outros. Peso baixo: os modelos com formato próprio continuam valendo */
-:where([data-cxlado=direita] .cx-msg.eu) .cx-txt:not(.so-figurinha) { border-radius: 17px 5px 17px 17px; }
-[data-cxlado=direita] .cx-msg.eu[data-bc=cristal] .cx-txt:not(.so-figurinha) { border-radius: 18px 6px 18px 6px; }
-[data-cxlado=direita] .cx-msg:not(.eu) .cx-bal { max-width: min(82%, 680px); }
+:where(:is(:is([data-cxlado=direita] .cx-msg.eu, [data-cxlado=todasdir] .cx-msg, [data-cxlado=invertido] .cx-msg:not(.eu)), [data-cxlado=todasdir] .cx-msg, [data-cxlado=invertido] .cx-msg:not(.eu))) .cx-txt:not(.so-figurinha) { border-radius: 17px 5px 17px 17px; }
+:is([data-cxlado=direita] .cx-msg.eu, [data-cxlado=todasdir] .cx-msg, [data-cxlado=invertido] .cx-msg:not(.eu))[data-bc=cristal] .cx-txt:not(.so-figurinha) { border-radius: 18px 6px 18px 6px; }
+:is([data-cxlado=direita] .cx-msg:not(.eu), [data-cxlado=invertido] .cx-msg.eu) .cx-bal { max-width: min(82%, 680px); }
 /* à esquerda (também no celular): a sua mensagem é igual à dos outros, com foto e nome */
 @media (max-width: 760px) {
   [data-cxlado=esquerda] .cx-msg.eu .cx-txt:not(.so-figurinha) { border-radius: 4px 16px 16px 16px; }
@@ -5962,7 +5982,7 @@ html.rolando :is(.conteudo, .cx-msgs, .chat-msgs, .tk-lista, .tk-amigos, .conv-l
    deixando a barra mais alta (entrava por cima do campo do chat). Agora as abas dividem a largura e o nome fica numa linha só */
 @media (max-width: 760px) {
   .topo .abas > .aba { flex: 1 1 0; min-width: 0; padding-inline: 2px; }
-  .topo .abas > .aba > span:not(.selo) { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(9px, 2.65vw, 11px); line-height: 1.25; }
+  .topo .abas > .aba > span:not(.selo):not(.orbe) { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(9px, 2.65vw, 11px); line-height: 1.25; }
 }
 /* (1.0.2) janela baixa (celular deitado, janela pequena no PC): o Aero Talk não passa da altura da tela (antes tinha no mínimo 440 px e o
    campo de mensagem ficava para fora, embaixo) */
@@ -5999,3 +6019,156 @@ html.rolando :is(.conteudo, .cx-msgs, .chat-msgs, .tk-lista, .tk-amigos, .conv-l
 .cred-tester { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 6px; border-radius: 999px; font-weight: 700; background: color-mix(in srgb, #f59e0b 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, #f59e0b 40%, transparent); }
 .cred-tester .selos { display: inline-flex; }
 .cred-fim { text-align: center; margin: 0; }
+/* (1.0.2) várias atividades juntas: a principal na linha e "+1" com os símbolos das outras no fim (como no Discord) */
+:is(.jog-linha, .ass-linha, .ouv-linha) > span.atv-mais { flex: none; display: inline-flex; align-items: center; gap: 3px; margin-left: auto; padding: 0 5px 0 6px; min-width: 0; overflow: visible; border-radius: 999px; font-size: 11px; line-height: 16px; color: var(--texto); background: rgba(255,255,255,.35); box-shadow: inset 0 0 0 1px rgba(255,255,255,.45); }
+[data-tema=escuro] :is(.jog-linha, .ass-linha, .ouv-linha) > span.atv-mais { background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+.atv-mais > b { font-weight: 800; }
+.atv-mais > .atv-mais-ic { flex: none; width: 12px !important; height: 12px !important; margin: 0 !important; }
+/* (1.0.2) mais de 9 fotos/vídeos juntos: a 9ª mostra quantas faltam */
+.cx-gcel.cx-gmais { position: relative; }
+.cx-gmais-n { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; font-size: 26px; font-weight: 800; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.5); background: rgba(10,20,30,.48); pointer-events: none; }
+/* (1.0.2) títulos de seção que recolhem (figurinhas, seus emojis) */
+button.cx-emoji-tit.cx-recolhe { all: unset; grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; box-sizing: border-box; width: 100%; padding: 5px 6px; border-radius: 8px; cursor: pointer; font-size: 11.5px; font-weight: 700; color: var(--suave); }
+button.cx-recolhe:hover, button.cx-recolhe:focus-visible { background: color-mix(in srgb, var(--texto) 7%, transparent); color: var(--texto); }
+button.cx-recolhe > svg { flex: none; transition: transform .18s; transform: rotate(180deg); }
+button.cx-recolhe.rec > svg { transform: rotate(90deg); }
+button.cx-recolhe > small { margin-left: auto; font-weight: 600; }
+.cx-fig[hidden], .cx-fig-grade > p[hidden], .px-emojis-grade[hidden] { display: none !important; }
+
+/* (1.0.2) mais lados: todas à direita, ou a sua à esquerda e as dos outros à direita; e quem mostra o nome e a foto */
+[data-cxlado=todasdir] .cx-msg .cx-bal, [data-cxlado=invertido] .cx-msg:not(.eu) .cx-bal { max-width: min(82%, 680px); }
+[data-cxnome=nenhum] .cx-msg .cx-cab :is(b, .selos), [data-cxnome=meu] .cx-msg:not(.eu) .cx-cab :is(b, .selos), [data-cxnome=outros] .cx-msg.eu .cx-cab :is(b, .selos) { display: none !important; }
+[data-cxav=nenhum] .cx-msg > :is(.cx-av-btn, .cx-av-vazio), [data-cxav=meu] .cx-msg:not(.eu) > :is(.cx-av-btn, .cx-av-vazio), [data-cxav=outros] .cx-msg.eu > :is(.cx-av-btn, .cx-av-vazio) { display: none !important; }
+.cx-ops-lado { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.cx-ops-lado .mq-cartao { min-width: 0; }
+.cx-ops-vis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 14px; margin-top: 4px; }
+.cx-ops-vis > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.cx-ops-vis .seg { flex-wrap: wrap; max-width: 100%; }
+.mq-todasdir .mq-l { flex-direction: row-reverse; transform-origin: 100% 100%; } .mq-todasdir .mq-l .mq-bl { border-radius: 8px 8px 3px 8px; }
+.mq-invertido .mq-l:not(.eu) { flex-direction: row-reverse; transform-origin: 100% 100%; } .mq-invertido .mq-l:not(.eu) .mq-bl { border-radius: 8px 8px 3px 8px; }
+/* (1.0.2) Controles > Atalhos e combos */
+.ctl-corpo > .ctl-atalhos-sec { grid-column: 1 / -1; min-width: 0; }
+.ctl-at-novo { gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+.ctl-at-novo > select { flex: 1 1 220px; min-width: 0; max-width: 100%; }
+.ctl-atalhos { gap: 6px; }
+.ctl-at { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 6px 8px; border-radius: 12px; background: color-mix(in srgb, var(--texto) 5%, transparent); }
+.ctl-at-bts { display: inline-flex; align-items: center; gap: 4px; flex: none; flex-wrap: wrap; max-width: 50%; }
+.ctl-at-bts kbd { min-width: 22px; padding: 2px 7px; border-radius: 8px; font: 700 12px/1.4 inherit; text-align: center; background: linear-gradient(180deg, #fff, #dfe9f1); color: #234; box-shadow: inset 0 -2px 0 rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.15); }
+.ctl-at-bts i { font-style: normal; opacity: .6; }
+.ctl-at-ac { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
+/* (1.0.2) os aparelhos conectados e o ícone do sistema ao lado do nome */
+.ap-vivo { display: inline-flex; vertical-align: middle; min-width: 0; }
+.ap-vivo:empty { display: none; }
+.ap-junto { display: inline-flex; align-items: center; gap: 5px; margin-left: 5px; color: var(--suave); font-weight: 600; }
+.ap-ic { display: inline-flex; align-items: center; gap: 3px; line-height: 1; }
+.ap-ic > svg { flex: 0 0 auto; opacity: .85; }
+.ap-junto.com-rotulo { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.ap-junto.com-rotulo .ap-ic { gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 12.5px; background: color-mix(in srgb, var(--texto) 6%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--texto) 10%, transparent); min-width: 0; max-width: 100%; }
+.ap-junto.com-rotulo small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: inherit; }
+.so-selo { display: inline-grid; place-items: center; flex: 0 0 auto; width: var(--t); height: var(--t); border-radius: 30%; background: linear-gradient(160deg, var(--a), var(--b));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45), inset 0 -1px 2px rgba(0,0,0,.18), 0 1px 2px rgba(0,0,0,.18); position: relative; overflow: hidden; }
+.so-selo::after { content: ''; position: absolute; left: 8%; right: 8%; top: 4%; height: 42%; border-radius: 30% 30% 50% 50%; background: linear-gradient(rgba(255,255,255,.4), rgba(255,255,255,0)); pointer-events: none; }
+.so-selo > svg { position: relative; z-index: 1; filter: drop-shadow(0 .5px .5px rgba(0,0,0,.25)); }
+.tk-item-nome .ap-junto { margin-left: 4px; }
+.ap-prev-so { display: inline-flex; }
+.so-grade-cx { padding: 4px 2px 6px; }
+.so-grade-cx.fechado { display: none; }
+.so-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 8px; }
+.so-op { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; padding: 10px 4px 8px; border: 0; border-radius: 14px; cursor: pointer; color: inherit; font: inherit;
+  background: color-mix(in srgb, var(--texto) 5%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--texto) 9%, transparent); transition: transform .15s, box-shadow .15s; }
+.so-op:hover { transform: translateY(-1px); }
+.so-op.on { box-shadow: inset 0 0 0 2px var(--cor-2, var(--cor)); }
+.so-op > small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; }
+.perfil-troca-exc { align-self: center; margin: 0 auto 10px; max-width: 100%; }
+.perfil-qr { width: 190px; height: 190px; max-width: 100%; padding: 10px; border-radius: 16px; background: #fff; box-sizing: content-box; }
+.perfil-compartilhar .campo { width: 100%; box-sizing: border-box; }
+.linha.apagado { opacity: .4; pointer-events: none; }
+/* (1.0.2) aba Desenvolvedor no celular: as subabas quebram de linha e nada passa da tela pela direita */
+.an-vistas { display: flex; flex-wrap: wrap; max-width: 100%; box-sizing: border-box; }
+.an-vistas > button { flex: 1 1 auto; min-width: 0; justify-content: center; }
+@media (max-width: 700px) {
+  .an-topo { grid-template-columns: minmax(0, 1fr); }
+  .an-tiles { grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr)); }
+  .an-tabela { max-width: 100%; }
+  .an-graf-caixa, .an-grafico { max-width: 100%; min-width: 0; } .an-grafico svg { max-width: 100%; height: auto; }
+}
+/* (1.0.2) ":" + nome: a lista rápida de emojis */
+.cx-sug-emoji .cx-sug-em { display: inline-grid; place-items: center; width: 24px; height: 24px; flex: 0 0 auto; font-size: 20px; line-height: 1; object-fit: contain; }
+.cx-sug-emoji .cx-sug-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--suave); font-size: 13px; }
+.cx-sis.fixou .ic { color: var(--cor-2, var(--cor)); }
+.cx-sis-ver { border: 0; padding: 2px 8px; border-radius: 999px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--cor-2, var(--cor)); background: color-mix(in srgb, var(--cor) 14%, transparent); }
+.cx-sis-ver:hover { background: color-mix(in srgb, var(--cor) 24%, transparent); }
+.conv-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.conv-it { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px 10px; border-radius: 12px; background: color-mix(in srgb, var(--texto) 5%, transparent); }
+.conv-it code { font-size: 14px; font-weight: 700; white-space: nowrap; }
+.conv-seta { color: var(--suave); } .conv-em { font-size: 20px; line-height: 1; }
+
+/* (1.0.2) tradução embaixo da mensagem, dicionário e o horário da pessoa */
+.cx-trad { display: block; width: fit-content; max-width: 100%; box-sizing: border-box; margin: 2px 0; padding: 5px 11px 6px 12px; border-radius: 14px; border-left: 3px solid var(--cor-2); min-width: 0;
+  background: linear-gradient(180deg, rgba(var(--vidro-rgb), .66), rgba(var(--vidro-rgb), .48)); box-shadow: 0 2px 8px rgba(10,60,100,.08); }
+[data-tema=escuro] .cx-trad { background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.04)); }
+.cx-trad[hidden] { display: none; }
+.cx-trad-topo { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: .76em; opacity: .8; }
+.cx-trad-topo svg { flex: none; }
+.cx-trad-alt { background: none; border: 0; padding: 0; color: var(--cor-2); cursor: pointer; font: inherit; text-decoration: underline; }
+.cx-trad-txt { margin-top: 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dic { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.dic-palavras { display: flex; flex-wrap: wrap; gap: 6px; max-height: 96px; overflow: auto; padding: 4px; }
+.dic-chip { border: 1px solid var(--borda, rgba(127,127,127,.3)); background: transparent; color: inherit; border-radius: 999px; padding: 3px 10px; cursor: pointer; font: inherit; font-size: .88em; }
+.dic-chip.sel { background: var(--cor-2); border-color: transparent; color: #fff; }
+.dic-linguas { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dic-sel { flex: 1 1 140px; min-width: 0; max-width: 220px; }
+.dic-trad { font-size: 1.02em; overflow-wrap: anywhere; }
+.dic-corpo { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; min-width: 0; }
+.dic-col { min-width: 0; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, currentColor 5%, transparent); overflow-wrap: anywhere; }
+.dic-cab { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.dic-pal { font-size: 1.25em; }
+.dic-ouvir { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; border: 0; cursor: pointer; background: color-mix(in srgb, var(--cor-2) 22%, transparent); color: inherit; }
+.dic-ipa { font-family: ui-monospace, monospace; opacity: .75; font-size: .9em; }
+.dic-sec { margin-top: 6px; }
+.dic-sec-t { font-weight: 600; font-size: .85em; opacity: .8; }
+.dic-sec ol { margin: 4px 0 0; padding-left: 20px; }
+.dic-sec li { margin: 2px 0; font-size: .92em; }
+.dic-fonte { margin-top: 8px; }
+.hora-pessoa { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; font-size: .74em; font-weight: 500; opacity: .7; vertical-align: middle; white-space: nowrap; }
+/* (1.0.2) o lugar de uma conversa que foi para uma janela separada */
+.sep-lugar { display: flex !important; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; min-width: 0; min-height: 0; overflow: hidden; }
+.sep-aviso { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; max-width: 340px; padding: 26px 22px; border-radius: 22px; }
+.sep-aviso > svg { opacity: .7; }
+/* (1.0.2) mídias da conversa */
+.gal { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.gal-topo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: space-between; }
+.gal-topo > .seg { flex: 1 1 auto; min-width: 0; }
+.gal-corpo { min-height: 200px; max-height: min(60vh, 620px); overflow: auto; padding: 6px; margin: -6px; }
+.gal-corpo.grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(120px, 30%), 1fr)); gap: 8px; align-content: start; }
+.gal-corpo.lista { display: flex; flex-direction: column; gap: 8px; }
+.gal-tile { position: relative; aspect-ratio: 1; border: 0; padding: 0; border-radius: 12px; overflow: hidden; cursor: pointer; background: color-mix(in srgb, currentColor 8%, transparent); }
+.gal-tile img, .gal-tile video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.gal-tile:hover img, .gal-tile:hover video, .gal-tile:focus-visible img { transform: scale(1.04); transition: transform .2s; }
+.gal-play { position: absolute; inset: auto 6px 6px auto; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: #fff; background: rgba(0,0,0,.55); }
+.gal-linha { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 8px 10px; border-radius: 12px; background: color-mix(in srgb, currentColor 5%, transparent); }
+.gal-linha .gal-tile { width: 64px; flex: none; }
+.gal-linha.gal-audio { align-items: flex-start; }
+.gal-ic { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 10px; background: color-mix(in srgb, var(--cor-2) 18%, transparent); }
+.gal-txt { min-width: 0; }
+.gal-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gal-cab-it { gap: 8px; }
+.gal-rodape { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.gal-vazio { grid-column: 1 / -1; padding: 30px 0; text-align: center; }
+/* (1.0.2) o áudio usa a largura do balão (no celular a barra ficava espremida ao lado do botão de baixar) */
+.cx-midia.cx-midia-audio { display: block; width: min(340px, 100%); box-sizing: border-box; }
+.cx-midia-audio .mp-audio { width: 100%; }
+.cx-midia-audio .mp-audio .mp-barra { min-width: 56px; }
+.vi-modal.vi-cheia { width: 100% !important; max-width: none; height: 100%; max-height: none; border-radius: 0; display: flex; flex-direction: column; }
+.vi-modal.vi-cheia .vi-palco, .vi-galeria.vi-cheia .vi-palco { flex: 1; height: auto; min-height: 0; max-height: none; }
+/* (1.0.2) não perturbe do Linux: as pessoas escolhidas */
+.np-lista { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+.np-pessoa { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 3px; border-radius: 999px; background: color-mix(in srgb, var(--cor-2) 16%, transparent); max-width: 100%; min-width: 0; }
+.np-pessoa > span:not(.av) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.np-tirar { display: grid; place-items: center; width: 20px; height: 20px; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; flex: none; }
+.cx-anexo-ver { cursor: zoom-in; }
+/* (1.0.2) celular: segurar a mensagem abre o menu do Aero (com "Copiar texto"), nunca a seleção de texto nem o menu do sistema */
+@media (pointer: coarse) {
+  .cx-msgs, .cx-msgs.selecionavel, .cx-msgs .selecionavel, .cx-bal, .cx-msgs .cx-txt, .msg-c .bal { user-select: none !important; -webkit-user-select: none !important; -webkit-touch-callout: none !important; }
+  .cx-msgs img, .cx-msgs video, .cx-msgs a { -webkit-touch-callout: none !important; -webkit-user-drag: none; }
+}

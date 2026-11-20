@@ -32,6 +32,36 @@
   };
   const comCena = (cena, op) => { op.classList.add('com-cena'); op.prepend(cena); return op; };
   const opcao = (rot, controle, desc) => h('div', { class: 'opcao' }, h('div', { class: 'cresce' }, h('div', { estilo: { 'font-weight': '600' } }, rot), desc ? h('div', { class: 'peq suave' }, desc) : null), controle);
+  // (1.0.2) notificações: no celular (ligar/desligar e o que aparece) e, no Linux, quem passa pelo "não perturbe"
+  const secaoNotif = () => {
+    const cel = A.plat.apk || A.plat.toque, linux = A.plat.desktop && /Linux/.test(navigator.userAgent);
+    if (!cel && !linux) return [];
+    const partes = [];
+    if (cel) {
+      const oQue = U.seg([['total', T('Só o total', 'Only the count')], ['texto', T('O texto', 'The text')]], A.cfg.v.notifConteudo === 'texto' ? 'texto' : 'total', (v) => { A.cfg.v.notifConteudo = v; A.cfg.salvar(); });
+      partes.push(
+        opcao(T('Notificações no celular', 'Phone notifications'), U.chave(A.cfg.v.notifCel !== false, async (v) => { A.cfg.v.notifCel = v; A.cfg.salvar(); oQue.closest('.opcao').hidden = !v; try { if (v) await A.push.ligar(); else await A.push.desligar(); } catch (e) { /* ok */ } }), T('Avisa das mensagens com o Aero no fundo ou fechado.', 'Tells you about messages with Aero in the background or closed.')),
+        ((x) => { x.hidden = A.cfg.v.notifCel === false; return x; })(opcao(T('O que aparece', 'What shows'), oQue, T('Com o Aero fechado aparece só quem mandou e quantas: as mensagens são cifradas e nem o servidor lê.', 'With Aero closed only who sent it and how many show: messages are encrypted and not even the server reads them.'))));
+    }
+    if (linux) {
+      const lista = h('div', { class: 'np-lista' });
+      const amigos = () => ((A.hub && A.hub.amigos) || []).filter((a) => a.estado === 'aceita');
+      const pintar = () => {
+        const sel = A.cfg.v.npExclusivos || [];
+        lista.replaceChildren(...sel.map((cod) => { const a = amigos().find((x) => x.codigo === cod) || { codigo: cod, nome: cod };
+          return h('span', { class: 'np-pessoa' }, U.avatar(a, 22), h('span', {}, a.apelido || a.nome), h('button', { type: 'button', class: 'np-tirar', title: T('Tirar', 'Remove'), onclick: () => { A.cfg.v.npExclusivos = sel.filter((x) => x !== cod); A.cfg.salvar(); pintar(); } }, A.icone('fechar', 12))); }),
+        U.btn(T('Escolher', 'Choose'), { icone: 'mais', tipo: 'sec', peq: true, onclick: (e) => {
+          const ja = new Set(A.cfg.v.npExclusivos || []), opc = amigos().filter((a) => !ja.has(a.codigo));
+          if (!opc.length) { U.toast(T('Todos os seus amigos já estão aqui.', 'All your friends are already here.')); return; }
+          U.menuContexto(e, opc.slice(0, 40).map((a) => ({ texto: a.apelido || a.nome, icone: 'pessoa', onclick: () => { A.cfg.v.npExclusivos = [...(A.cfg.v.npExclusivos || []), a.codigo].slice(0, 30); A.cfg.salvar(); pintar(); } })));
+        } }));
+      };
+      pintar();
+      partes.push(h('div', { class: 'opcao quebra' }, h('div', { class: 'cresce' }, h('div', { estilo: { 'font-weight': '600' } }, T('Não perturbe: quem pode passar', 'Do not disturb: who gets through')),
+        h('div', { class: 'peq suave' }, T('Enquanto você compartilha a tela o sistema liga o "não perturbe". Só essas pessoas aparecem, num aviso só por pessoa com o total de mensagens.', 'While you share your screen the system turns on "do not disturb". Only these people show up, in one notice per person with the message count.')), lista)));
+    }
+    return [secao(T('Notificações', 'Notifications'), ...partes)];
+  };
   const ouvir = (offs, ev, f) => offs.push(A.evt.on(ev, f));
 
   // ---------- perfil de qualquer pessoa (usado na lista de amigos e dentro da sala) ----------
@@ -208,7 +238,7 @@
       const ds = H.dispositivosDe(a.codigo);
       const est = !ds.length ? 'offline' : ds.some((d) => d.estado === 'online') ? 'online' : 'ausente';
       return h('div', { class: 'amigo vidro', role: 'button', tabindex: '0', dados: { menu: '1' }, oncontextmenu: (e) => { if (a.estado === 'aceita' && A.perfil && A.perfil.menu) A.perfil.menu(e, a); }, onclick: (e) => { if (!e.target.closest('.btn')) { if (A.perfil && a.estado === 'aceita') A.perfil.ver(a.codigo); else abrirAmigo(a); } } }, U.avatar(a, 50, est),
-        h('div', { class: 'cresce' }, h('div', { class: 'nm' }, a.nome, ' ', h('span', { class: 'tag' }, '#' + a.tag)), h('div', { class: 'quando' }, a.estado === 'aceita' ? quando(a) : a.estado === 'recebido' ? T('quer ser seu amigo', 'wants to be your friend') : T('aguardando resposta', 'waiting for a reply')), a.estado === 'aceita' && A.jogando ? A.jogando.linha(a.codigo) : null, a.estado === 'aceita' && A.assistindo ? A.assistindo.linha(a.codigo) : null, a.estado === 'aceita' && A.ouvindo ? A.ouvindo.linha(a.codigo) : null), extra);
+        h('div', { class: 'cresce' }, h('div', { class: 'nm' }, a.nome, ' ', h('span', { class: 'tag' }, '#' + a.tag), a.estado === 'aceita' && A.aparelhos ? A.aparelhos.vivo(a.codigo) : null), h('div', { class: 'quando' }, a.estado === 'aceita' ? quando(a) : a.estado === 'recebido' ? T('quer ser seu amigo', 'wants to be your friend') : T('aguardando resposta', 'waiting for a reply')), a.estado === 'aceita' && A.jogando ? A.jogando.linha(a.codigo) : null, a.estado === 'aceita' && A.assistindo ? A.assistindo.linha(a.codigo) : null, a.estado === 'aceita' && A.ouvindo ? A.ouvindo.linha(a.codigo) : null), extra);
     };
     const agir = async (f) => { try { await f(); } catch (e) { U.toast(e.message, { tipo: 'erro' }); } };
     const render = () => {
@@ -594,10 +624,23 @@
         pintar2fa();
         // (0.8.6) o que conta para o "visto por último": só a hora em que você sai, ou também a última vez que mexeu no app
         const cDc = cenaPriv('discord', dc.ativo !== false), cOuv = cenaPriv('musica', (A.cfg.v.ouvir || {}).ativo !== false), cLidos = cenaPriv('lidos', !!p.lidos), cVisto = cenaPriv('visto', p.visto !== false), cMsg = cenaPriv('msg', p.mensagens || 'amigos'), pintarMsg = (k, v) => { const d = cMsg.dataset; d.k = k; if (k === 'msg') { d.a = 'passa'; d.b = { amigos: 'barra', pedidos: 'espera' }[v] || 'passa'; } else { d.a = v === 'ninguem' ? 'barra' : 'passa'; d.b = v === 'todos' || !v ? 'passa' : 'barra'; } }, cAp = cenaPriv('aparelho', !!p.esconderAparelho);
+        // (1.0.2) o que o Discord mostra: cada parte pode ficar de fora (tudo desligado: só o "Aero" com o logo)
+        const dcOp = (k, v) => { dc[k] = v; A.cfg.salvar(); A.evt.emit('discord:config'); };
+        const dcOpc = A.discord && A.discord.opcoes ? A.discord.opcoes() : { onde: true, conversa: 'tipo', chamada: 'sim', sala: true, conta: true, tempo: true };
+        const subDc = (rot, ctl, desc) => { const o = opcao(rot, ctl, desc); o.classList.add('sub-opcao'); o.hidden = dc.ativo === false; return o; };
+        const dcOpcoes = A.plat.desktop ? [
+          subDc(T('Onde estou no app', 'Where I am in the app'), U.chave(dcOpc.onde, (v) => dcOp('onde', v)), T('"Configurando: Aparência", "No Aero Talk", "Vendo as conexões"...', '"Configuring: Appearance", "In Aero Talk", "Browsing connections"...')),
+          subDc(T('Conversas', 'Chats'), U.seg([['nao', T('Não mostrar', 'Hide')], ['tipo', T('Só "Conversando"', 'Just "Chatting"')], ['nome', T('Com quem', 'With whom')]], dcOpc.conversa, (v) => dcOp('conversa', v)), T('Com quem: o nome da pessoa ou do grupo aparece no seu Discord.', 'With whom: the person\'s or group\'s name shows on your Discord.')),
+          subDc(T('Chamadas', 'Calls'), U.seg([['nao', T('Não mostrar', 'Hide')], ['sim', T('Só "Em uma chamada"', 'Just "In a call"')], ['nome', T('Com quem', 'With whom')]], dcOpc.chamada, (v) => dcOp('chamada', v)), T('Com quantas pessoas, e se você está mostrando a tela.', 'With how many people, and whether you are sharing your screen.')),
+          subDc(T('Salas', 'Rooms'), U.chave(dcOpc.sala, (v) => dcOp('sala', v)), T('Em uma sala, transmitindo ou assistindo, com quantas pessoas.', 'In a room, streaming or watching, with how many people.')),
+          subDc(T('Minha conta', 'My account'), U.chave(dcOpc.conta, (v) => dcOp('conta', v)), T('A sua foto e o seu nome #tag no ícone grande. Desligado: só o ícone do Aero.', 'Your photo and name #tag on the big icon. Off: just the Aero icon.')),
+          subDc(T('Tempo decorrido', 'Elapsed time'), U.chave(dcOpc.tempo, (v) => dcOp('tempo', v)), T('Há quanto tempo o Aero (ou a chamada, ou a sala) está aberto.', 'How long Aero (or the call, or the room) has been open.')),
+        ] : [];
         const modoVisto = h('div', { class: 'opcao sub-opcao', hidden: p.visto === false }, h('div', { class: 'cresce' }, h('div', { estilo: { 'font-weight': '600' } }, T('O que conta', 'What counts')), h('div', { class: 'peq suave' }, T('"Quando eu saio": a hora em que você fechou o app ou ficou off-line. "Quando eu mexo no app": também a última vez que você usou o app, mesmo com ele aberto.', '"When I leave": the time you closed the app or went offline. "When I use the app": also the last time you used it, even with it open.'))),
           U.seg([['saida', T('Quando eu saio', 'When I leave')], ['atividade', T('Quando eu mexo no app', 'When I use the app')]], p.vistoModo || 'saida', (v) => { salvar({ vistoModo: v }); }));
         corpo.replaceChildren(
-          A.plat.desktop ? comCena(cDc, opcao(T('Mostrar no Discord o que estou fazendo', 'Show what I am doing on Discord'), U.chave(dc.ativo !== false, (v) => { cDc.dataset.e = v; dc.ativo = v; A.cfg.salvar(); A.evt.emit('discord:config'); setTimeout(mostrarDc, 800); }), T('Rich Presence: no menu ou em uma sala (com quantas pessoas), com a sua foto.', 'Rich Presence: in the menu or in a room (with how many people), with your photo.'))) : null,
+          A.plat.desktop ? comCena(cDc, opcao(T('Mostrar no Discord o que estou fazendo', 'Show what I am doing on Discord'), U.chave(dc.ativo !== false, (v) => { cDc.dataset.e = v; dc.ativo = v; A.cfg.salvar(); A.evt.emit('discord:config'); setTimeout(mostrarDc, 800); dcOpcoes.forEach((x) => { x.hidden = !v; }); }), T('Rich Presence: onde você está no Aero, a conversa, a chamada ou a sala, com a sua foto. Escolha abaixo o que aparece.', 'Rich Presence: where you are in Aero, the chat, the call or the room, with your photo. Choose below what shows.'))) : null,
+          ...(A.plat.desktop ? dcOpcoes : []),
           A.plat.desktop ? dcEstado : null,
           A.ouvindo && A.ouvindo.disponivel() ? comCena(cOuv, opcao(T('Mostrar a música que estou ouvindo', 'Show the music I am listening to'), U.chave((A.cfg.v.ouvir || {}).ativo !== false, (v) => { cOuv.dataset.e = v; A.cfg.v.ouvir = { ...(A.cfg.v.ouvir || {}), ativo: v }; A.cfg.salvar(); A.evt.emit('ouvir:config'); }), T('Como no Discord: os amigos veem nas listas e no seu perfil a música que toca no Spotify deste computador (e no YouTube Music e no Deezer do navegador), com a barra andando. No modo invisível ninguém vê.', 'Like Discord: friends see in their lists and on your profile the song playing on Spotify on this computer (and on YouTube Music and Deezer in the browser), with a moving progress bar. In invisible mode nobody sees it.'))) : null,
           A.ouvindo && A.ouvindo.disponivel() ? ouvExtensao() : null,
@@ -616,6 +659,7 @@
             return h('div', { class: 'opcao com-cena pc-dupla' }, cMsg, h('div', { class: 'pc-dupla-col' }, oMsg, oPed));
           })(),
           comCena(cAp, opcao(T('Esconder o nome do aparelho e o sistema', 'Hide device name and system'), U.chave(p.esconderAparelho, (v) => { cAp.dataset.e = v; salvar({ esconderAparelho: v }); }), T('Em Conexões, os amigos não veem o nome do seu computador/celular nem o sistema (Windows, Linux, Android).', 'In Connections, friends do not see your computer/phone name or system (Windows, Linux, Android).'))),
+          A.aparelhos ? A.aparelhos.secao(p, salvar) : null, // (1.0.2) os símbolos dos aparelhos e o ícone do sistema ao lado do nome
           API.eu && API.eu.donoPend ? (() => { // (0.9.7) só a conta do dono vê isto, e só enquanto não provou a chave exclusiva
             const campo = h('input', { type: 'password', class: 'campo', autocomplete: 'off', spellcheck: 'false', placeholder: T('Chave', 'Key') });
             const ir = async () => { const v = campo.value.trim(); if (!v) return; campo.value = ''; try { await API.req('dono', { chave: v }); U.toast(T('Pronto. Reabra o app.', 'Done. Reopen the app.'), { ms: 3000 }); } catch (e) { U.toast(e.message, { tipo: 'erro' }); } };
@@ -674,7 +718,7 @@
     // (0.5.9-7) prévia do chat nas Configurações: você e um amigo numa conversa de mentira, com o tamanho de letra e de foto escolhidos
     // (0.9.1) o lado das suas mensagens: duas maquetes animadas (como a da barra das abas) e um clique escolhe
     function escolhaLado() {
-      const atual = () => { const v = A.cfg.v.chat.lado; return v === 'direita' || v === 'esquerda' ? v : document.documentElement.dataset.cxlado || 'esquerda'; };
+      const atual = () => { const v = A.cfg.v.chat.lado; return ['direita', 'esquerda', 'todasdir', 'invertido'].includes(v) ? v : document.documentElement.dataset.cxlado || 'esquerda'; };
       const conversa = (dir) => h('div', { class: 'mq-tela', 'aria-hidden': 'true' }, h('div', { class: 'mq-conv' },
         h('div', { class: 'mq-l' }, h('i', { class: 'mq-foto' }), h('i', { class: 'mq-bl w2' })),
         h('div', { class: 'mq-l eu' }, h('i', { class: 'mq-foto' }), h('i', { class: 'mq-bl w1' })),
@@ -687,9 +731,18 @@
       };
       const esq = cartao('esquerda', T('Todas à esquerda', 'All on the left'), T('As suas mensagens ficam do mesmo lado das outras, com a sua foto e o seu nome.', 'Your messages sit on the same side as everyone else\'s, with your photo and name.'));
       const dir = cartao('direita', T('As minhas à direita', 'Mine on the right'), T('Como no WhatsApp: as suas do lado direito, as dos outros do esquerdo.', 'Like WhatsApp: yours on the right, everyone else\'s on the left.'));
-      const sync = () => { const v = atual(); esq.setAttribute('aria-checked', String(v === 'esquerda')); dir.setAttribute('aria-checked', String(v === 'direita')); };
-      return h('div', { class: 'col', estilo: { gap: '6px' } }, h('div', { estilo: { 'font-weight': '600' } }, T('Lado das suas mensagens', 'Side of your messages')),
-        h('div', { class: 'mq-escolha', role: 'radiogroup', 'aria-label': T('Lado das suas mensagens', 'Side of your messages') }, esq, dir));
+      // (1.0.2) mais dois lados: todas à direita, e a sua à esquerda com as dos outros à direita
+      const tdir = cartao('todasdir', T('Todas à direita', 'All on the right'), T('Todo mundo encosta na direita.', 'Everyone sits on the right.'));
+      const inv = cartao('invertido', T('Os outros à direita', 'Others on the right'), T('As suas à esquerda, as dos outros à direita.', 'Yours on the left, everyone else\'s on the right.'));
+      const cartoes = { esquerda: esq, direita: dir, todasdir: tdir, invertido: inv };
+      const sync = () => { const v = atual(); for (const [k, b] of Object.entries(cartoes)) b.setAttribute('aria-checked', String(v === k)); };
+      // quem mostra o nome e a foto, independente do lado
+      const QUEM = [['todos', T('Todos', 'Everyone')], ['meu', T('Só o meu', 'Only mine')], ['outros', T('Só dos outros', 'Only others')], ['nenhum', T('Ninguém', 'No one')]];
+      const padrao = (k) => { const v = A.cfg.v.chat[k]; if (QUEM.some(([q]) => q === v)) return v; return k === 'nomes' && atual() === 'direita' ? 'outros' : A.cfg.v.chat.foto === 'nao' ? 'nenhum' : 'todos'; };
+      const vis = (k, tit) => h('div', {}, h('small', { class: 'suave', estilo: { 'font-weight': '600' } }, tit), U.seg(QUEM, padrao(k), (v) => { A.cfg.v.chat[k] = v; if (k === 'fotosLado' && v !== 'nenhum' && A.cfg.v.chat.foto === 'nao') A.cfg.v.chat.foto = 'normal'; A.cfg.salvar(); A.tema.aplicar(); A.som.tocar('click'); }));
+      return h('div', { class: 'col', estilo: { gap: '8px' } }, h('div', { estilo: { 'font-weight': '600' } }, T('Lado das mensagens', 'Message sides')),
+        h('div', { class: 'mq-escolha cx-ops-lado', role: 'radiogroup', 'aria-label': T('Lado das mensagens', 'Message sides') }, esq, dir, tdir, inv),
+        h('div', { class: 'cx-ops-vis' }, vis('nomes', T('Mostrar o nome de', 'Show the name of')), vis('fotosLado', T('Mostrar a foto de', 'Show the photo of'))));
     }
     function previaChat() {
       const eu = API.eu || { nome: 'Você', codigo: '' };
@@ -968,9 +1021,11 @@
     };
     el.append(cab(T('Configurações', 'Settings')),
       grupo('customizacao', T('Aparência', 'Appearance'), 'oPaleta', T('Cores, vidro e bolhas de conversa', 'Colors, glass and chat bubbles'), [
+        ...(A.estilos ? [secao(T('Seus estilos', 'Your styles'), A.estilos.secao())] : []), // (1.0.2) até 3 estilos do app, troca arrastando
         ...(() => { const ap = A.aparencia.secao(); return ap.partes.map((x) => secao(null, x)); })(), // (0.8.7) cada parte da aparência na sua caixa
         secaoBolhas(),
         ...(A.extras ? [secao(T('Ícone e sons', 'Icon and sounds'), A.extras.secaoApp())] : []), // (1.0.0) os extras do Aero Bubble no app
+        secao(T('Na chamada', 'In calls'), opcao(T('Ficar no meio com todo mundo', 'Stay in the middle with everyone'), U.chave(A.cfg.v.chamJuntos === true, (v) => (A.chamada && A.chamada.juntos ? A.chamada.juntos(v) : (A.cfg.v.chamJuntos = v, A.cfg.salvar()))), T('Você aparece junto com os outros, sem a linha que te separa. Ao maximizar alguém, todos vão para a fileira de baixo. Também dá para trocar clicando com o botão direito em você na chamada.', 'You show up with the others, without the line between you. When you maximize someone, everyone goes to the row below. You can also switch it by right-clicking yourself in the call.'))), // (1.0.2)
         ...(A.extras && A.extras.secaoChamada ? [secao(T('Tela de chamada', 'Call screen'), A.extras.secaoChamada())] : []), // (1.0.2) cor, imagem, bolhas e acessórios da sua chamada, com prévia
         ...(A.aer ? [secao('Skins', A.aer.secao())] : []), // (1.0.0) as skins .aer fazem parte da aparência
       ]),
@@ -980,9 +1035,14 @@
           opcao(T('Fotos das pessoas no chat', 'People photos in chat'), ((x) => { x.classList.add('quebra'); return x; })(U.seg([['enorme', T('Muito grandes', 'Very large')], ['grande', T('Grandes', 'Large')], ['normal', T('Normais', 'Normal')], ['pequena', T('Pequenas', 'Small')], ['nao', T('Sem fotos', 'No photos')]], A.cfg.v.chat.foto || 'normal', (v) => { A.cfg.v.chat.foto = v; A.cfg.salvar(); A.tema.aplicar(); })), T('Com foto, clicar nela abre o mini perfil da pessoa.', 'With photos, clicking one opens the person\'s mini profile.')),
           escolhaLado(),
           previaChat(),
+          opcao(T('Conversões automáticas', 'Automatic conversions'), h('div', { class: 'linha', estilo: { gap: '8px' } }, U.btn(T('Ver a lista', 'See the list'), { peq: true, tipo: 'link', onclick: () => U.modal(T('Conversões automáticas', 'Automatic conversions'), h('div', { class: 'conv-lista' }, ...(A.chatConversoes || []).map(([de, em]) => h('div', { class: 'conv-it' }, h('code', {}, de), h('span', { class: 'conv-seta' }, '→'), h('span', { class: 'conv-em' }, em)))), { largura: 460 }) }), U.chave(A.cfg.v.chat.conversoes === true, (v) => { A.cfg.v.chat.conversoes = v; A.cfg.salvar(); })), T('Escreveu <3, :) ou >:( e deu espaço: vira ❤️, 🙂 ou 😠.', 'Type <3, :) or >:( and a space: it becomes ❤️, 🙂 or 😠.')), // (1.0.2)
           opcao(T('Aviso de outras conversas', 'Alerts from other chats'), U.chave(A.cfg.v.avisoConversa !== false, (v) => { A.cfg.v.avisoConversa = v; A.cfg.salvar(); }), T('Com uma conversa aberta, as mensagens que chegam em outras aparecem num cartãozinho embaixo do nome, para pular para elas.', 'With a chat open, messages from other chats show in a small card under the name, so you can jump to them.'))),
+        ...(A.idiomas ? [secao(T('Tradução e horário', 'Translation and time'), ...A.idiomas.secao(opcao))] : []), // (1.0.2)
+        ...secaoNotif(), // (1.0.2)
         secao(T('Versão e som', 'Version and sound'),
           opcao(T('Versão da interface', 'Interface version'), U.seg([['lite', T('Otimizada', 'Optimized')], ['fancy', T('Completa', 'Fancy')]], A.cfg.v.visual === 'lite' ? 'lite' : 'fancy', (v) => { A.cfg.v.visual = v; A.tema.aplicar(); A.cfg.salvar(); }), T('Otimizada: sem desfoque nem bolhas. Melhor para Safari antigo e PC fraco.', 'Optimized: no blur or bubbles. Best for old Safari and weak PCs.')),
+          // (1.0.2) ex.: otimizada só no celular e completa no computador
+          API.eu && API.sincronizando() ? opcao(T('Só neste aparelho', 'Only on this device'), U.chave(!API.sincParte('desempenho'), (v) => { API.mudarSincParte('desempenho', !v); }), T('A versão escolhida aqui não muda a dos seus outros aparelhos (ex.: otimizada no celular e completa no PC).', 'The version picked here does not change your other devices (e.g. optimized on the phone and fancy on the PC).')) : null,
           opcao(T('Sons', 'Sounds'), U.chave(A.cfg.v.som.ativo, (v) => { A.cfg.v.som.ativo = v; A.cfg.salvar(); if (v) A.som.tocar('sucesso'); })),
           h('div', {}, h('div', { class: 'linha entre' }, h('span', {}, T('Volume dos sons', 'Sound volume'))), U.slider({ valor: A.cfg.v.som.volume, onchange: (v) => { A.som.volume(v); A.som.tocar('msg'); } })),
           h('div', { class: 'linha', estilo: { 'margin-top': '10px', 'flex-wrap': 'wrap' } }, btnSons, sonsEstado),
@@ -1004,7 +1064,7 @@
           }), T('Escolha abaixo o que segue a sua conta. Desligado, este aparelho fica com as configurações dele (ex.: doca no celular e bolha no computador).', 'Choose below what follows your account. Off, this device keeps its own settings (e.g. dock on the phone and bubble on the computer).')),
           // (0.9.5) o que segue a conta, parte por parte
           h('div', { class: 'col sinc-partes', estilo: { gap: '2px', 'padding-left': '14px' }, hidden: A.cfg.v.sincronizar === false }, ...[
-            ['aparencia', T('Aparência e barra das abas', 'Appearance and tab bar')], ['chats', T('Chats', 'Chats')],
+            ['aparencia', T('Aparência e barra das abas', 'Appearance and tab bar')], ['desempenho', T('Versão da interface (otimizada ou completa)', 'Interface version (optimized or fancy)')], ['chats', T('Chats', 'Chats')],
             ['sons', T('Sons e volumes', 'Sounds and volumes')], ['integracoes', T('Integrações instaladas', 'Installed integrations')], ['geral', T('Idioma e atualizações', 'Language and updates')],
           ].map(([k, nome]) => opcao(nome, U.chave(API.sincParte(k), (v) => API.mudarSincParte(k, v))))),
           opcao(T('Pular a tela inicial', 'Skip the start screen'), U.chave(A.cfg.v.pularSplash, (v) => { A.cfg.v.pularSplash = v; A.cfg.salvar(); }), T('Abre direto na home.', 'Opens straight to home.'))),
@@ -1019,11 +1079,11 @@
           return h('div', { class: 'col', estilo: { gap: '8px' } },
             opcao(T('Procurar atualizações automaticamente', 'Check for updates automatically'), U.chave(A.cfg.v.atualizar.auto !== false, (v) => { A.cfg.v.atualizar.auto = v; A.cfg.salvar(); }), T('A cada minuto. Quando sai versão nova, o app pergunta antes de atualizar.', 'Every minute. When a new version is out, the app asks before updating.')),
             opcao(T('Mostrar as novidades depois de atualizar', 'Show what\'s new after updating'), U.chave(A.cfg.v.atualizar.novidades === true, (v) => { A.cfg.v.atualizar.novidades = v; A.cfg.salvar(); }), T('Na primeira vez que o app abre numa versão nova, as Novidades dela aparecem sozinhas.', 'The first time the app opens on a new version, its notes show up on their own.')),
-            // (1.0.2) versões de teste: só para testers, supporters e o desenvolvedor, e só no app do PC (mesma conta, mesmo servidor)
-            A.plat.desktop && A.sistema && A.sistema.podeTeste && A.sistema.podeTeste() ? opcao(T('Receber versões de teste', 'Get test versions'), U.chave(A.cfg.v.atualizar.teste === true, (v) => {
+            // (1.0.2) versões de teste: só para testers, supporters e o desenvolvedor, no app do PC, no site e no celular (mesma conta, mesmo servidor)
+            A.sistema && A.sistema.podeTeste && A.sistema.podeTeste() && A.sistema.temCanalTeste() ? opcao(T('Receber versões de teste', 'Get test versions'), U.chave(A.cfg.v.atualizar.teste === true, (v) => {
               A.cfg.v.atualizar.teste = v; A.cfg.salvar();
               if (v) verificar(); else if (A.sistema.sairDoTeste) A.sistema.sairDoTeste();
-            }), T('Você recebe as versões novas do app antes de todo mundo, com a mesma conta, os mesmos amigos e as mesmas conversas. Podem ter bugs: conte pelo Feedback. Se o canal de teste sair do ar ou a versão de teste não abrir, o Aero volta sozinho para a versão normal.', 'You get new app versions before everyone else, with the same account, friends and chats. They may have bugs: tell us through Feedback. If the test channel goes down or the test version does not open, Aero goes back to the regular version by itself.')) : null,
+            }), T('Você recebe as versões novas do Aero antes de todo mundo, com a mesma conta, os mesmos amigos e as mesmas conversas. Podem ter bugs: conte pelo Feedback. Se o canal de teste sair do ar ou a versão de teste não abrir, o Aero volta sozinho para a versão normal.', 'You get new app versions before everyone else, with the same account, friends and chats. They may have bugs: tell us through Feedback. If the test channel goes down or the test version does not open, Aero goes back to the regular version by itself.')) : null,
             h('div', { class: 'linha', estilo: { 'flex-wrap': 'wrap', gap: '10px' } }, U.btn(T('Verificar atualização', 'Check for updates'), { icone: 'atualizar', tipo: 'sec', peq: true, onclick: verificar }),
               A.novidades && A.novidades.tem() ? U.btn(T('Novidades', 'What\'s new'), { icone: 'estrela', tipo: 'sec', peq: true, onclick: () => A.novidades.abrir() }) : null, est)); // (0.8.3) o que cada versão trouxe
         })()),
@@ -1064,6 +1124,7 @@
       const pg = paginas.find((p) => p.id === id).pg;
       if (antes) { pg.classList.remove('entra'); void pg.offsetWidth; pg.classList.add('entra'); A.som.tocar('menu-abrir'); }
       A.cfg.v.cfgPagina = id; A.cfg.salvar();
+      A.onde = { ...(A.onde || {}), pagina: id, paginaNome: (paginas.find((p) => p.id === id) || {}).titulo || '' }; A.evt.emit('onde'); // (1.0.2) "Configurando: Aparência" no Discord
       if (clique) { const c = el.closest('.conteudo'); if (c) c.scrollTo({ top: 0 }); }
     }
     if (ctx.lateralNaBolha && ctx.lateralNaBolha()) ctx.lateral(subnav); else el.insertBefore(subnav, el.children[1] || null);

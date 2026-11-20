@@ -38,6 +38,11 @@
       else if (m[5]) { // (1.0.0) emoji próprio: se o plano de quem criou acabou, fica o :nome:
         const nome = ':' + m[7].toLowerCase() + ':', img = h('img', { class: 'cx-emoji-pr', src: `${A.api.servidor}/api/emoji/${m[5].toUpperCase()}/${m[6]}`, alt: nome, title: nome, loading: 'lazy', draggable: 'false' });
         img.addEventListener('error', () => img.replaceWith(nome)); out.push(img);
+        img.addEventListener('contextmenu', (e) => { // (1.0.2) importar o emoji de alguém para as suas figurinhas
+          const F = A.talk && A.talk.figurinhas; if (!F || !F.importar) return; e.preventDefault(); e.stopPropagation();
+          A.ui.menuContexto(e, [{ texto: T('Importar para as minhas figurinhas', 'Import to my stickers'), icone: 'figurinha', onclick: async () => { try { await F.importar(img.src, m[7].toLowerCase()); A.som.tocar('sucesso'); A.ui.toast(T('Figurinha criada: ', 'Sticker created: ') + nome); } catch (er) { A.ui.toast(er.message, { tipo: 'erro' }); } } },
+            { texto: T('Copiar ', 'Copy ') + nome, icone: 'copiar', onclick: () => { try { navigator.clipboard.writeText(nome); } catch (_) { /* ok */ } } }]);
+        });
       }
       else if (m[4]) out.push(h('span', { class: 'cx-mencao todos', title: m[4].toLowerCase() === 'aqui' ? T('Todo mundo online na conversa', 'Everyone online in the chat') : T('Todo mundo da conversa', 'Everyone in the chat') }, '@' + m[4].toLowerCase()));
       else if (m[2]) {
@@ -78,6 +83,7 @@
   const meChama = (texto) => { const eu = A.api.eu; if (!eu || !texto) return false; if (mencoes(texto).includes(eu.codigo) || /<@todos>/i.test(texto)) return true; return /<@aqui>/i.test(texto) && (!A.hub || A.hub.estado === 'online'); };
   A.chatMeChama = meChama;
   // ---------- embeds (0.6.0): YouTube como no Discord, GIFs (Klipy) e convites de grupo ----------
+  const ehSpotify = (u) => /^https?:\/\/(?:open\.)?spotify\.com\/(?:intl-[a-z-]+\/)?(?:embed\/)?(track|album|playlist|episode)\/[A-Za-z0-9]{22}/i.test(u); // (1.0.2)
   const idYoutube = (u) => { const m = /^https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/.exec(u); return m ? m[1] : null; };
   const ehGif = (u) => /^https:\/\/([a-z0-9-]+\.)*(klipy\.com|klipy\.co)\/[^\s]+\.(gif|webp)(\?[^\s]*)?$/i.test(u);
   const codigoConvite = (u) => { const m = /(?:#convite=|aerostream:\/\/convite\/)([0-9A-F]{10})\b/i.exec(u); return m ? m[1].toUpperCase() : null; };
@@ -180,6 +186,65 @@
       const rod = h('a', { class: 'cx-tw-rod', href: url, title: T('Abrir no X (botão direito: copiar o link)', 'Open on X (right-click: copy link)'), onclick: abrir }, marcaX(11), h('span', null, 'X' + (quando ? ' · ' + quando : '')));
       partes.push(rod);
       caixa.addEventListener('contextmenu', (e) => { if (!e.target.closest('.cx-gcel')) menuLink(url, 'X', extra)(e); }); // (0.9.6) o link fica escondido: botão direito copia
+      caixa.classList.remove('cx-tw-carregando'); caixa.replaceChildren(...partes); grudar();
+    });
+    return el;
+  }
+  // (1.0.2) post do Reddit: sub, autor, título, texto, fotos (até 20, abrem na galeria com setas) e o vídeo que toca aqui mesmo, com som
+  const ehReddit = (u) => /^https?:\/\/(?:(?:www|old|new|np|m|sh)\.)?reddit\.com\/(?:r\/[A-Za-z0-9_]{2,21}\/)?(?:comments|s)\/[A-Za-z0-9]{3,12}/i.test(u);
+  const ehLoja = (u) => /^https?:\/\/(?:(?:www|pt|m|smile)\.)?(?:amazon\.(?:com\.br|com|co\.uk|de|es|fr|it|ca|co\.jp|com\.mx)\/(?:[^\s]*\/)?(?:dp|gp\/product|d)\/|(?:a\.)?aliexpress\.(?:com|us|ru)\/(?:item|i)\/|amzn\.(?:to|eu|com)\/|a\.co\/)/i.test(u);
+  const marcaReddit = (t) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('width', t); s.setAttribute('height', t); s.setAttribute('aria-hidden', 'true'); s.innerHTML = '<circle cx="12" cy="12" r="12" fill="#FF4500"/><path fill="#fff" d="M19.6 12a1.7 1.7 0 0 0-2.9-1.2 8.4 8.4 0 0 0-4.5-1.4l.8-3.6 2.5.5a1.2 1.2 0 1 0 .1-.7l-2.8-.6a.3.3 0 0 0-.4.3l-.9 4.1a8.4 8.4 0 0 0-4.6 1.4 1.7 1.7 0 1 0-1.9 2.8 3.3 3.3 0 0 0 0 .5c0 2.6 3 4.7 6.7 4.7s6.7-2.1 6.7-4.7a3.3 3.3 0 0 0 0-.5 1.7 1.7 0 0 0 1.2-1.6zM8.3 13.2a1.2 1.2 0 1 1 1.2 1.2 1.2 1.2 0 0 1-1.2-1.2zm6.6 3.2a4.4 4.4 0 0 1-2.9.9 4.4 4.4 0 0 1-2.9-.9.3.3 0 0 1 .4-.4 3.7 3.7 0 0 0 2.5.7 3.7 3.7 0 0 0 2.5-.7.3.3 0 1 1 .4.4zm-.3-2a1.2 1.2 0 1 1 1.2-1.2 1.2 1.2 0 0 1-1.2 1.2z"/>'; return s; };
+  function embedReddit(u, grudar = () => {}, soLink = false, extra = null) {
+    const U = A.ui;
+    const caixa = h('div', { class: 'cx-midia cx-tw cx-rd cx-tw-carregando' }, h('div', { class: 'cx-tw-esq' }));
+    const el = U.pelicula(caixa);
+    dadosEmbed(u).then((d) => {
+      if (!d || d.tipo !== 'reddit') { el.replaceWith(soLink ? h('div', { class: 'cx-txt' }, ...U.textoComLinks(u)) : h('span')); return; }
+      const url = d.url || u, abrir = (e) => { if (e) { e.preventDefault(); e.stopPropagation(); } U.abrirFora(url); };
+      const topo = h('div', { class: 'cx-tw-topo' }, h('span', { class: 'cx-rd-av' }, marcaReddit(36)),
+        h('a', { class: 'cx-tw-quem', href: 'https://www.reddit.com/r/' + d.sub, onclick: (e) => { e.preventDefault(); e.stopPropagation(); U.abrirFora('https://www.reddit.com/r/' + d.sub); } },
+          h('b', null, 'r/' + d.sub), d.autor ? h('small', null, 'u/' + d.autor) : null),
+        d.nsfw ? h('span', { class: 'cx-rd-nsfw' }, 'NSFW') : null);
+      const partes = [topo, h('div', { class: 'cx-rd-titulo' }, d.titulo)];
+      if (d.texto) partes.push(h('div', { class: 'cx-tw-txt cx-rd-txt' }, ...U.textoComLinks(d.texto)));
+      const ms = d.midias || [];
+      if (d.video) {
+        const v = d.video, cel = h('button', { type: 'button', class: 'cx-gcel video', tabindex: '-1' });
+        if (v.capa) cel.append(h('img', { src: v.capa, alt: '', loading: 'lazy', decoding: 'async', draggable: 'false', referrerpolicy: 'no-referrer' }));
+        cel.append(h('span', { class: 'cx-gplay' }, A.icone('play', 22)));
+        cel.addEventListener('click', (e) => {
+          e.stopPropagation(); if (g.classList.contains('sens')) return;
+          const vid = h('video', { src: v.url, class: 'cx-tw-video', autoplay: '', playsinline: '', controls: '', poster: v.capa || null, referrerpolicy: 'no-referrer' });
+          if (v.som) { // o Reddit manda a imagem e o som separados: os dois andam juntos
+            const a = new Audio(v.som); a.preload = 'auto';
+            const junto = () => { if (Math.abs(a.currentTime - vid.currentTime) > 0.25) a.currentTime = vid.currentTime; };
+            vid.addEventListener('play', () => { junto(); a.play().catch(() => {}); }); vid.addEventListener('pause', () => a.pause()); vid.addEventListener('waiting', () => a.pause());
+            vid.addEventListener('playing', () => { junto(); a.play().catch(() => {}); }); vid.addEventListener('seeked', junto); vid.addEventListener('timeupdate', () => { if (!vid.isConnected) { a.pause(); return; } if (Math.abs(a.currentTime - vid.currentTime) > 0.4) a.currentTime = vid.currentTime; });
+            vid.addEventListener('volumechange', () => { a.volume = vid.volume; a.muted = vid.muted; }); vid.addEventListener('ratechange', () => { a.playbackRate = vid.playbackRate; });
+          }
+          const vivo = h('div', { class: 'cx-gcel tocando' }, vid); vid.addEventListener('click', (ev) => ev.stopPropagation()); cel.replaceWith(vivo);
+        });
+        var g = h('div', { class: 'cx-tw-midias cx-grade n1 um' + (d.nsfw ? ' sens' : '') }, cel); g.style.aspectRatio = '16 / 9';
+      } else if (ms.length) {
+        const todas = ms.slice(0, 20), vis = todas.length > 9 ? todas.slice(0, 9) : todas, n = vis.length;
+        var g = h('div', { class: 'cx-tw-midias cx-grade n' + n + (n === 1 ? ' um' : '') + (n > 4 ? ' muitos' : '') + (d.nsfw ? ' sens' : '') });
+        const fotos = todas.map((m, i) => ({ url: m.url, video: false, nome: 'reddit-' + (i + 1) + '.jpg', link: url }));
+        vis.forEach((m, i) => {
+          const cel = h('button', { type: 'button', class: 'cx-gcel', tabindex: '-1' }, h('img', { src: m.url, alt: '', loading: 'lazy', decoding: 'async', draggable: 'false', referrerpolicy: 'no-referrer' }));
+          if (todas.length > 9 && i === 8) { cel.classList.add('cx-gmais'); cel.append(h('span', { class: 'cx-gmais-n' }, '+' + (todas.length - 8))); }
+          cel.addEventListener('click', (e) => { e.stopPropagation(); if (g.classList.contains('sens')) return; U.verImagem(fotos[i].url, { nome: fotos[i].nome, link: url, galeria: { itens: fotos, i } }); });
+          g.append(cel);
+        });
+      }
+      if (g) {
+        if (d.nsfw) { const aviso = h('button', { type: 'button', class: 'cx-tw-aviso', onclick: (e) => { e.stopPropagation(); g.classList.remove('sens'); aviso.remove(); } }, A.icone('olho', 16), T('Conteúdo +18. Clique para ver', '18+ content. Click to view')); partes.push(h('div', { class: 'cx-tw-midia-caixa' }, g, aviso)); }
+        else partes.push(g);
+      }
+      const st = (ic, v, tit) => (v == null ? null : h('span', { class: 'cx-tw-num', title: tit }, A.icone(ic, 14), numCurto(v)));
+      if (d.pontos != null || d.coment != null) partes.push(h('div', { class: 'cx-tw-nums' }, st('subir', d.pontos, T('Pontos', 'Upvotes')), st('responder', d.coment, T('Comentários', 'Comments'))));
+      const qd = d.t ? (() => { try { return new Intl.DateTimeFormat(A.idioma && A.idioma() === 'en' ? 'en' : 'pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(d.t)); } catch (e) { return ''; } })() : '';
+      partes.push(h('a', { class: 'cx-tw-rod', href: url, title: T('Abrir no Reddit (botão direito: copiar o link)', 'Open on Reddit (right-click: copy link)'), onclick: abrir }, marcaReddit(12), h('span', null, 'Reddit' + (qd ? ' · ' + qd : ''))));
+      caixa.addEventListener('contextmenu', (e) => { if (!e.target.closest('.cx-gcel')) menuLink(url, 'Reddit', extra)(e); });
       caixa.classList.remove('cx-tw-carregando'); caixa.replaceChildren(...partes); grudar();
     });
     return el;
@@ -297,7 +362,7 @@
     const aceitar = o.aceitar || 'image/*';
     const els = new Map();
     let resp = null, anexos = [], editando = null;
-    const MAX_ANEXOS = 10;
+    const MAX_ANEXOS = 20; // (1.0.2) até 20 fotos/vídeos juntos
 
     const lista = h('div', { class: 'cx-msgs selecionavel', role: 'log', 'aria-live': 'polite' });
     // (0.8.6) várias ligações seguidas viram uma linha só (a mais nova), com "+N" para ver as outras: nada de encher o chat de avisos
@@ -394,6 +459,30 @@
     const btnGif = o.gifs ? U.btn('', { icone: 'gif', tipo: 'sec', redondo: true, peq: true, titulo: 'GIFs', onclick: () => alternarEmojis(null, 'gif') }) : null;
     const btnFig = o.figurinhas ? U.btn('', { icone: 'figurinha', tipo: 'sec', redondo: true, peq: true, titulo: T('Figurinhas', 'Stickers'), onclick: () => alternarEmojis(null, 'fig') }) : null;
     const btnGravar = o.gravarAudio ? U.btn('', { icone: 'mic', tipo: 'sec', redondo: true, peq: true, titulo: T('Gravar mensagem de voz', 'Record a voice message'), onclick: () => gravador() }) : null;
+    // (1.0.2) botão direito (ou segurar, no celular) no microfone: entrada, sensibilidade, supressão de ruído e cancelamento de eco das mensagens de voz
+    const cfgGrav = () => { const c = A.cfg.v.chat = A.cfg.v.chat || {}; c.grav = { dev: '', sens: 100, sup: true, eco: true, ...(c.grav || {}) }; return c.grav; };
+    if (btnGravar) btnGravar.addEventListener('contextmenu', async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const g = cfgGrav(), salvar = () => A.cfg.salvar();
+      const { entradas } = A.mic && A.mic.dispositivos ? await A.mic.dispositivos() : { entradas: [] };
+      const marca = (sim) => (sim ? 'check' : null);
+      const ev = { clientX: e.clientX, clientY: e.clientY, target: btnGravar, ancora: btnGravar };
+      U.menuContexto(ev, [
+        { texto: T('Entrada', 'Input'), icone: 'mic', sub: [{ texto: T('Padrão do sistema', 'System default'), icone: marca(!g.dev), onclick: () => { g.dev = ''; salvar(); } },
+          ...entradas.filter((d) => d.deviceId && d.deviceId !== 'default').map((d, i) => ({ texto: (d.label || T('Microfone ', 'Microphone ') + (i + 1)).slice(0, 48), icone: marca(g.dev === d.deviceId), onclick: () => { g.dev = d.deviceId; salvar(); } }))] },
+        { texto: T('Sensibilidade', 'Sensitivity') + (g.sens >= 100 ? T(' · sempre aberto', ' · always open') : ' · ' + g.sens + '%'), icone: 'sinal', onclick: () => sensibilidade() },
+        null,
+        { texto: T('Supressão de ruído', 'Noise suppression') + (g.sup ? T(' · ligada', ' · on') : T(' · desligada', ' · off')), icone: marca(g.sup) || 'micOff', onclick: () => { g.sup = !g.sup; salvar(); } },
+        { texto: T('Cancelamento de eco', 'Echo cancellation') + (g.eco ? T(' · ligado', ' · on') : T(' · desligado', ' · off')), icone: marca(g.eco) || 'fones', onclick: () => { g.eco = !g.eco; salvar(); } },
+      ]);
+    });
+    function sensibilidade() {
+      const g = cfgGrav();
+      const val = h('span', { class: 'peq suave' }), sl = h('input', { type: 'range', min: 0, max: 100, step: 1, value: g.sens, class: 'gs-slider', 'aria-label': T('Sensibilidade', 'Sensitivity') });
+      const pintar = () => { val.textContent = sl.value >= 100 ? T('Sempre aberto: grava tudo', 'Always open: records everything') : T('Só grava acima de ', 'Only records above ') + sl.value + '%'; };
+      sl.addEventListener('input', () => { g.sens = +sl.value; pintar(); A.cfg.salvar(); }); pintar();
+      U.popover(btnGravar, [h('div', { class: 'peq suave' }, T('Mais à esquerda: só a voz mais alta entra na gravação. No fim: grava tudo.', 'Further left: only louder voice gets recorded. At the end: records everything.')), sl, val], { largura: 300, titulo: T('Sensibilidade do microfone', 'Microphone sensitivity') });
+    }
     const sugestoes = h('div', { class: 'cx-sugestoes vidro', hidden: true, role: 'listbox' });
     const btnEnviar = U.btn('', { icone: 'enviar', redondo: true, peq: true, titulo: T('Enviar', 'Send'), onclick: () => enviar() });
     // "Fulano está digitando…" (como no Discord): quem usa o chat avisa (o.digitando) e mostra o dos outros (digitando(nomes))
@@ -499,7 +588,7 @@
         const est = h('button', { type: 'button', class: 'cx-gif-fav' + (fav ? ' on' : ''), title: fav ? T('Tirar dos favoritos', 'Remove from favorites') : T('Adicionar aos favoritos', 'Add to favorites'), onclick: async (e) => { e.stopPropagation(); await o.gifs.favoritar(g, !est.classList.contains('on')); est.classList.toggle('on'); } }, A.icone('estrela', 15));
         // (0.6.1) cada GIF na proporção dele (a caixa já nasce do tamanho certo, sem pular quando a imagem carrega)
         const prop = g.w > 0 && g.h > 0 ? A.limitar(g.h / g.w, 0.4, 2.2) : 0.75;
-        const b = h('button', { type: 'button', class: 'cx-gif-it', title: g.titulo || 'GIF', estilo: { 'aspect-ratio': String(1 / prop) }, onclick: () => { alternarEmojis(false); const r = resp; responder(null); o.enviar({ texto: g.url, resp: r }).catch((er) => U.toast(er.message, { tipo: 'erro' })); } }, h('img', { src: g.prev, alt: g.titulo || 'GIF', loading: 'lazy', draggable: 'false' }), est);
+        const b = h('button', { type: 'button', class: 'cx-gif-it', title: g.titulo || 'GIF', estilo: { 'aspect-ratio': String(1 / prop) }, onclick: () => { alternarEmojis(false); if (inp.value.trim()) { const a = inp.selectionStart ?? inp.value.length, antes = inp.value.slice(0, a), depois = inp.value.slice(inp.selectionEnd ?? a); inserir((antes && !/\s$/.test(antes) ? ' ' : '') + g.url + (depois && !/^\s/.test(depois) ? ' ' : '')); guardarRascunho(); inp.focus(); return; } /* (1.0.2) escrevendo: o GIF entra onde está o cursor */ const r = resp; responder(null); o.enviar({ texto: g.url, resp: r }).catch((er) => U.toast(er.message, { tipo: 'erro' })); } }, h('img', { src: g.prev, alt: g.titulo || 'GIF', loading: 'lazy', draggable: 'false' }), est);
         b.addEventListener('contextmenu', (e) => menuMidia(e, { url: g.url, tipo: 'gif' }));
         b.prop = prop;
         return b;
@@ -554,25 +643,46 @@
       const mandar = (cod, id) => { alternarEmojis(false); const r = resp; responder(null); o.enviar({ texto: `<fig:${cod}:${id}>`, resp: r }).catch((er) => U.toast(er.message, { tipo: 'erro' })); }; // (0.9.7) também responde
       // (0.8.5) a estrela no canto de cada figurinha: guarda (ou tira) das favoritas
       const estrela = (cod, id) => F.favoritar ? h('button', { type: 'button', class: 'cx-gif-fav cx-fig-fav' + (F.eFavorita(cod, id) ? ' on' : ''), title: F.eFavorita(cod, id) ? T('Tirar das favoritas', 'Remove from favorites') : T('Favoritar figurinha', 'Favorite sticker'), onclick: async (e) => { e.stopPropagation(); try { await F.favoritar(cod, id, !F.eFavorita(cod, id)); pintar(); } catch (er) { U.toast(er.message, { tipo: 'erro' }); } } }, A.icone('estrela', 15)) : null;
+      // (1.0.2) busca pelo nome (dá para dar nome a qualquer uma no botão direito) e as seções recolhem (fica guardado)
+      const norm = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+      const busca = h('input', { class: 'campo cx-gif-busca', placeholder: T('Procurar figurinha pelo nome', 'Search stickers by name'), 'aria-label': T('Procurar figurinhas', 'Search stickers') });
+      busca.addEventListener('keydown', (e) => e.stopPropagation());
+      busca.addEventListener('input', () => filtrar());
+      const nomear = async (cod, f) => {
+        const campo = h('input', { class: 'campo', value: f.n || '', maxlength: 40, autocomplete: 'off', placeholder: T('ex.: gato rindo', 'e.g. laughing cat') });
+        const ok = await U.confirmar(h('div', { class: 'col', estilo: { gap: '8px' } }, h('p', { estilo: { margin: 0 } }, T('Nome para achar na busca', 'Name to find it in search')), campo), { sim: T('Salvar', 'Save'), titulo: T('Nome da figurinha', 'Sticker name') });
+        if (!ok) return; try { await F.nomear(cod, f.id, campo.value.trim()); pintar(); } catch (er) { U.toast(er.message, { tipo: 'erro' }); }
+      };
+      let secoes = [];
+      const filtrar = () => {
+        const q = norm(busca.value);
+        for (const s of secoes) { let vis = 0; for (const b of s.itens) { const ok = !q || norm(b.dataset.n).includes(q); b.hidden = !ok || (s.rec && !q); if (ok) vis++; } s.tit.hidden = !!q && !vis; }
+      };
+      const secao = (k, texto, qtd) => { const s = { itens: [], rec: false }; s.tit = U.tituloRecolhe(k, texto, (rec) => { s.rec = rec; filtrar(); }, h('small', { class: 'suave' }, String(qtd))); secoes.push(s); grade.append(s.tit); return s; };
       const pintar = async () => {
         try {
           const [{ lista, codigo }, favs] = await Promise.all([F.listar(), F.favoritas ? F.favoritas().catch(() => []) : []]);
-          grade.textContent = '';
+          grade.textContent = ''; secoes = [];
           if (favs.length) {
-            grade.append(h('div', { class: 'cx-emoji-tit' }, T('Favoritas', 'Favorites')));
-            for (const f of favs) grade.append(h('button', { type: 'button', class: 'cx-fig', onclick: () => mandar(f.c, f.id) }, h('img', { src: src(f.c, f.id), alt: '', loading: 'lazy', draggable: 'false' }), estrela(f.c, f.id)));
-            grade.append(h('div', { class: 'cx-emoji-tit' }, T('Suas figurinhas', 'Your stickers')));
+            const s = secao('fig-fav', T('Favoritas', 'Favorites'), favs.length);
+            for (const f of favs) {
+              const b = h('button', { type: 'button', class: 'cx-fig', title: f.n || '', dados: { n: f.n || '' }, onclick: () => mandar(f.c, f.id) }, h('img', { src: src(f.c, f.id), alt: f.n || '', loading: 'lazy', draggable: 'false' }), estrela(f.c, f.id));
+              b.addEventListener('contextmenu', (e) => U.menuContexto(e, [{ texto: T('Dar um nome', 'Name it'), icone: 'lapis', onclick: () => nomear(f.c, f) }, { texto: T('Tirar das favoritas', 'Remove from favorites'), icone: 'estrela', onclick: async () => { await F.favoritar(f.c, f.id, false).catch(() => {}); pintar(); } }]));
+              s.itens.push(b); grade.append(b);
+            }
           }
-          grade.append(novo, arq);
+          const s = secao('fig-suas', T('Suas figurinhas', 'Your stickers'), lista.length);
+          grade.append(novo, arq); s.itens.push(novo); novo.dataset.n = '';
           for (const f of lista) {
-            const b = h('button', { type: 'button', class: 'cx-fig', onclick: () => mandar(codigo, f.id) }, h('img', { src: src(codigo, f.id), alt: '', loading: 'lazy', draggable: 'false' }), estrela(codigo, f.id));
-            b.addEventListener('contextmenu', (e) => U.menuContexto(e, [{ texto: T('Apagar figurinha', 'Delete sticker'), icone: 'lixo', perigo: true, onclick: async () => { if (await U.confirmar(T('Apagar esta figurinha?', 'Delete this sticker?'), { perigo: true })) { await F.apagar(f.id).catch((er) => U.toast(er.message, { tipo: 'erro' })); pintar(); } } }]));
-            grade.append(b);
+            const b = h('button', { type: 'button', class: 'cx-fig', title: f.n || '', dados: { n: f.n || '' }, onclick: () => mandar(codigo, f.id) }, h('img', { src: src(codigo, f.id), alt: f.n || '', loading: 'lazy', draggable: 'false' }), estrela(codigo, f.id));
+            b.addEventListener('contextmenu', (e) => U.menuContexto(e, [{ texto: T('Dar um nome', 'Name it'), icone: 'lapis', onclick: () => nomear('', f) }, { texto: T('Apagar figurinha', 'Delete sticker'), icone: 'lixo', perigo: true, onclick: async () => { if (await U.confirmar(T('Apagar esta figurinha?', 'Delete this sticker?'), { perigo: true })) { await F.apagar(f.id).catch((er) => U.toast(er.message, { tipo: 'erro' })); pintar(); } } }]));
+            s.itens.push(b); grade.append(b);
           }
-          if (!lista.length) grade.append(h('p', { class: 'peq suave' }, T('Crie a sua primeira figurinha com o +. Todas ficam do mesmo tamanho.', 'Create your first sticker with +. They all end up the same size.')));
+          if (!lista.length) { const p = h('p', { class: 'peq suave', dados: { n: '' } }, T('Crie a sua primeira figurinha com o +. Todas ficam do mesmo tamanho.', 'Create your first sticker with +. They all end up the same size.')); s.itens.push(p); grade.append(p); }
+          filtrar();
         } catch (e) { grade.textContent = ''; grade.append(novo, arq, h('p', { class: 'peq suave' }, e.message)); }
       };
-      corpoPainel.append(grade); pintar();
+      corpoPainel.append(h('div', { class: 'cx-gif-topo' }, busca), grade); pintar();
     }
     // clique fora fecha o painel; o ouvinte só existe enquanto ele está aberto (cada chat criado não deixa nada pendurado no documento)
     const foraEmojis = (e) => { if (!emojiPainel.contains(e.target) && ![btnEmoji, btnGif, btnFig].some((b) => b && b.contains(e.target))) alternarEmojis(false); };
@@ -622,7 +732,9 @@
       anexos.forEach((b) => {
         if (!urlsPrev.has(b)) urlsPrev.set(b, URL.createObjectURL(b));
         const url = urlsPrev.get(b);
-        const prev = /^image\//.test(b.type) ? h('img', { src: url, alt: '' }) : /^video\//.test(b.type) ? h('video', { src: url, muted: '' }) : h('span', { class: 'cx-anexo-ic' }, A.icone(A.codigo && A.codigo.ehTexto(b.nome, b.type) ? 'codigo' : /^audio\//.test(b.type) || /\.(mp3|m4a|aac|ogg|oga|opus|wav|flac|weba)$/i.test(b.nome || '') ? 'musica' : 'clipe', 22));
+        // (1.0.2) foto ou vídeo: clicar abre a prévia em tamanho grande (com as outras fotos/vídeos do envio para passar de lado)
+        const verPrevia = (e) => { e.stopPropagation(); const midias = anexos.filter((x) => /^(image|video)\//.test(x.type)).map((x) => ({ url: urlsPrev.get(x) || (urlsPrev.set(x, URL.createObjectURL(x)), urlsPrev.get(x)), nome: x.nome || x.name, video: /^video\//.test(x.type) })); U.verImagem(url, { nome: b.nome || b.name, galeria: { itens: midias } }); };
+        const prev = /^image\//.test(b.type) ? h('img', { src: url, alt: '', class: 'cx-anexo-ver', title: T('Ver antes de enviar', 'Preview before sending'), onclick: verPrevia }) : /^video\//.test(b.type) ? h('video', { src: url, muted: '', class: 'cx-anexo-ver', title: T('Ver antes de enviar', 'Preview before sending'), onclick: verPrevia }) : h('span', { class: 'cx-anexo-ic' }, A.icone(A.codigo && A.codigo.ehTexto(b.nome, b.type) ? 'codigo' : /^audio\//.test(b.type) || /\.(mp3|m4a|aac|ogg|oga|opus|wav|flac|weba)$/i.test(b.nome || '') ? 'musica' : 'clipe', 22));
         anexoBar.append(h('div', { class: 'cx-anexo-it', title: b.nome + ' · ' + Math.max(1, Math.round(b.size / 1024)) + ' KB' }, prev, anexos.length === 1 ? h('span', { class: 'peq' }, b.nome, ' · ', Math.max(1, Math.round(b.size / 1024)) + ' KB') : null,
           U.btn('', { icone: 'fechar', tipo: 'sec', redondo: true, peq: true, titulo: T('Tirar anexo', 'Remove attachment'), onclick: () => { anexos = anexos.filter((x) => x !== b); pintarAnexos(); guardarRascunho(); } })));
       });
@@ -645,7 +757,8 @@
     async function gravador() {
       if (gravando) return;
       // (0.6.0) sem o ganho automático do navegador (era ele que deixava os áudios estourados) e com um limitador suave antes de gravar
-      let st; try { st = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false } }); } catch (e) { U.toast(T('Não consegui usar o microfone.', 'Could not use the microphone.'), { tipo: 'erro' }); return; }
+      const gc = cfgGrav();
+      let st; try { st = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: gc.eco !== false, noiseSuppression: gc.sup !== false, autoGainControl: false, ...(gc.dev ? { deviceId: { ideal: gc.dev } } : {}) } }); } catch (e) { U.toast(T('Não consegui usar o microfone.', 'Could not use the microphone.'), { tipo: 'erro' }); return; }
       const tipo = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
       const ctx = A.som.destravar() || new AudioContext(); const an = ctx.createAnalyser(); an.fftSize = 256; const src = ctx.createMediaStreamSource(st); src.connect(an);
       const ganho = ctx.createGain(); ganho.gain.value = 0.8;
@@ -662,6 +775,7 @@
       const desenhar = (agora) => {
         raf = requestAnimationFrame(desenhar);
         an.getByteTimeDomainData(dados); let pico = 0; for (const v of dados) pico = Math.max(pico, Math.abs(v - 128)); const nivel = Math.min(1, pico / 60);
+        if (gc.sens < 100) { const abre = nivel * 100 >= (100 - gc.sens) * 0.6; ganho.gain.setTargetAtTime(abre ? 0.8 : 0, ctx.currentTime, abre ? 0.01 : 0.25); } // (1.0.2) sensibilidade: abaixo do limite, silêncio
         medir();
         if (Math.random() < 0.15 + nivel * 0.9 && bolhas.length < 40) bolhas.push({ x: 8 + Math.random() * (W - 16), y: H + 6, r: 3 + nivel * 8 + Math.random() * 2, v: 0.35 + nivel * 1.2 + Math.random() * 0.35, a: 0.9 });
         g.clearRect(0, 0, W, H);
@@ -771,6 +885,7 @@
     let sugIdx = 0, sugLista = [];
     function pintarSugestoes() {
       const pos = inp.selectionStart || 0, antes = inp.value.slice(0, pos), m = /(^|\s)@([^\s@]{0,24})$/.exec(antes);
+      if (!m) { const me = /(^|\s):([\p{L}\p{N}_+-]{2,24})$/u.exec(antes); if (me) { pintarEmojisSug(me[2].toLowerCase(), antes); return; } }
       if (!m || !o.membros) { sugestoes.hidden = true; return; }
       const q = m[2].toLowerCase();
       // (0.6.9) num grupo, "@todos" e "@aqui" aparecem primeiro
@@ -782,6 +897,38 @@
       sugLista.forEach((p, i) => sugestoes.append(h('button', { type: 'button', class: 'cx-sug' + (i === sugIdx ? ' sel' : ''), onpointerdown: (e) => { e.preventDefault(); escolherMencao(p); } }, p.especial ? h('span', { class: 'cx-sug-todos' }, '@') : U.avatar(p, 24), h('b', {}, p.especial ? '@' + p.nome : p.nome), p.especial ? h('span', { class: 'suave peq' }, p.desc) : p.tag ? h('span', { class: 'suave peq' }, '#' + p.tag) : null)));
       sugestoes.hidden = false;
     }
+    // (1.0.2) ":" + o começo do nome abre os emojis (português ou inglês, e os seus emojis criados); Enter/Tab ou clicar coloca no texto
+    const normal = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    function pintarEmojisSug(q, antes) {
+      carregarNomes().then((nomes) => {
+        if (inp.value.slice(0, inp.selectionStart || 0) !== antes) return; // já mudou
+        const qn = normal(q), lista = [];
+        const ec = A.extras && A.extras.emojisCache ? A.extras.emojisCache() : null;
+        if (ec && ec.emojis) for (const e of ec.emojis) if (e.n.includes(qn)) lista.push({ custom: e, cod: ec.codigo, nome: e.n, pont: e.n.startsWith(qn) ? 0 : 1 });
+        for (const [em, txt] of Object.entries(nomes || {})) {
+          const pals = normal(txt).split(' '); let pont = -1;
+          for (let i = 0; i < pals.length; i++) if (pals[i].startsWith(qn)) { pont = (pals[i] === qn ? 0 : 1) + Math.min(i, 8) / 10; break; }
+          if (pont >= 0) lista.push({ emoji: em, nome: txt.split(' ').slice(0, 7).join(' '), pont: pont + 0.5 });
+          if (lista.length > 200) break;
+        }
+        lista.sort((a, b) => a.pont - b.pont);
+        sugLista = lista.slice(0, 8);
+        if (!sugLista.length) { sugestoes.hidden = true; return; }
+        sugIdx = Math.min(sugIdx, sugLista.length - 1); sugestoes.textContent = '';
+        sugLista.forEach((x, i) => sugestoes.append(h('button', { type: 'button', class: 'cx-sug cx-sug-emoji' + (i === sugIdx ? ' sel' : ''), onpointerdown: (e) => { e.preventDefault(); escolherSug(x); } },
+          x.custom ? h('img', { class: 'cx-sug-em', src: A.extras.emojis.url(x.cod, x.custom.id), alt: '' }) : h('span', { class: 'cx-sug-em' }, x.emoji), h('span', { class: 'cx-sug-nome', title: x.nome }, x.custom ? ':' + x.nome + ':' : x.nome))));
+        sugestoes.hidden = false;
+      });
+    }
+    function escolherSug(x) {
+      if (!x.emoji && !x.custom) return escolherMencao(x);
+      const pos = inp.selectionStart || 0, antes = inp.value.slice(0, pos), me = /(^|\s):([\p{L}\p{N}_+-]{2,24})$/u.exec(antes); if (!me) return;
+      const ini = pos - me[2].length - 1, txt = (x.custom ? ':' + x.custom.n + ':' : x.emoji) + ' ';
+      inp.value = inp.value.slice(0, ini) + txt + inp.value.slice(pos);
+      const np = ini + txt.length; inp.setSelectionRange(np, np);
+      if (x.emoji && A.chat && A.chat.usouEmoji) A.chat.usouEmoji(x.emoji);
+      sugestoes.hidden = true; autoAltura(); guardarRascunho(); A.som.tocar('bolha');
+    }
     function escolherMencao(p) {
       const pos = inp.selectionStart || 0, antes = inp.value.slice(0, pos), m = /(^|\s)@([^\s@]{0,24})$/.exec(antes); if (!m) return;
       const ini = pos - m[2].length - 1, txt = '@' + p.nome + ' ';
@@ -790,6 +937,12 @@
       sugestoes.hidden = true; autoAltura(); A.som.tocar('bolha');
     }
     inp.addEventListener('input', () => { sugIdx = 0; pintarSugestoes(); });
+    inp.addEventListener('input', (e) => { // (1.0.2) conversões: troca na hora, quando a "palavra" termina com espaço
+      if (!(A.cfg.v.chat && A.cfg.v.chat.conversoes === true) || e.inputType !== 'insertText' || e.data !== ' ') return;
+      const pos = inp.selectionStart || 0, antes = inp.value.slice(0, pos - 1), mm = /(^|\s)(\S{2,4})$/.exec(antes); if (!mm || !MAPA_CONV.has(mm[2])) return;
+      const ini = antes.length - mm[2].length, em = MAPA_CONV.get(mm[2]);
+      inp.value = inp.value.slice(0, ini) + em + inp.value.slice(antes.length); const np = ini + em.length + 1; inp.setSelectionRange(np, np); autoAltura(); guardarRascunho();
+    });
     inp.addEventListener('blur', () => setTimeout(() => { sugestoes.hidden = true; }, 120));
     const comMencoes = (t) => { let r = t; for (const [nome, cod] of [...marcados].sort((x, y) => y[0].length - x[0].length)) r = r.split(nome).join('<@' + cod + '>'); return r; };
 
@@ -803,7 +956,7 @@
       e.stopPropagation(); // atalhos da sala (C, M, F...) não disparam enquanto escreve
       if (!sugestoes.hidden && sugLista.length) {
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); sugIdx = (sugIdx + (e.key === 'ArrowDown' ? 1 : -1) + sugLista.length) % sugLista.length; pintarSugestoes(); return; }
-        if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); escolherMencao(sugLista[sugIdx]); return; }
+        if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); escolherSug(sugLista[sugIdx]); return; }
         if (e.key === 'Escape') { sugestoes.hidden = true; return; }
       }
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); }
@@ -814,8 +967,9 @@
     // (0.8.3) como no Discord: com anexo, o campo fica livre na hora (a mensagem aparece no chat "enviando" e sobe em segundo plano);
     // vários anexos viram uma mensagem cada, o texto vai junto do primeiro
     async function enviar() {
-      const texto = comMencoes(A.extras && A.extras.trocarEmojis ? A.extras.trocarEmojis(inp.value.trim()) : inp.value.trim()); // (1.0.0) :nome: dos seus emojis vira o emoji
+      let texto = comMencoes(A.extras && A.extras.trocarEmojis ? A.extras.trocarEmojis(converterTexto(inp.value.trim())) : converterTexto(inp.value.trim())); // (1.0.0) :nome: dos seus emojis vira o emoji
       if ((!texto && !anexos.length) || enviando) return;
+      if (texto && A.idiomas && A.cfg.v.chat && A.cfg.v.chat.minhasPara) { enviando = true; try { texto = await A.idiomas.antesDeEnviar(texto); } finally { enviando = false; } } // (1.0.2) traduz o que você escreveu, se escolheu
       const lista0 = anexos.slice(), resp0 = resp, bruto = inp.value;
       if (lista0.length) {
         inp.value = ''; semente = Math.floor(Math.random() * 1e9); ultimoAviso = 0; marcados.clear(); autoAltura(); responder(null); anexos = []; pintarAnexos(); guardarRascunho(); if (!emojiPainel.hidden) alternarEmojis(false);
@@ -1095,6 +1249,11 @@
       const meu = o.ehMeu(m), it = [{ texto: T('Responder', 'Reply'), icone: 'responder', onclick: () => responder(m) }];
       if (o.reagir && !m.pendente && !m.trancada) it.unshift({ texto: T('Adicionar reação', 'Add reaction'), icone: 'emoji', onclick: () => { const x = els.get(m.id); escolherReacao(x ? x.el : lista, m); } });
       if (o.encaminhar && !m.pendente && !m.trancada) it.push({ texto: T('Encaminhar', 'Forward'), icone: 'encaminhar', onclick: () => o.encaminhar(m) });
+      if (m.texto && !m.trancada && A.idiomas) { // (1.0.2) traduzir e o dicionário (a palavra selecionada, ou escolhe entre as da mensagem)
+        const sel = String(window.getSelection ? window.getSelection() : '').trim(), pal = sel && sel.split(/\s+/).length <= 3 ? sel : '';
+        it.push({ texto: T('Traduzir', 'Translate'), icone: 'traduzir', onclick: () => { const x = els.get(m.id); if (x) A.idiomas.traduzirMsg(m, x.el); } });
+        if (A.idiomas.palavrasDe(m.texto).length) it.push({ texto: pal ? T('Dicionário: ', 'Dictionary: ') + (pal.length > 18 ? pal.slice(0, 18) + '…' : pal) : T('Dicionário', 'Dictionary'), icone: 'livro', onclick: () => A.idiomas.dicionario(pal, m.texto) });
+      }
       if (m.texto) it.push({ texto: T('Copiar texto', 'Copy text'), icone: 'copiar', onclick: () => U.copiar(m.texto.replace(/<@([A-Z0-9]{6})>/gi, (_, c) => '@' + (o.nomeDe ? o.nomeDe(c.toUpperCase()) : c))) });
       if (o.fixar && !m.pendente) it.push({ texto: o.fixada && o.fixada(m) ? T('Desafixar mensagem', 'Unpin message') : T('Fixar mensagem', 'Pin message'), icone: 'alfinete', onclick: () => o.fixar(m) });
       if (o.marcarNaoLida && !m.pendente) it.push({ texto: T('Marcar como não lida', 'Mark as unread'), icone: 'marcar', onclick: () => o.marcarNaoLida(m) });
@@ -1164,9 +1323,10 @@
     }
     // (0.9.5) várias fotos/vídeos enviados juntos: uma grade (a primeira anexada fica em cima, à esquerda). Clicar abre a galeria com setas
     function gradeMidia(m) {
-      const l = m.anexos.slice(0, 10), n = l.length;
+      // (1.0.2) até 20: com mais de 9, aparecem 8 e a 9ª mostra "+N" (abre a galeria ali, com setas por todas)
+      const todas = m.anexos.slice(0, 20), l = todas.length > 9 ? todas.slice(0, 9) : todas, n = l.length, resto = todas.length - 8;
       const g = h('div', { class: 'cx-grade n' + n + (n > 4 ? ' muitos' : '') });
-      l.forEach((a, i) => g.append(celulaGrade(m, a, i)));
+      l.forEach((a, i) => { const c = celulaGrade(m, a, i); if (todas.length > 9 && i === 8) { c.classList.add('cx-gmais'); c.append(h('span', { class: 'cx-gmais-n' }, '+' + resto)); } g.append(c); });
       return U.pelicula(h('div', { class: 'cx-midia cx-midia-grade' }, g));
     }
     function celulaGrade(m, a, i) {
@@ -1208,14 +1368,18 @@
         const soGif = urls.length === 1 && so === urls[0] && (ehGif(so) || ehPaginaKlipy(so)), soFig = /^<fig:[A-Z0-9]{6}:[0-9a-f]{10}>$/i.test(so);
         const soDiscord = urls.length === 1 && so === urls[0] && !!tipoDiscord(so); // (0.6.9) só o link de um anexo do Discord: vira a mídia, sem o texto
         const ehAero = (u) => !!(o.ehLinkMidia && o.ehLinkMidia(u)), soAero = urls.length === 1 && so === urls[0] && ehAero(so); // (0.8.3) link de mídia do Aero
-        const soEmbed = urls.length === 1 && so === urls[0] && (!!idYoutube(so) || !!idTweet(so)); // (0.9.6) só o link do YouTube/X: fica só o cartão (o link vai no botão direito)
+        const soEmbed = urls.length === 1 && so === urls[0] && (!!idYoutube(so) || !!idTweet(so) || ehSpotify(so) || ehReddit(so) || ehLoja(so)); // (0.9.6) só o link do YouTube/X: fica só o cartão (o link vai no botão direito)
         if (soGif) partes.push(ehPaginaKlipy(so) ? gifDePagina(so, m) : midiaGif(so));
         else if (!soDiscord && !soAero && !soEmbed) partes.push(h('div', { class: 'cx-txt' + (soFig ? ' so-figurinha' : '') }, ...comLinks(m.texto, o)));
+        if (!soGif && !soDiscord && !soAero && !soEmbed && !soFig && A.idiomas) { const tr = A.idiomas.bloco(m, o.ehMeu(m)); if (tr) partes.push(tr); } // (1.0.2) a tradução embaixo do texto
         partes.push(...midias);
         for (const u of [...new Set(urls)].slice(0, 3)) {
           if (ehAero(u)) { partes.push(midiaDeLink(u, m, soAero)); continue; }
           const yt = idYoutube(u); if (yt) { partes.push(embedYoutube(yt, u, () => itensMsg(m))); continue; }
           if (idTweet(u)) { partes.push(embedTweet(u, grudar, soEmbed, () => itensMsg(m))); continue; }
+          if (ehReddit(u)) { partes.push(embedReddit(u, grudar, soEmbed, () => itensMsg(m))); continue; } // (1.0.2)
+          if (ehLoja(u) && A.embeds) { partes.push(A.embeds.loja(u, { dados: dadosEmbed, menu: menuLink(u, T('Loja', 'Store'), () => itensMsg(m)), grudar, soLink: soEmbed })); continue; } // (1.0.2) preço, imposto, fotos e avaliações
+          if (ehSpotify(u) && A.embeds) { partes.push(A.embeds.spotify(u, { dados: dadosEmbed, menu: menuLink(u, 'Spotify', () => itensMsg(m)), grudar })); continue; } // (1.0.2) com o trecho para ouvir
           if (!soGif && ehGif(u)) { partes.push(midiaGif(u)); continue; }
           if (!soGif && ehPaginaKlipy(u)) { partes.push(gifDePagina(u, m)); continue; }
           const td = tipoDiscord(u); if (td) { partes.push(midiaDiscord(u, td, m)); continue; }
@@ -1301,7 +1465,8 @@
     function pintar(m, junto) { return vigiar(pintar0(m, junto)); }
     function pintar0(m, junto) {
       // mensagem do sistema (chamada iniciada / quanto durou): uma linha no meio, como no Discord
-      if (m.sistema) return h('div', { class: 'cx-sis' + (m.sistema === 'perdida' ? ' perdida' : ''), dados: { id: m.id } }, A.icone(m.sistema === 'perdida' ? 'desligarTel' : 'telefone', 15), h('span', {}, m.texto), selo(m.t));
+      if (m.sistema) return h('div', { class: 'cx-sis' + (m.sistema === 'perdida' ? ' perdida' : '') + (m.sistema === 'fixou' ? ' fixou' : ''), dados: { id: m.id } }, A.icone(m.sistema === 'perdida' ? 'desligarTel' : m.sistema === 'fixou' ? 'alfinete' : 'telefone', 15), h('span', {}, m.texto),
+        m.sistema === 'fixou' && m.alvo ? h('button', { type: 'button', class: 'cx-sis-ver', onclick: () => { const alvo = els.get(m.alvo); if (alvo && alvo.el && alvo.el.isConnected) { alvo.el.scrollIntoView({ block: 'center', behavior: 'smooth' }); alvo.el.classList.add('piscar'); setTimeout(() => alvo.el.classList.remove('piscar'), 1200); } else if (o.irParaMsg) o.irParaMsg(m.alvo); } }, T('Ver mensagem', 'See message')) : null, selo(m.t));
       const meu = o.ehMeu(m);
       // (0.5.9-6) a foto (e o nome) abrem o mini perfil da pessoa, quando o chat sabe de quem é a conta
       const cod = o.perfilDe ? o.perfilDe(m) : null;
@@ -1492,12 +1657,19 @@
       const pedaco = filaTopo.splice(0).reverse(), f = document.createDocumentFragment(); f.append(...pedaco);
       const ref = primeiraNaTela();
       if (!ref) lista.append(f);
-      else if (vaoH > 0) {
-        if (vao.nextSibling !== ref) lista.insertBefore(vao, ref);
-        lista.insertBefore(f, ref);
-        const alt = ref.getBoundingClientRect().top - pedaco[0].getBoundingClientRect().top;
-        if (alt <= vaoH) porVao(vaoH - alt); else { const falta = alt - vaoH; porVao(0); lista.scrollTop += falta; }
-      } else { const deBaixo = lista.scrollHeight - lista.scrollTop; lista.insertBefore(f, ref); lista.scrollTop = lista.scrollHeight - deBaixo; }
+      else {
+        // (1.0.2) mede onde a mensagem da tela estava e devolve ela ao mesmo lugar no fim. Antes somava a diferença por conta própria, e o
+        // navegador (que também segura a rolagem sozinho) já tinha somado: a conversa pulava para trás ao subir lendo as antigas
+        const antes = ref.getBoundingClientRect().top;
+        if (vaoH > 0) {
+          if (vao.nextSibling !== ref) lista.insertBefore(vao, ref);
+          lista.insertBefore(f, ref);
+          const alt = ref.getBoundingClientRect().top - pedaco[0].getBoundingClientRect().top;
+          porVao(alt <= vaoH ? vaoH - alt : 0);
+        } else lista.insertBefore(f, ref);
+        const d = ref.getBoundingClientRect().top - antes;
+        if (Math.abs(d) >= 0.5) lista.scrollTop += d;
+      }
       depois(podarBaixo); if (!maisAcima) depois(cuidarVao);
     }
     const descarregar = () => inserirTopo();
@@ -1574,11 +1746,13 @@
       }
       if (!n) return;
       const alt = posDe(ents[n] ? ents[n].el : vao).top - posDe(ents[0].el).top; // o vão cresce no lugar delas: nada abaixo se mexe
+      const fixa = ents[n + 1] ? ents[n + 1].el : null, antes = fixa ? fixa.getBoundingClientRect().top : 0;
       for (const x of ents.slice(0, n)) { largar(x.el); x.el.remove(); els.delete(x.m.id); }
       // a primeira que ficou mostra o nome e a foto de novo
       const prim = ents[n];
       if (prim && prim.junto) { prim.junto = false; const novo = pintar(prim.el._m || prim.m, false); novo.classList.add('ja'); largar(prim.el); prim.el.replaceWith(novo); prim.el = novo; if (ultima === prim) ultima = prim; }
       maisAcima = true; porVao(vaoH + alt);
+      if (fixa && fixa.isConnected) { const d = fixa.getBoundingClientRect().top - antes; if (Math.abs(d) >= 0.5) lista.scrollTop += d; } // (1.0.2) a da tela não sai do lugar
       if (o.aoPodarTopo) o.aoPodarTopo();
     }
 
@@ -1599,6 +1773,13 @@
 
   // (0.8.7) a grade de emojis do chat, reaproveitada em outros lugares (ex.: o indicador de digitação): categorias, tom de pele e busca pelo
   // nome (em português ou inglês; os nomes só carregam na primeira busca)
+  // (1.0.2) conversões automáticas (desligadas por padrão, em Chats): <3 vira ❤️, :) vira 🙂... só a "palavra" inteira, nunca dentro de links
+  const CONVERSOES = [['<3', '❤️'], ['</3', '💔'], ['<33', '💕'], [':)', '🙂'], [':-)', '🙂'], [':D', '😃'], ['xD', '😆'], ['XD', '😆'], [';)', '🥲'], [';-)', '🥲'],
+    [':(', '🙁'], [':-(', '🙁'], [":'(", '😢'], ["T_T", '😭'], [":')", '🥹'], [':P', '😛'], [':p', '😛'], [';P', '😜'], [':O', '😮'], [':o', '😮'], [':|', '😐'], [':/', '😕'], [':s', '😖'],
+    ['>:(', '😠'], ['>:)', '😈'], ['B)', '😎'], ['8)', '😎'], [':*', '😘'], ['^^', '😊'], ['^_^', '😊'], ['-_-', '😑'], ['¬¬', '😒'], ['O:)', '😇'], [':3', '😺'], ['o/', '👋'], ['\\o/', '🙌'], ['(y)', '👍'], ['(n)', '👎'], ['<(")', '🐧']];
+  const MAPA_CONV = new Map(CONVERSOES);
+  A.chatConversoes = CONVERSOES;
+  const converterTexto = (t) => (A.cfg.v.chat && A.cfg.v.chat.conversoes === true ? t.replace(/(^|\s)(\S{2,4})(?=\s|$)/g, (m0, a, w) => (MAPA_CONV.has(w) ? a + MAPA_CONV.get(w) : m0)) : t);
   function carregarNomes() {
     if (A.emojiNomes) return Promise.resolve(A.emojiNomes);
     if (!carregarNomes.p) carregarNomes.p = new Promise((ok) => { const sc = document.createElement('script'); sc.src = 'js/emoji-nomes.js'; sc.onload = () => ok(A.emojiNomes || {}); sc.onerror = () => { carregarNomes.p = null; ok({}); }; document.head.append(sc); });

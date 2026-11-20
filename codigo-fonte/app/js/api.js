@@ -242,7 +242,7 @@
     if (serie !== conexaoN) return; // saiu ou reconectou enquanto o bilhete vinha
     // (0.7.4) o id deste aparelho é o MESMO em todas as reconexões. Antes o servidor sorteava um novo a cada conexão: a internet piscava, o app
     // voltava com outro id e o servidor achava que a chamada tinha passado para "outro aparelho" (o app saía dela e o amigo via você sumir)
-    const ws = new WebSocket(`${API.wsBase()}/hub?ticket=${ticket}&maquina=${encodeURIComponent(m.maquina)}&so=${encodeURIComponent(m.so)}&hw=${await API.hw()}&dev=${idAparelho()}`);
+    const ws = new WebSocket(`${API.wsBase()}/hub?ticket=${ticket}&maquina=${encodeURIComponent(m.maquina)}&so=${encodeURIComponent(m.so)}&sov=${encodeURIComponent(A.aparelhos ? await A.aparelhos.meu().catch(() => '') : '')}&hw=${await API.hw()}&dev=${idAparelho()}`);
     H.ws = ws; conectandoAte = 0;
     // (0.6.0) conexão "morta" (o celular suspendeu, o Wi-Fi trocou, o PC hibernou): o servidor achava que o aparelho estava ligado e as
     // novidades (resposta da equipe, mensagem lida, chamada) se perdiam até reiniciar. Sem resposta ao ping em 45 s, reconecta.
@@ -358,9 +358,9 @@
   const SINC = ['tema', 'visual', 'som', 'toque', 'chat', 'idioma', 'atualizar', 'volMusica', 'volMidia', 'pularSplash', 'integ', 'toqueExtra', 'toquesAmigo', 'pacoteSons', 'somEntrarOutros', 'iconeApp'];
   let aplicandoPrefs = false, tPrefs = 0;
   // (0.9.5) dá para escolher o que segue a conta, por parte. A parte desligada fica só neste aparelho, e o que a conta tem dela continua guardado
-  const PARTES = { aparencia: ['tema', 'visual', 'iconeApp'], chats: ['chat'], sons: ['som', 'toque', 'volMusica', 'volMidia', 'toqueExtra', 'toquesAmigo', 'pacoteSons', 'somEntrarOutros'], geral: ['idioma', 'atualizar', 'pularSplash'], integracoes: ['integ'] };
+  const PARTES = { aparencia: ['tema', 'iconeApp'], desempenho: ['visual'], /* (1.0.2) a versão (otimizada/completa) pode ficar só no aparelho */ chats: ['chat'], sons: ['som', 'toque', 'volMusica', 'volMidia', 'toqueExtra', 'toquesAmigo', 'pacoteSons', 'somEntrarOutros'], geral: ['idioma', 'atualizar', 'pularSplash'], integracoes: ['integ'] };
   const parteDe = (k) => Object.keys(PARTES).find((x) => PARTES[x].includes(k));
-  const sincK = (k) => { const ps = A.cfg.v.sincPartes; return !ps || typeof ps !== 'object' || ps[parteDe(k)] !== false; };
+  const sincK = (k) => { const ps = A.cfg.v.sincPartes; if (!ps || typeof ps !== 'object') return true; const p = parteDe(k); if (p === 'desempenho' && ps.desempenho === undefined) return ps.aparencia !== false; return ps[p] !== false; };
   // (0.9.5) as integrações instaladas seguem a conta. As da Comunidade vão sem o pacote (cada aparelho baixa de novo do servidor, passando
   // pelas travas daqui); as feitas por você vão inteiras, e só ficam neste aparelho se não couberem
   const integLeve = (g) => {

@@ -20,7 +20,16 @@
   // sempre. O app pergunta aos dois e fica com a versão mais nova que respondeu certo; se o de teste cair ou estiver atrás, vale o normal
   A.TESTE_ATUALIZACAO = 'https://canal-de-teste.exemplo.invalid';
   const podeTeste = () => { const eu = A.api && A.api.eu; if (!eu) return false; const sl = Array.isArray(eu.sl) ? eu.sl : []; return eu.cargo === 'dev' || sl.includes('dev') || sl.includes('tester') || sl.includes('supporter'); };
-  const testeLigado = () => desktop() && podeTeste() && !!(A.cfg.v.atualizar && A.cfg.v.atualizar.teste);
+  // No site e no celular, a versão de teste fica em /teste/app/ do MESMO endereço do site (o site busca no canal de teste e, se ele não
+  // responder, entrega a versão normal): a conta, o tema e o que fica guardado no aparelho continuam os mesmos
+  const web = () => !desktop() && location.protocol === 'https:' && /^\/(teste\/)?app\//.test(location.pathname);
+  const emTeste = () => web() && location.pathname.startsWith('/teste/');
+  const ligouTeste = () => !!(A.cfg.v.atualizar && A.cfg.v.atualizar.teste);
+  const testeLigado = () => (desktop() || web()) && podeTeste() && ligouTeste();
+  const testeWeb = () => web() && ligouTeste() && (!(A.api && A.api.eu) || podeTeste()); // antes de entrar na conta vale o que ficou ligado
+  const lerVersao = async (u) => { try { const v = await (await fetch(u, { cache: 'no-store' })).json(); return v && typeof v.versao === 'string' ? v.versao : ''; } catch (e) { return ''; } };
+  const irPara = (dir) => location.replace(location.origin + dir + location.search + location.hash);
+  let destinoWeb = null;
 
   function quandoSairDaSala(fn) { if (!naSala()) { fn(); return; } const off = A.evt.on('sala:fechada', () => { off(); setTimeout(fn, 800); }); }
   const reiniciar = () => { if (desktop() && window.aero.reiniciar) window.aero.reiniciar(); else location.reload(); };
@@ -37,7 +46,7 @@
     quandoSairDaSala(() => instalar(versao, pronta));
   }
   async function instalar(versao, pronta) {
-    if (!desktop() || !window.aero.atualizacao) { reiniciar(); return; }
+    if (!desktop() || !window.aero.atualizacao) { if (destinoWeb) irPara(destinoWeb); else reiniciar(); return; }
     const t = pronta ? null : U().toast(T('Baixando a versão ' + versao + '...', 'Downloading version ' + versao + '...'), { ms: 0 });
     const o = origem || { base: A.api.servidor || location.origin, canal: 'normal' };
     const r = pronta ? { pronta: true } : await window.aero.atualizacao.verificar(o.base, o.canal).catch((e) => ({ erro: String(e.message || e) }));
@@ -62,6 +71,15 @@
         } else if (window.aero.atualizacao.checar) { r = await window.aero.atualizacao.checar(base); origem = { base, canal: 'normal' }; }
         else { const x = await window.aero.atualizacao.verificar(base); r = x && x.pronta ? { ok: true, nova: true, pronta: true, versao: x.versao } : x && x.precisaInstalador ? { ok: true, nova: true, precisaInstalador: true, versao: x.versao } : { ok: !(x && x.erro), erro: x && x.erro }; }
         if (r && r.erro) { A.log.aviso('atualização', r.erro); return (ultima = { nova: null, erro: r.erro }); }
+      } else if (web()) {
+        // (1.0.2) site/celular no endereço do site: a versão normal (/app/) ou, para quem ligou as versões de teste, a de teste (/teste/app/)
+        // se ela for mais nova. Canal de teste fora do ar ou atrás: fica a normal
+        const pv = await lerVersao(location.origin + '/versao.json');
+        if (!pv) throw new Error('versao.json');
+        let alvo = { v: pv, dir: '/app/' };
+        if (testeWeb()) { const tv = await lerVersao(location.origin + '/teste/versao.json'); if (tv && novaMaior(tv, pv)) alvo = { v: tv, dir: '/teste/app/' }; else if (!tv) A.log.aviso('versões de teste: sem resposta, usando a versão normal'); }
+        destinoWeb = alvo.dir !== (emTeste() ? '/teste/app/' : '/app/') ? alvo.dir : null;
+        r = { ok: true, nova: novaMaior(alvo.v, A.versao), versao: alvo.v };
       } else {
         // site/celular: pergunta ao PRÓPRIO endereço de onde o app veio (workers.dev ou pages.dev). Perguntar a outro poderia dizer
         // "versão nova" antes de este endereço recebê-la, e o app recarregaria sem parar.
@@ -147,11 +165,21 @@
       setInterval(() => { if (auto() && !document.hidden) verificarAtualizacao(); }, 60000); // (0.5.9-6) a cada minuto
       addEventListener('online', () => setTimeout(() => auto() && verificarAtualizacao(), 3000));
       if (desktop() && window.aero.vce3) setTimeout(() => verificarDriver({ silencioso: false }), 9000);
+      // (1.0.2) site/celular com as versões de teste ligadas: ao abrir em /app/ (o celular sempre abre lá), vai direto para a de teste se ela
+      // for mais nova. Sem perguntar: quem ligou já escolheu, e o app acabou de abrir
+      if (testeWeb() && !emTeste()) Promise.all([lerVersao(location.origin + '/versao.json'), lerVersao(location.origin + '/teste/versao.json')])
+        .then(([p, t]) => { if (p && t && novaMaior(t, p) && novaMaior(t, A.versao) && !naSala()) irPara('/teste/app/'); });
     },
     verificarAtualizacao, ultimaVerificacao: () => ultima,
-    podeTeste, testeLigado,
+    podeTeste, testeLigado, temCanalTeste: () => desktop() || web(),
     // (1.0.2) desligou as versões de teste: se a que está rodando veio do canal de teste e é mais nova que a normal, oferece voltar já
     async sairDoTeste() {
+      if (web()) {
+        if (!emTeste()) return;
+        const ok = await U().confirmar(T('Você está numa versão de teste (' + A.versao + '). Quer voltar para a versão normal agora? O Aero recarrega.', 'You are on a test version (' + A.versao + '). Go back to the regular version now? Aero will reload.'), { titulo: T('Versões de teste', 'Test versions'), sim: T('Voltar agora', 'Go back now'), nao: T('Depois', 'Later') });
+        if (ok) quandoSairDaSala(() => irPara('/app/'));
+        return;
+      }
       if (!desktop() || !window.aero.atualizacao || !window.aero.atualizacao.normal) return;
       let canal = 'normal'; try { canal = window.aero.atualizacao.canal ? await window.aero.atualizacao.canal() : 'normal'; } catch (e) { /* ok */ }
       if (canal !== 'teste') return;

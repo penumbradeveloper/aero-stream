@@ -3,7 +3,7 @@
 (() => {
   'use strict';
   const A = (window.Aero = window.Aero || {});
-  A.versao = '0.9.8';
+  A.versao = '0.9.9';
   A.autor = 'Ryan Victtor';
 
   // ---------- plataforma ----------
@@ -341,6 +341,7 @@
     oPaleta: '<path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-.9 2-1.9 0-1.3-1.1-1.6-1.1-2.7 0-1 .8-1.6 1.9-1.6H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z" fill="currentColor" fill-opacity=".2"/><circle cx="7.6" cy="11" r="1.4" fill="currentColor"/><circle cx="10" cy="7.2" r="1.4" fill="currentColor"/><circle cx="14.6" cy="7.2" r="1.4" fill="currentColor"/>',
     oEscudo: '<path d="M12 2.6 20 6v5.4c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6z" fill="currentColor" fill-opacity=".2"/><path d="M12 2.6v18.8M4 6l8 5.6L20 6" stroke-width="1.4" opacity=".75"/>',
     // (0.8.0) cheios, para as bolinhas brilhantes (estilo Aero): Spotify, Apple
+    traduzir: '<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>',
     livro: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/><path d="M8 7h8" opacity=".6"/>', // (0.9.0) livros do Mural
     disco: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><path d="M12 5.5a6.5 6.5 0 0 0-6.5 6.5" opacity=".6"/>', // (0.8.7) álbum
     letterboxd: '<circle stroke="none" fill="#ff8000" cx="5.5" cy="12" r="3.6"/><circle stroke="none" fill="#00e054" cx="12" cy="12" r="3.6"/><circle stroke="none" fill="#40bcf4" cx="18.5" cy="12" r="3.6"/>', // (0.8.7) widget do Letterboxd

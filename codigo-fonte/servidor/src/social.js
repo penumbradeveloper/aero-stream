@@ -51,7 +51,7 @@ const embValido = (v) => typeof v === 'string' && v.length < 200 && /^[A-Za-z0-9
 
 // (0.6.0) privacidade de cada conta: confirmação de leitura (como no WhatsApp: os dois precisam deixar ligada), quem pode mandar mensagem
 // (só amigos, pedidos de mensagem como no Instagram, ou todos) e esconder o nome do aparelho e o sistema dos amigos (padrão: escondido)
-export const privDe = (c) => { const p = (c && c.priv) || {}; return { lidos: p.lidos !== false, visto: p.visto !== false, vistoModo: p.vistoModo === 'atividade' ? 'atividade' : 'saida', mensagens: ['amigos', 'pedidos', 'todos'].includes(p.mensagens) ? p.mensagens : 'amigos', esconderAparelho: p.esconderAparelho !== false, pedidosAmizade: ['todos', 'amigos2', 'ninguem'].includes(p.pedidosAmizade) ? p.pedidosAmizade : 'todos' }; };
+export const privDe = (c) => { const p = (c && c.priv) || {}; return { lidos: p.lidos !== false, visto: p.visto !== false, vistoModo: p.vistoModo === 'atividade' ? 'atividade' : 'saida', mensagens: ['amigos', 'pedidos', 'todos'].includes(p.mensagens) ? p.mensagens : 'amigos', esconderAparelho: p.esconderAparelho !== false, esconderAparelhos: p.esconderAparelhos === true, mostrarSistema: p.mostrarSistema === true, pedidosAmizade: ['todos', 'amigos2', 'ninguem'].includes(p.pedidosAmizade) ? p.pedidosAmizade : 'todos' }; };
 // bloqueio (0.6.0): vale para os dois lados (nenhum vê as mensagens do outro, nem perfil, nem pedido de amizade)
 export const bloqueio = (a, b) => !!(a && b && (((a.bloqueados || {})[b.id]) || ((b.bloqueados || {})[a.id])));
 
@@ -200,6 +200,7 @@ export class Social {
     const p = conta.extra = conta.extra || {};
     if (b.bio !== undefined) p.bio = txt(String(b.bio || '').replace(/[\u0000-\u0009\u000b-\u001f]/g, ''), 190);
     if (b.cor1 !== undefined) p.cor1 = HEX6.test(b.cor1) ? b.cor1 : '';
+    if (b.fz !== undefined) p.fz = typeof b.fz === 'string' && b.fz.length <= 40 && /^[A-Za-z]+(?:\/[A-Za-z0-9_+-]+){1,2}$/.test(b.fz) ? b.fz : ''; // (1.0.2) o fuso (o horário da pessoa aparece ao lado do nome, se ela deixar)
     if (b.cor2 !== undefined) p.cor2 = HEX6.test(b.cor2) ? b.cor2 : '';
     // (0.5.9-7) a cor do corpo do cartão (embaixo do banner): sólida (só fundo1) ou degradê (fundo1 -> fundo2)
     if (b.fundo1 !== undefined) p.fundo1 = HEX6.test(b.fundo1) ? b.fundo1 : '';
@@ -315,13 +316,15 @@ export class Social {
     for (const c of ['f', 's', 'a', 'm', 'l', 'b', 'j']) {
       const x = m[c] && typeof m[c] === 'object' ? m[c] : {};
       // (0.8.7) sem limite pequeno: até 100 em cada lista (o que cabe guardado numa chave só)
-      const v = { fav: item(x.fav), gosto: (Array.isArray(x.gosto) ? x.gosto : []).slice(0, 100).map(item).filter(Boolean), quero: c === 'm' || c === 'l' || !Array.isArray(x.quero) ? [] : x.quero.slice(0, 100).map(item).filter(Boolean) }; // (0.8.7) músicas e álbuns sem "quero ouvir"
+      const v = { fav: item(x.fav), gosto: (Array.isArray(x.gosto) ? x.gosto : []).slice(0, 100).map(item).filter(Boolean), quero: c === 'm' || c === 'l' || !Array.isArray(x.quero) ? [] : x.quero.slice(0, 100).map(item).filter(Boolean) };
+      const agora = c === 'm' || c === 'l' || !Array.isArray(x.agora) ? [] : x.agora.slice(0, 100).map(item).filter(Boolean); if (agora.length) v.agora = agora; // (1.0.2) jogando/assistindo/lendo agora // (0.8.7) músicas e álbuns sem "quero ouvir"
       // (0.8.7) a ordem das seções (favorito, gosto, quero): a pessoa arrasta no editor
-      const secs = c === 'm' || c === 'l' ? ['fav', 'gosto'] : ['fav', 'gosto', 'quero'];
+      const secs = c === 'm' || c === 'l' ? ['fav', 'gosto'] : ['fav', 'agora', 'gosto', 'quero'];
       const so = Array.isArray(x.so) ? x.so.filter((s, i, l) => secs.includes(s) && l.indexOf(s) === i) : [];
-      if (so.length === secs.length && so.join() !== secs.join()) v.so = so;
+      const so2 = so.length ? [...so, ...secs.filter((s2) => !so.includes(s2))] : []; // (1.0.2) quem já tinha uma ordem não a perde com a seção nova
+      if (so2.length === secs.length && so2.join() !== secs.join()) v.so = so2;
       if (JSON.stringify(v).length > 120000) return erro('Essa aba do mural ficou grande demais. Tire alguns itens ou comentários.');
-      novo['mr:' + conta.id + ':' + c] = v.fav || v.gosto.length || v.quero.length ? v : null;
+      novo['mr:' + conta.id + ':' + c] = v.fav || v.gosto.length || v.quero.length || (v.agora && v.agora.length) ? v : null;
     }
     // (0.8.7) a ordem das abas (a pessoa arrasta no editor)
     const ord = (Array.isArray(b && b.ord) ? b.ord : []).filter((c, i, l) => ['f', 's', 'a', 'm', 'l', 'b', 'j'].includes(c) && l.indexOf(c) === i);
@@ -535,7 +538,7 @@ export class Social {
       }
     }
     // (0.9.5) várias fotos/vídeos enviados juntos: uma mensagem só com a lista (o primeiro também vai em "anexo", para os apps antigos)
-    const ids = Array.isArray(b.anexos) && b.anexos.length > 1 ? b.anexos.slice(0, 10).map(String) : b.anexo ? [String(b.anexo)] : [];
+    const ids = Array.isArray(b.anexos) && b.anexos.length > 1 ? b.anexos.slice(0, 20).map(String) : b.anexo ? [String(b.anexo)] : [];
     if (ids.length > 1 && (new Set(ids).size !== ids.length || (b.anexo && String(b.anexo) !== ids[0]))) return erro('Anexo não encontrado.');
     const lista = [];
     for (const id of ids) {
@@ -677,6 +680,7 @@ export class Social {
     if (b.sim) l.unshift(seq);
     cv.fixadas = l.slice(0, 50);
     await this.st.put('cv:' + cv.id, cv);
+    if (b.sim) await this.msgSistema(cv, conta.id, { tipo: 'fixou', seq }); // (1.0.2) "Fulano fixou uma mensagem." no chat, com o botão para ir até ela
     this.avisar(Object.keys(cv.membros), { tipo: 'conv-mudou', cid: cv.id });
     return resposta({ ok: true, fixadas: cv.fixadas });
   }

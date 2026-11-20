@@ -1,0 +1,123 @@
+/* (1.0.2) cartões de links (embeds.js): Spotify com o trecho para ouvir, a cor da capa, pausa, barra e volume */
+.cx-midia.emb-sp { --sp: #1f3d2c; display: flex; flex-direction: column; gap: 10px; width: min(440px, calc(100% - 8px)); max-width: min(440px, calc(100% - 8px)); box-sizing: border-box; padding: 12px; color: #fff;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--sp) 92%, #fff 8%) 0%, color-mix(in srgb, var(--sp) 78%, #000) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.28), inset 0 0 0 1px rgba(255,255,255,.1), 0 6px 22px color-mix(in srgb, var(--sp) 45%, transparent); border-radius: 20px; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.emb-sp.carregando { min-height: 128px; }
+.emb-sp-topo { display: flex; gap: 12px; min-width: 0; }
+.emb-sp-capa { flex: none; width: 96px; height: 96px; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: rgba(0,0,0,.25); box-shadow: 0 6px 16px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.12); }
+.emb-sp-capa > img { width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border-radius: 0; object-fit: cover; display: block; }
+.emb-sp.carregando .emb-sp-capa { animation: emb-pulsa 1.2s ease-in-out infinite alternate; }
+@keyframes emb-pulsa { from { opacity: .45; } to { opacity: .8; } }
+.emb-sp-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.emb-sp-selo { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; letter-spacing: .02em; opacity: .9; }
+.emb-sp-selo > svg { color: #fff; flex: none; filter: drop-shadow(0 1px 1px rgba(0,0,0,.3)); }
+.emb-sp-previa { margin-left: 2px; padding: 1px 6px; border-radius: 6px; font-size: 10px; font-weight: 800; background: rgba(0,0,0,.35); text-shadow: none; }
+.emb-sp-nome { all: unset; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; font-size: 18px; font-weight: 800; line-height: 1.2; cursor: pointer; overflow-wrap: anywhere; }
+.emb-sp-nome:hover, .emb-sp-nome:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
+.emb-sp-sub, .emb-sp-qtd, .emb-sp-agora { font-size: 13px; opacity: .82; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.emb-sp-qtd { font-size: 12px; opacity: .68; margin-top: auto; }
+.emb-sp-agora { display: flex; align-items: center; gap: 5px; font-size: 12px; opacity: .95; color: #b8ffd2; }
+.emb-sp-agora > svg { flex: none; }
+.emb-sp-agora > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.emb-sp-e { display: inline-grid; place-items: center; width: 15px; height: 15px; margin-right: 4px; border-radius: 3px; font-size: 9.5px; font-style: normal; font-weight: 800; color: var(--sp); background: rgba(255,255,255,.75); text-shadow: none; vertical-align: 1px; }
+.emb-sp-aviso { font-size: 12.5px; opacity: .8; }
+/* os controles: anterior, tocar, próxima, a barra com o tempo e o volume */
+.emb-sp-ctl { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.emb-sp-play { flex: none; display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; color: #111; background: radial-gradient(circle at 50% 30%, #fff, #dfe8e4); box-shadow: 0 4px 12px rgba(0,0,0,.35), inset 0 -2px 4px rgba(0,0,0,.12); transition: transform .15s ease-out; }
+.emb-sp-play:hover { transform: scale(1.06); } .emb-sp-play:active { transform: scale(.96); }
+.emb-sp-play > svg { width: 20px; height: 20px; } .emb-sp-play > svg:first-child { margin-left: 2px; }
+.emb-sp-play > svg:last-child, .emb-sp.tocando .emb-sp-play > svg:first-child { display: none; } .emb-sp.tocando .emb-sp-play > svg:last-child { display: block; }
+.emb-sp-pulo { flex: none; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; color: #fff; background: rgba(255,255,255,.12); transition: background-color .15s ease-out; }
+.emb-sp-pulo:hover, .emb-sp-pulo:focus-visible { background: rgba(255,255,255,.26); }
+.emb-sp-linha { flex: 1 1 auto; min-width: 60px; display: flex; flex-direction: column; gap: 3px; }
+.emb-sp-barra { position: relative; height: 6px; border-radius: 3px; background: rgba(255,255,255,.22); cursor: pointer; touch-action: none; }
+.emb-sp-barra::before { content: ""; position: absolute; inset: -8px 0; }
+.emb-sp-barra > i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 3px; background: linear-gradient(90deg, #fff, #c8ffe0); box-shadow: 0 0 6px rgba(255,255,255,.5); }
+.emb-sp-tempo { font-size: 11px; opacity: .78; font-variant-numeric: tabular-nums; }
+/* o volume (o Discord não tem): o botão liga/desliga o som, a barrinha ajusta; fica guardado */
+.emb-vol { flex: none; display: flex; align-items: center; gap: 4px; }
+.emb-vol-bt { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; color: inherit; background: transparent; }
+.emb-vol-bt:hover, .emb-vol-bt:focus-visible { background: rgba(255,255,255,.18); }
+.emb-vol-bt > svg:last-child, .emb-vol.mudo .emb-vol-bt > svg:first-child { display: none; } .emb-vol.mudo .emb-vol-bt > svg:last-child { display: block; }
+.emb-vol input { --v: 60%; -webkit-appearance: none; appearance: none; width: 70px; height: 5px; margin: 0; border-radius: 3px; cursor: pointer; background: linear-gradient(90deg, #fff var(--v), rgba(255,255,255,.25) var(--v)); }
+.emb-vol input::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+.emb-vol input::-moz-range-thumb { width: 13px; height: 13px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+/* a lista de faixas (playlist e álbum): rola por dentro com folga para a sombra, cada uma toca o trecho */
+.emb-sp-rolar { max-height: 232px; overflow-y: auto; overscroll-behavior: contain; margin: 0 -6px -4px; padding: 2px 6px 4px; border-radius: 12px; background: rgba(0,0,0,.16); }
+.emb-sp-faixas { list-style: none; margin: 0; padding: 4px 0; display: flex; flex-direction: column; gap: 1px; }
+.emb-sp-faixa { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; cursor: pointer; outline: none; transition: background-color .12s ease-out; }
+.emb-sp-faixa:hover, .emb-sp-faixa:focus-visible { background: rgba(255,255,255,.12); }
+.emb-sp-faixa.atual { background: rgba(255,255,255,.18); }
+.emb-sp-faixa.sem { cursor: default; opacity: .5; }
+.emb-sp-n { display: grid; place-items: center; font-size: 12.5px; opacity: .8; font-variant-numeric: tabular-nums; }
+.emb-sp-n > * { grid-area: 1 / 1; } .emb-sp-n > svg { display: none; }
+.emb-sp-faixa:not(.sem):hover .emb-sp-n > b, .emb-sp-faixa.atual .emb-sp-n > b { display: none; }
+.emb-sp-faixa:not(.sem):hover:not(.tocando) .emb-sp-n > svg:first-of-type, .emb-sp-faixa.atual:not(.tocando):not(:hover) .emb-sp-n > svg:first-of-type { display: block; }
+.emb-sp-faixa.tocando .emb-sp-n > svg:last-of-type { display: block; color: #1ed760; }
+.emb-sp-ft { min-width: 0; display: flex; flex-direction: column; }
+.emb-sp-ft > b { font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.emb-sp-faixa.atual .emb-sp-ft > b { color: #b8ffd2; }
+.emb-sp-ft > small { font-size: 11.5px; opacity: .72; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.emb-sp-dur { font-size: 12px; opacity: .75; font-variant-numeric: tabular-nums; }
+@media (max-width: 520px) {
+  .emb-sp-capa { width: 76px; height: 76px; } .emb-sp-nome { font-size: 16px; }
+  .emb-vol input { width: 54px; } .emb-sp-pulo { width: 28px; height: 28px; }
+}
+:is([data-visual=lite], [data-anim=nenhuma]) .emb-sp.carregando .emb-sp-capa { animation: none; }
+/* cartão estreito (celular, chat lateral): o volume desce para a linha de baixo, nunca sai do cartão */
+.emb-sp-ctl { flex-wrap: wrap; row-gap: 4px; }
+.emb-sp-ctl > .emb-vol { margin-left: auto; }
+
+/* a bolinha do volume no meio da barrinha (a regra geral dos sliders tem uma trilha mais grossa) */
+.emb-vol input::-webkit-slider-runnable-track { height: 5px; border-radius: 3px; background: transparent; box-shadow: none; }
+.emb-vol input::-webkit-slider-thumb { margin-top: -4px; border: 0; transition: transform .15s; }
+.emb-vol input::-moz-range-track { height: 5px; background: transparent; }
+.emb-vol input:active::-webkit-slider-thumb { transform: scale(1.15); }
+
+/* (1.0.2) Reddit: o mesmo cartão do X, com a cor do Reddit */
+.cx-rd { --tw-cor: #ff4500; }
+.cx-rd-av { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; }
+.cx-rd-titulo { font-size: 15.5px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.cx-rd-txt { display: -webkit-box; -webkit-line-clamp: 8; -webkit-box-orient: vertical; overflow: hidden; }
+.cx-rd-nsfw { margin-left: auto; padding: 2px 7px; border-radius: 6px; font-size: 10.5px; font-weight: 800; color: #fff; background: #e0245e; }
+
+/* (1.0.2) lojas: Amazon e AliExpress */
+.cx-midia.emb-lj { --lj: #ff9900; display: flex; gap: 14px; width: min(520px, calc(100% - 8px)); max-width: min(520px, calc(100% - 8px)); box-sizing: border-box; padding: 12px; border-radius: 16px; color: var(--texto);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--lj) 10%, var(--vidro, rgba(255,255,255,.7))) 0%, var(--vidro, rgba(255,255,255,.6)) 70%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.5), inset 0 0 0 1px color-mix(in srgb, var(--lj) 26%, transparent), 0 6px 20px rgba(0,0,0,.12); border-left: 4px solid var(--lj); overflow: hidden; }
+.emb-lj.carregando { min-height: 150px; animation: emb-pulsa 1.2s ease-in-out infinite alternate; }
+.emb-lj-fotos { flex: none; width: 168px; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.emb-lj-palco { position: relative; display: grid; place-items: center; width: 168px; height: 168px; padding: 0; border: 0; border-radius: 12px; overflow: hidden; cursor: zoom-in; background: #fff; color: #889; }
+.emb-lj-palco > img { width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; object-fit: contain; display: block; border-radius: 0; }
+.emb-lj-qtd { position: absolute; right: 6px; bottom: 6px; display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #fff; background: rgba(0,0,0,.55); }
+.emb-lj-faixa { display: flex; gap: 5px; overflow-x: auto; overflow-y: hidden; padding: 3px 2px 6px; scroll-snap-type: x proximity; }
+.emb-lj-mini { flex: none; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 8px; overflow: hidden; cursor: pointer; background: #fff; opacity: .7; box-shadow: 0 0 0 1px rgba(0,0,0,.12); scroll-snap-align: start; }
+.emb-lj-mini.on { opacity: 1; box-shadow: 0 0 0 2px var(--lj); }
+.emb-lj-mini > img { width: 100%; height: 100%; max-width: none; margin: 0; object-fit: contain; display: block; border-radius: 0; }
+.emb-lj-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.emb-lj-loja { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--lj); }
+.emb-lj-ponto { width: 9px; height: 9px; border-radius: 50%; background: var(--lj); box-shadow: 0 0 6px var(--lj); }
+.emb-lj-titulo { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: 14.5px; font-weight: 700; line-height: 1.3; color: inherit; text-decoration: none; overflow-wrap: anywhere; }
+.emb-lj-titulo:hover { text-decoration: underline; }
+.emb-lj-nota { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; font-size: 13px; }
+.emb-lj-nota small { opacity: .7; }
+.emb-lj-estrelas { display: inline-flex; gap: 1px; }
+.emb-lj-est { --f: 100%; width: 13px; height: 13px; background: linear-gradient(90deg, #ffa41c var(--f), rgba(128,128,128,.35) var(--f)); clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+.emb-lj-preco { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.emb-lj-preco > b { font-size: 22px; font-weight: 800; }
+.emb-lj-preco > s { font-size: 13px; opacity: .6; }
+.emb-lj-preco.sem { font-size: 13px; opacity: .7; }
+.emb-lj-off { padding: 1px 6px; border-radius: 6px; font-size: 11.5px; font-weight: 800; color: #fff; background: #cc0c39; }
+.emb-lj-imp { display: flex; flex-direction: column; gap: 2px; padding: 7px 9px; border-radius: 10px; font-size: 12.5px; background: color-mix(in srgb, var(--lj) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lj) 22%, transparent); }
+.emb-lj-imp > div { display: flex; justify-content: space-between; gap: 10px; min-width: 0; }
+.emb-lj-imp > div > span { opacity: .78; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.emb-lj-imp > .tot { margin-top: 2px; padding-top: 3px; border-top: 1px solid color-mix(in srgb, var(--lj) 25%, transparent); font-weight: 700; }
+.emb-lj-imp.ok { flex-direction: row; align-items: center; gap: 6px; color: #18794e; }
+.emb-lj-frete { font-size: 12px; opacity: .75; }
+.emb-lj-ir { align-self: flex-start; margin-top: auto; display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border: 0; border-radius: 999px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; color: #111;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--lj) 70%, #fff), var(--lj)); box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 2px 6px rgba(0,0,0,.18); }
+@media (max-width: 520px) {
+  .cx-midia.emb-lj { flex-direction: column; gap: 10px; }
+  .emb-lj-fotos, .emb-lj-palco { width: 100%; } .emb-lj-palco { height: auto; aspect-ratio: 1 / 1; max-height: 260px; }
+}
+.cx-midia.cx-tw.cx-rd { border-left-color: #ff4500; }

@@ -7,9 +7,11 @@
 import { CORS, resposta, erro, txt, aleatorio, hex, enviar, TAG_REGEX, normalizarTag, umEmoji } from './util.js';
 import { Social, privDe, bloqueio } from './social.js';
 import { capaOk } from './midia.js';
+import * as Embeds from './embeds.js';
 import { Acesso } from './acesso.js';
 import { Admin } from './admin.js';
 import { Bolha, planoDe, seloFiel } from './bolha.js';
+import { traduzir, dicionario } from './idiomas.js';
 import { nivelDe, nmPublico, extrasPublicos, bcPublico, BOLHAS as BOLHAS_PAGAS } from './extras.js';
 import { Analytics } from './analytics.js';
 import { Integracoes } from './integracoes.js';
@@ -25,7 +27,7 @@ const par = (a, b) => (a < b ? [a, b] : [b, a]);
 // (0.6.0) o nome do aparelho e o sistema só vão para os amigos se a pessoa deixar (Privacidade; o padrão é esconder)
 const msgPresenca = (a) => ({
   tipo: 'presenca', codigo: a.codigo, nome: a.nome, tag: a.tag, av: a.av, dispositivo: a.dev,
-  maquina: a.esconder ? '' : a.maquina, so: a.esconder ? '' : a.so, estado: a.estado, sala: a.sala, comp: !!a.comp, ins: a.ins || undefined, stc: a.stc ? { t: a.stc.t, c: a.stc.c, i: a.stc.i } : undefined, ouv: ouvPublico(a), jog: jogPublico(a), ass: assPublico(a),
+  maquina: a.esconder ? '' : a.maquina, so: a.esconder ? '' : a.so, ap: a.semAp ? undefined : a.ap || undefined, sov: a.mostraSo ? a.sov || undefined : undefined, estado: a.estado, sala: a.sala, comp: !!a.comp, ins: a.ins || undefined, stc: a.stc ? { t: a.stc.t, c: a.stc.c, i: a.stc.i } : undefined, ouv: ouvPublico(a), jog: jogPublico(a), ass: assPublico(a),
 });
 // (1.0.0) "Ouvindo agora" (como o do Discord): a música que toca no PC da pessoa. O servidor guarda quando ela começou (ini) e manda aos
 // amigos quanto já tocou (dt, contado aqui): cada um calcula a barra pelo próprio relógio, sem depender do relógio de ninguém
@@ -66,6 +68,11 @@ export const limparJog = (x, agora = Date.now()) => {
   if (Array.isArray(x.p) && x.p.length === 2 && x.p.every((v) => Number.isInteger(v) && v >= 0 && v < 1e6) && x.p[1] > 0) o.p = [Math.min(x.p[0], x.p[1]), x.p[1]];
   if (typeof x.app === 'string' && /^\d{15,25}$/.test(x.app)) o.app = x.app;
   if (x.emu === 1) o.emu = 1;
+  if (x.pj === 1) o.pj = 1; // (1.0.2) a partida aceita gente entrando
+  if (Array.isArray(x.b)) { // (1.0.2) os botões do jogo (como no Discord): até 2, só https
+    const b = x.b.slice(0, 2).map((y) => { if (!y || typeof y !== 'object') return null; const l = txtOuv(y.l, 32); let u = ''; try { const v = new URL(String(y.u || '')); if (v.protocol === 'https:' && v.hostname.includes('.') && !v.username && !v.password && v.href.length <= 300) u = v.href; } catch (e) { /* link torto */ } return l && u ? { l, u } : null; }).filter(Boolean);
+    if (b.length) o.b = b;
+  }
   const vb = txtOuv(x.vb, 20); if (vb) o.vb = vb; // o que vem antes do nome, escolhido pela pessoa ("Jogando", "Ao vivo na"...)
   if (typeof x.lk === 'string' && x.lk.length <= 300 && /^https:\/\/[^\s"'<>\\]+$/.test(x.lk)) { // o nome clicável (a live): só https
     try { const u = new URL(x.lk); if (u.protocol === 'https:' && u.hostname.includes('.') && !u.username && !u.password) o.lk = u.href; } catch (e) { /* link torto */ }
@@ -345,7 +352,7 @@ export class Hub {
   }
 
   // banner, cores, bio, Discord e música do Spotify (o que a pessoa escolheu mostrar)
-  extraPublico(o) { const e = o.extra || {}; return { bio: e.bio || '', cor1: e.cor1 || '', cor2: e.cor2 || '', fundo1: e.fundo1 || '', fundo2: e.fundo2 || '', discord: e.discord || '', spotify: e.spotify || null, ml: e.ml || '', mv: e.mv || 0, lb: e.lb || '', gl: e.gl || '', lbf: e.lbf || null, bannerV: e.bannerV || 0, bc: bcPublico(e.bc, nivelDe(o)) || null, nm: nmPublico(e.nm, nivelDe(o)) || null, fd: e.fd || null, np: e.np || null, npV: e.npV || 0, fdV: e.fdV || 0, mf: e.mf || null, mfV: e.mfV || 0, pf: e.pf || null, dg: e.dg || null, ...extrasPublicos(e, nivelDe(o)) }; }
+  extraPublico(o) { const e = o.extra || {}; return { bio: e.bio || '', cor1: e.cor1 || '', cor2: e.cor2 || '', fundo1: e.fundo1 || '', fundo2: e.fundo2 || '', discord: e.discord || '', spotify: e.spotify || null, ml: e.ml || '', mv: e.mv || 0, lb: e.lb || '', gl: e.gl || '', lbf: e.lbf || null, bannerV: e.bannerV || 0, bc: bcPublico(e.bc, nivelDe(o)) || null, nm: nmPublico(e.nm, nivelDe(o)) || null, fd: e.fd || null, np: e.np || null, npV: e.npV || 0, fdV: e.fdV || 0, mf: e.mf || null, mfV: e.mfV || 0, pf: e.pf || null, dg: e.dg || null, fz: e.fz || '', ...extrasPublicos(e, nivelDe(o)) }; }
 
   async perfilPublico(conta, codigo) {
     const oid = await this.get('f:' + codigo.toUpperCase());
@@ -360,7 +367,30 @@ export class Hub {
     const vs = podeVisto ? (await this.get('vs:' + oid)) || 0 : 0, va = podeVisto && pv.vistoModo === 'atividade' ? (await this.get('va:' + oid)) || 0 : 0;
     const visto = Math.max(vs, va) || undefined, vm = visto && pv.vistoModo === 'atividade' ? 'atividade' : undefined;
     let uid, assinatura; if (await this.admin.ehDev(conta)) { if (!o.uid) await this.admin.garantir(o); uid = o.uid; assinatura = await this.bolha.resumoDev(o); } // (0.8.2) a assinatura também, só para o desenvolvedor
-    return resposta({ uid, assinatura, codigo: o.codigo, nome: o.nome, tag: o.tag || '', av: o.avatarV || 0, ins: o.ins || [], sl: await this.selos(o), criado: o.criado, visto, vm, amizade: rel ? rel.estado : null, avisarOnline: !!(rel && rel.avisarOnline), podeMensagem: oid !== conta.id && this.social.podeEscrever(conta, o), apelido: (conta.apelidos || {})[oid] || '', ...this.extraPublico(o) });
+    return resposta({ uid, assinatura, codigo: o.codigo, nome: o.nome, tag: o.tag || '', av: o.avatarV || 0, ins: o.ins || [], sl: await this.selos(o), criado: o.criado, visto, vm, amizade: rel ? rel.estado : null, avisarOnline: !!(rel && rel.avisarOnline), podeMensagem: oid !== conta.id && this.social.podeEscrever(conta, o), apelido: (conta.apelidos || {})[oid] || '', ...this.extraPublico(o), fz: oid === conta.id || (rel && rel.estado === 'aceita') ? ((o.extra || {}).fz || '') : '', ...this.exclusivos(conta, o, rel) });
+  }
+
+  // (1.0.2) perfil exclusivo: um amigo pode ter um jeito do perfil só para você (bio e cores). Você vê o exclusivo e escolhe ver o público
+  exclusivos(conta, o, rel) {
+    if (!rel || rel.estado !== 'aceita' || o.id === conta.id) return {};
+    const exc = nivelDe(o) >= 4 ? ((o.extra || {}).pp || {})[conta.id] : null, meu = ((conta.extra || {}).pp || {})[o.id];
+    return { exc: exc || undefined, meuExc: meu || undefined };
+  }
+  async perfilExclusivo(conta, b) {
+    if (nivelDe(conta) < 4) return erro('O perfil exclusivo é do Aero Bubble Supporter.', 403);
+    const oid = await this.get('f:' + String(b.codigo || '').toUpperCase()), rel = oid && conta.amigos[oid];
+    if (!rel || rel.estado !== 'aceita') return erro('Só dá para fazer um perfil exclusivo para um amigo.', 404);
+    conta.extra = conta.extra || {}; const pp = (conta.extra.pp = conta.extra.pp || {});
+    if (b.apagar) delete pp[oid];
+    else {
+      const COR = /^#[0-9a-f]{6}$/i;
+      if (!pp[oid] && Object.keys(pp).length >= 30) return erro('Você já tem 30 perfis exclusivos. Apague um antes.', 400);
+      const x = { bio: txt(String(b.bio || '').replace(/[\u0000-\u0009\u000b-\u001f]/g, ''), 190), cor1: COR.test(b.cor1) ? b.cor1.toLowerCase() : '', cor2: COR.test(b.cor2) ? b.cor2.toLowerCase() : '' };
+      if (!x.bio && !x.cor1 && !x.cor2) delete pp[oid]; else pp[oid] = x;
+    }
+    if (!Object.keys(pp).length) delete conta.extra.pp;
+    await this.put({ ['c:' + conta.id]: conta }); await this.mudou([oid]);
+    return resposta({ ok: true, meuExc: pp[oid] || null });
   }
 
   async banner(codigo) { return this.servirImagem('bn:', codigo); }
@@ -577,7 +607,13 @@ export class Hub {
     const yt = /^https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/.exec(u);
     // (0.9.5) post do Twitter/X (e dos espelhos fxtwitter/vxtwitter/fixupx): texto, autor, números e as fotos/vídeos, pela API pública do FxTwitter
     const tw = /^https?:\/\/(?:www\.|mobile\.)?(?:twitter\.com|x\.com|fxtwitter\.com|vxtwitter\.com|fixupx\.com|fixvx\.com)\/([A-Za-z0-9_]{1,15}|i\/web|i)\/status(?:es)?\/(\d{5,25})/i.exec(u);
-    if (tw) {
+    if (Embeds.RE_SPOTIFY.test(u)) { // (1.0.2) Spotify: a capa, a cor e o trecho de cada faixa
+      try { d = await Embeds.spotify(u); } catch (_) { d = null; }
+    } else if (Embeds.RE_REDDIT.test(u)) { // (1.0.2) Reddit: fotos (até 20), vídeo com som, texto e números
+      try { d = await Embeds.reddit(u); } catch (_) { d = null; }
+    } else if (Embeds.RE_LOJA.test(u)) { // (1.0.2) Amazon e AliExpress: preço, imposto, fotos e avaliações
+      try { d = await Embeds.loja(u); } catch (_) { d = null; }
+    } else if (tw) {
       try {
         const r = await fetch('https://api.fxtwitter.com/status/' + tw[2], { headers: { 'User-Agent': 'AeroStream-embed/1.0' } });
         const j = r.ok ? await r.json() : null, t = j && j.tweet;
@@ -630,11 +666,22 @@ export class Hub {
   }
 
   // (0.8.5) figurinhas favoritas: as de qualquer pessoa (vistas no chat), guardadas na conta como os GIFs favoritos
+  // (1.0.2) um nome para a figurinha (sua ou favorita), para achar pela busca do painel
+  async nomearFigurinha(conta, b) {
+    const cod = String((b && b.codigo) || '').toUpperCase(), id = String((b && b.id) || ''), n = txt(String((b && b.n) || ''), 40).trim();
+    if (!/^[0-9a-f]{10}$/.test(id) || (cod && !/^[A-Z0-9]{6}$/.test(cod))) return erro('Figurinha inválida.');
+    let achou = false;
+    if (!cod || cod === conta.codigo) conta.figurinhas = (conta.figurinhas || []).map((f) => (f.id === id ? (achou = true, n ? { ...f, n } : { id: f.id, t: f.t }) : f));
+    conta.figsFav = (conta.figsFav || []).map((f) => (f.id === id && (!cod || f.c === cod) ? (achou = true, n ? { ...f, n } : { c: f.c, id: f.id }) : f));
+    if (!achou) return erro('Figurinha não encontrada.', 404);
+    await this.put({ ['c:' + conta.id]: conta });
+    return resposta({ ok: true, figurinhas: conta.figurinhas, favoritas: conta.figsFav });
+  }
   async favoritarFigurinha(conta, b) {
     const cod = String((b && b.codigo) || '').toUpperCase(), id = String((b && b.id) || '');
     if (!/^[A-Z0-9]{6}$/.test(cod) || !/^[0-9a-f]{10}$/.test(id)) return erro('Figurinha inválida.');
     const l = (conta.figsFav || []).filter((x) => !(x.c === cod && x.id === id));
-    if (b.sim) l.unshift({ c: cod, id });
+    if (b.sim) { const n = txt(String(b.n || ''), 40).trim(); l.unshift(n ? { c: cod, id, n } : { c: cod, id }); }
     conta.figsFav = l.slice(0, TRAVA_FAV_FIGS); await this.put({ ['c:' + conta.id]: conta });
     for (const w of this.ctx.getWebSockets('c:' + conta.id)) { try { w.send(JSON.stringify({ tipo: 'figs-fav' })); } catch (_) { /* ok */ } }
     return resposta({ ok: true, favoritas: conta.figsFav });
@@ -842,8 +889,10 @@ export class Hub {
       if (['amigos', 'pedidos', 'todos'].includes(b.mensagens)) p.mensagens = b.mensagens;
       if (['todos', 'amigos2', 'ninguem'].includes(b.pedidosAmizade)) p.pedidosAmizade = b.pedidosAmizade; // (0.8.7) quem pode mandar pedido de amizade
       if (b.esconderAparelho !== undefined) p.esconderAparelho = !!b.esconderAparelho;
+      if (b.esconderAparelhos !== undefined) p.esconderAparelhos = !!b.esconderAparelhos; // (1.0.2) os símbolos dos aparelhos ao lado do nome
+      if (b.mostrarSistema !== undefined) p.mostrarSistema = !!b.mostrarSistema; // (1.0.2) o ícone do sistema (distro, versão do Windows)
       await this.put({ ['c:' + conta.id]: conta });
-      for (const w of this.ctx.getWebSockets('c:' + conta.id)) { const a = w.deserializeAttachment(); if (a) { a.esconder = privDe(conta).esconderAparelho; w.serializeAttachment(a); await this.anunciar(w); } try { w.send(JSON.stringify({ tipo: 'priv-mudou' })); } catch (_) { /* ok */ } }
+      for (const w of this.ctx.getWebSockets('c:' + conta.id)) { const a = w.deserializeAttachment(); if (a) { const pv = privDe(conta); a.esconder = pv.esconderAparelho; a.semAp = pv.esconderAparelhos; a.mostraSo = pv.mostrarSistema; w.serializeAttachment(a); await this.anunciar(w); } try { w.send(JSON.stringify({ tipo: 'priv-mudou' })); } catch (_) { /* ok */ } }
       return resposta({ ok: true, priv: privDe(conta) });
     }
     if (rota === 'avatares-recentes' && request.method === 'GET') return resposta({ recentes: conta.avRecentes || [] });
@@ -861,6 +910,7 @@ export class Hub {
     if (rota === 'gifs/favoritos' && request.method === 'POST') return this.favoritarGif(conta, b);
     if (rota === 'figurinhas/favoritas' && request.method === 'GET') return resposta({ favoritas: conta.figsFav || [] });
     if (rota === 'figurinhas/favoritas' && request.method === 'POST') return this.favoritarFigurinha(conta, b);
+    if (rota === 'figurinhas/nome' && request.method === 'POST') return this.nomearFigurinha(conta, b);
     // (0.5.9-7) configurações da conta (tema, sons, toque, chat, idioma...): as mesmas em todo aparelho. Guardadas como vieram (até 60 KB);
     // os outros aparelhos da conta ficam sabendo na hora e buscam a versão nova.
     // (1.0.2) termos de serviço: guarda a versão que a pessoa aceitou (e quando). O app mostra os termos de novo quando sai uma versão nova
@@ -905,6 +955,13 @@ export class Hub {
       return resposta({ ok: true });
     }
     if (rota === 'perfil' && request.method === 'POST') return this.atualizarPerfil(conta, b);
+    if (rota === 'perfil/exclusivo' && request.method === 'POST') return this.perfilExclusivo(conta, b);
+    // (1.0.2) traduzir uma mensagem e o dicionário por palavra (idiomas.js)
+    if ((rota === 'traduzir' || rota === 'dicionario') && request.method === 'POST') {
+      if (!this.limitar('idi:' + conta.id, 90, 60000)) return erro('Devagar! Tente de novo em um minuto.', 429);
+      try { return resposta(rota === 'traduzir' ? await traduzir(b.texto, b.para, b.de) : await dicionario(b.palavra, b.lingua)); }
+      catch (e) { return erro(e.message || 'Não deu certo agora.', 502); }
+    }
     if (rota === 'avatar' && request.method === 'POST') return this.salvarAvatar(conta, b);
     if ((rota === 'imagem/avatar' || rota === 'imagem/banner' || rota === 'imagem/nameplate' || rota === 'imagem/fundo' || rota === 'imagem/mural' || rota === 'imagem/ligacao' || rota === 'imagem/acessorio' || rota === 'imagem/jogo') && request.method === 'POST') return this.subirImagem(conta, seg[1], request);
     if (rota === 'acesso/trocar') { const rs = await this.sessao(token); b._sid = (rs && rs.s.sid) || ''; }
@@ -987,7 +1044,7 @@ export class Hub {
     servidor.serializeAttachment({
       conta: conta.id, codigo: conta.codigo, nome: conta.nome, tag: conta.tag, av: conta.avatarV || 0, ins: conta.ins || [],
       dev: /^[a-z0-9]{12}$/.test(url.searchParams.get('dev') || '') ? url.searchParams.get('dev') : crypto.randomUUID().slice(0, 8), sid: (ses && ses.sid) || tk.slice(0, 10), maquina, // (0.7.4) o mesmo id ao reconectar
-      so, estado: ['ausente', 'invisivel', 'ocupado'].includes(conta.status) ? conta.status : 'online', sala: null, comp: false, esconder: privDe(conta).esconderAparelho, stc: conta.stc || null,
+      so, sov: /^[a-z0-9]{1,14}$/.test(url.searchParams.get('sov') || '') ? url.searchParams.get('sov') : '', ap: /^(android|ios)$/i.test(so) ? 'cel' : /^web$/i.test(so) ? 'web' : 'pc', semAp: privDe(conta).esconderAparelhos, mostraSo: privDe(conta).mostrarSistema, estado: ['ausente', 'invisivel', 'ocupado'].includes(conta.status) ? conta.status : 'online', sala: null, comp: false, esconder: privDe(conta).esconderAparelho, stc: conta.stc || null,
     });
     enviar(servidor, { tipo: 'eu', dev: servidor.deserializeAttachment().dev }); // o aparelho fica sabendo o próprio id (chamadas)
     await this.sincronizar(conta.id, [servidor]);
@@ -1057,6 +1114,10 @@ export class Hub {
       await this.put({ ['va:' + a.conta]: Date.now() }); return;
     }
     if (mensagem.length > 2048) return;
+    if (m.tipo === 'sov') { // (1.0.2) trocou o ícone do sistema neste aparelho (distro, versão do Windows)
+      const v = /^[a-z0-9]{1,14}$/.test(m.v || '') ? m.v : ''; if (a.sov === v || !this.limitar('sov:' + a.conta, 20, 60000)) return;
+      a.sov = v; ws.serializeAttachment(a); if (!invisivel(a)) await this.anunciar(ws); return;
+    }
     if (m.tipo === 'ouvindo') { // (1.0.0) a música que toca agora no PC (ou parou: ouv null). Invisível: guarda, mas ninguém fica sabendo
       if (!this.limitar('ouv:' + a.conta + ':' + a.dev, 30, 60000)) return;
       const o = limparOuv(m.ouv), antes = a.ouv || null;

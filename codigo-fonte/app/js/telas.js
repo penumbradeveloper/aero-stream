@@ -636,6 +636,7 @@
       girar();
       Object.entries(botoes).forEach(([k, b]) => { b.classList.toggle('sel', k === id); b.setAttribute('aria-selected', k === id); });
       dados.aba = id;
+      A.onde = { ...(A.onde || {}), aba: id }; A.evt.emit('onde'); // (1.0.2) o Discord mostra onde você está
       if (A.cfg && A.cfg.v.ultAba !== id) { A.cfg.v.ultAba = id; A.cfg.salvar(); } // (0.8.7) o app abre na última aba em que você estava
       cancelarMontagem();
       const montar = () => {

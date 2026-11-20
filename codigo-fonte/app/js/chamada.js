@@ -934,7 +934,54 @@
     p[chave] = atual;
     return v > atual * folga[0] + folga[1];
   };
-  const marcarFala = (el, on) => { if (!el) return; if (A.extras && A.extras.fala) A.extras.fala(el, on); else el.classList.toggle('falando', on); };
+  const marcarFala = (el, on) => {
+    if (!el) return;
+    const antes = el.classList.contains('falando');
+    if (A.extras && A.extras.fala) A.extras.fala(el, on); else el.classList.toggle('falando', on);
+    if (on) el._ultFala = Date.now();
+    // (1.0.2) alguém que estava escondido na janelinha/mini começou a falar: troca quem aparece
+    if (on && !antes && ch && ch.ui && ch.modo !== 'max' && (el.classList.contains('fora-pequena') || ch.ui.miniAvs.dataset.n > 3)) pintarPequenos();
+  };
+  // (1.0.2) com muita gente: na janelinha (PiP) só 3 pessoas (quem está falando primeiro, depois quem falou por último) e um "+N";
+  // na minimizada, 3 fotinhas do mesmo jeito e o "+N"
+  const PEQ_MAX = 3;
+  function pintarPequenos() {
+    if (!ch || !ch.ui) return;
+    const ui = ch.ui;
+    const tiles = [...ui.pessoas.children].filter((t) => t.classList.contains('cham-tile') && !t.classList.contains('eu'));
+    const ordem = tiles.slice().sort((a, b) => (b.classList.contains('falando') - a.classList.contains('falando')) || ((b._ultFala || 0) - (a._ultFala || 0)) || (tiles.indexOf(a) - tiles.indexOf(b)));
+    const muitos = tiles.length > PEQ_MAX + 1;
+    const vis = new Set(muitos ? ordem.slice(0, PEQ_MAX) : tiles);
+    tiles.forEach((t) => t.classList.toggle('fora-pequena', !vis.has(t)));
+    ui.el.classList.toggle('pip-muitos', muitos);
+    let mais = ui.pessoas.querySelector(':scope > .cham-mais');
+    if (muitos) {
+      if (!mais) { mais = h('button', { type: 'button', class: 'cham-mais', title: T('Ver todo mundo', 'See everyone'), onclick: () => CH.modo('max') }); }
+      mais.textContent = '+' + (tiles.length - PEQ_MAX); ui.pessoas.append(mais);
+    } else if (mais) mais.remove();
+    const avs = ordem.slice(0, PEQ_MAX).map((t) => t._pessoa).filter(Boolean);
+    const total = tiles.length;
+    ui.miniAvs.dataset.n = total;
+    ui.miniAvs.replaceChildren(...avs.map((p) => A.ui.avatar(p, 30)), ...(total > PEQ_MAX ? [h('span', { class: 'cham-mini-mais' }, '+' + (total - PEQ_MAX))] : []));
+  }
+  // (1.0.2) a grade da maximizada com mais de 9 pessoas: o maior quadro que cabe, com as colunas que aproveitam melhor o espaço
+  function pintarGrade() {
+    if (!ch || !ch.ui) return;
+    const ui = ch.ui, el = ui.el;
+    const n = [...ui.pessoas.children].filter((t) => t.classList.contains('cham-tile')).length;
+    const grade = ch.modo === 'max' && !el.classList.contains('com-palco') && n > 9;
+    el.toggleAttribute('data-muitos', grade);
+    if (!grade) { el.style.removeProperty('--tw'); return; }
+    const W = ui.pessoas.clientWidth - 4, H = ui.pessoas.clientHeight - 12, gap = 8;
+    if (W <= 0 || H <= 0) return;
+    let melhor = 40;
+    for (let c = 1; c <= n; c++) {
+      const r = Math.ceil(n / c);
+      const w = Math.min((W - (c - 1) * gap) / c, ((H - (r - 1) * gap) / r) * 4 / 3);
+      if (w > melhor) melhor = w;
+    }
+    el.style.setProperty('--tw', Math.floor(melhor) + 'px');
+  }
   function medirFalas() {
     if (!ch || !ch.ui) return;
     for (const par of ch.pares.values()) {
@@ -1013,6 +1060,7 @@
     const quadro = h('div', { class: 'cham-quadro' }, videoEl || null, h('div', { class: 'cham-av' }, semTamanho(A.ui.avatar(pessoa, 96))), h('span', { class: 'cham-mudo', title: T('Microfone desligado', 'Microphone off') }, A.icone('micOff', 16)));
     const el = h('div', { class: 'cham-tile' + (ehEu ? ' eu' : '') }, quadro,
       h('div', { class: 'cham-nome' }, h('span', {}, ehEu ? T('Você', 'You') : nomeDe(pessoa.codigo) || pessoa.nome), h('span', { class: 'cham-pontos' }, h('i'), h('i'), h('i'))));
+    el._pessoa = pessoa;
     return A.extras ? A.extras.marcarChamada(el, pessoa.codigo) : el; // (1.0.0) o anel de fala e a moldura da câmera da pessoa (só aqui, em quem vê)
   }
   function tilePar(par) {
@@ -1070,6 +1118,7 @@
   // quem aparece grande (o "palco"):
   //  - a pessoa que você clicou (como no Discord): a tela dela se estiver compartilhando, senão a câmera, senão a foto; clicar de novo volta;
   //  - sem ninguém escolhido: a tela compartilhada mais recente (de alguém, ou a sua se só você compartilha).
+  CH.juntos = (v) => { A.cfg.v.chamJuntos = !!v; A.cfg.salvar(); if (ch && ch.ui) { pintarTudo(); CH.ajustarJanela(); } };
   CH.focar = (chave) => {
     if (!ch) return;
     ch.foco = ch.foco === chave ? null : chave; ch.semAuto = false; zoomReset();
@@ -1238,7 +1287,10 @@
     for (const par of ch.pares.values()) if (par.tile) par.tile.classList.toggle('em-foco', par.chave === chaveFoco);
     ui.euTile.classList.toggle('em-foco', chaveFoco === 'eu');
     // (0.7.9) outra pessoa em destaque: você aparece na fila com os outros, para dar para voltar para você com um clique
-    const euNaFila = !!(p && p.foco && !p.eu);
+    // (1.0.2) "todo mundo junto": você fica no meio com os outros, sem a linha; só vai para a fila de baixo (com todos) quando alguém está no palco
+    const juntos = A.cfg.v.chamJuntos === true && ch.modo === 'max';
+    ui.el.classList.toggle('juntos', juntos); ui.euTile.classList.toggle('juntos-eu', juntos);
+    const euNaFila = juntos || !!(p && p.foco && !p.eu);
     if (euNaFila && ui.euTile.parentNode !== ui.pessoas) ui.pessoas.append(ui.euTile);
     else if (!euNaFila && ui.euTile.parentNode === ui.pessoas) ui.pessoas.nextElementSibling.after(ui.euTile);
     if (p) {
@@ -1256,9 +1308,9 @@
     ui.pessoas.querySelectorAll('.cham-tile.chamando').forEach((t) => { if (!ch.saindo || n) t.remove(); });
     // cabeçalho e botões
     ui.estado.textContent = ch.inicio ? fmt(Date.now() - ch.inicio) : ch.saindo && !n ? T('chamando', 'calling') : T('conectando…', 'connecting…');
-    ui.el.dataset.pessoas = String(Math.max(1, ui.pessoas.children.length));
-    ui.miniAvs.textContent = '';
-    [...ch.pares.values()].slice(0, 3).forEach((x) => ui.miniAvs.append(A.ui.avatar(pessoaDe(x.codigo), 30)));
+    pintarPequenos();
+    ui.el.dataset.pessoas = String(Math.max(1, ui.pessoas.querySelectorAll(':scope > .cham-tile').length));
+    pintarGrade();
     const bt = (b, ico, ligado, tit) => { if (!b) return; b.replaceChildren(A.icone(ico, 22)); b.classList.toggle('ativo', !!ligado); b.title = tit; b.setAttribute('aria-label', tit); };
     bt(ui.bMic, ch.mudo ? 'micOff' : 'mic', false, ch.mudo ? T('Ligar microfone', 'Unmute') : T('Desligar microfone', 'Mute'));
     ui.bMic.classList.toggle('desligado', ch.mudo);
@@ -1654,6 +1706,7 @@
     const el = h('div', { class: 'cham-janela', role: 'dialog', 'aria-label': T('Chamada com ', 'Call with ') + ch.titulo },
       brilho, cab, palco, pessoas, horizonte, euTile, barra, puxador, mini, chatBox);
     euTile.querySelector('.cham-quadro').addEventListener('click', () => CH.focar('eu'));
+    euTile.addEventListener('contextmenu', (ev) => { ev.preventDefault(); const j = A.cfg.v.chamJuntos === true; A.ui.menuContexto(ev, [{ texto: j ? T('Ficar embaixo, separado', 'Stay at the bottom, apart') : T('Ficar no meio com todo mundo', 'Stay in the middle with everyone'), icone: 'pessoas', onclick: () => CH.juntos(!j) }]); });
     el.addEventListener('click', (ev) => { if (ch && ch.modo === 'mini' && !ev.target.closest('.btn')) CH.modo('max'); });
     const tecla = (ev) => { if (ev.key === 'Escape' && ch && ch.ui && ch.ui.palco.classList.contains('cheio')) { ev.stopPropagation(); CH._telaCheia(false); return; } if (ev.key === 'Escape' && ch && ch.modo === 'max' && !document.querySelector('#modais .pop, #modais .modal')) CH.modo(modoPequeno()); };
     document.addEventListener('keydown', tecla);
@@ -1661,7 +1714,8 @@
     const arrJanela = A.ui.arrastar(el, el, { chave: () => 'cham-' + ((ch && ch.modo) || 'pip'), quando: () => ch && (ch.modo === 'pip' || ch.modo === 'mini') && !matchMedia('(max-width: 680px)').matches });
     if (A.extras && A.extras.pintarTelaChamada) A.extras.pintarTelaChamada(el); // (1.0.2) a cor, a imagem, as bolhas e os acessórios que você escolheu para a sua tela
     document.body.append(el);
-    ch.ui = { el, arrJanela, pessoas, canto, cantoEls: new Map(), palco, palcoVideo, palcoNome, palcoAv, palcoMidia, zoomTxt, estado, miniAvs, bMic, bCam, bTela, bSom, bSinal, msEl, miniMic, euTile, euVideo, abrirChat, chatAberto: () => !chatBox.hidden, pintarCtl, limpar: () => { offsCtl.forEach((f) => f()); camCur.limpar(); if (E.lock && nosso()) E.sairLock('fim'); document.removeEventListener('keydown', tecla); if (palco.classList.contains('cheio')) telaCheia(false); if (chatCx) chatCx.limpar(); } };
+    const roGrade = new ResizeObserver(() => pintarGrade()); roGrade.observe(pessoas); // (1.0.2) a grade de muita gente acompanha o tamanho da janela
+    ch.ui = { el, arrJanela, pessoas, canto, cantoEls: new Map(), palco, palcoVideo, palcoNome, palcoAv, palcoMidia, zoomTxt, estado, miniAvs, bMic, bCam, bTela, bSom, bSinal, msEl, miniMic, euTile, euVideo, abrirChat, chatAberto: () => !chatBox.hidden, pintarCtl, limpar: () => { roGrade.disconnect(); offsCtl.forEach((f) => f()); camCur.limpar(); if (E.lock && nosso()) E.sairLock('fim'); document.removeEventListener('keydown', tecla); if (palco.classList.contains('cheio')) telaCheia(false); if (chatCx) chatCx.limpar(); } };
     CH.ativa = ch; garantirCtx();
     for (const par of ch.pares.values()) pessoas.append(tilePar(par));
     CH.modo('max');

@@ -103,7 +103,8 @@
 
   // a linha das listas: o símbolo e o canal (ou o título)
   S.linha = (cod) => { const el = h('div', { class: 'ass-linha', dados: { assCod: cod || '' }, hidden: true }); preencherLinha(el); return el; };
-  function preencherLinha(el) {
+  function preencherLinha(el) { preencherLinha0(el); if (A.ui && A.ui.atvMais) A.ui.atvMais(el); } // (1.0.2) "+1" com várias atividades
+  function preencherLinha0(el) {
     const o = S.de(el.dataset.assCod), k = o ? chave(o) : '';
     const pai = el.parentElement; if (pai) pai.classList.toggle('com-ass', !!o);
     if (el.dataset.k === k) return;

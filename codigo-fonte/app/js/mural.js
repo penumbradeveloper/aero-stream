@@ -7,13 +7,13 @@
   const A = window.Aero, h = A.h, T = A.T, U = A.ui, API = A.api;
   const MU = (A.mural = {});
   const CATS = {
-    f: { ic: 'video', nome: ['Filmes', 'Movies'], fav: ['Filme favorito', 'Favorite movie'], gosto: ['Filmes que eu gosto', 'Movies I like'], quero: ['Quero assistir', 'Want to watch'], busca: ['Procure um filme', 'Search a movie'] },
-    s: { ic: 'tela', nome: ['Séries', 'Shows'], fav: ['Série favorita', 'Favorite show'], gosto: ['Séries que eu gosto', 'Shows I like'], quero: ['Quero assistir', 'Want to watch'], busca: ['Procure uma série', 'Search a show'] },
-    a: { ic: 'estrela', nome: ['Animes', 'Anime'], fav: ['Anime favorito', 'Favorite anime'], gosto: ['Animes que eu gosto', 'Anime I like'], quero: ['Quero assistir', 'Want to watch'], busca: ['Procure um anime', 'Search an anime'] },
+    f: { ic: 'video', nome: ['Filmes', 'Movies'], fav: ['Filme favorito', 'Favorite movie'], gosto: ['Filmes que eu gosto', 'Movies I like'], agora: ['Assistindo agora', 'Watching now'], quero: ['Quero assistir', 'Want to watch'], busca: ['Procure um filme', 'Search a movie'] },
+    s: { ic: 'tela', nome: ['Séries', 'Shows'], fav: ['Série favorita', 'Favorite show'], gosto: ['Séries que eu gosto', 'Shows I like'], agora: ['Assistindo agora', 'Watching now'], quero: ['Quero assistir', 'Want to watch'], busca: ['Procure uma série', 'Search a show'] },
+    a: { ic: 'estrela', nome: ['Animes', 'Anime'], fav: ['Anime favorito', 'Favorite anime'], gosto: ['Animes que eu gosto', 'Anime I like'], agora: ['Assistindo agora', 'Watching now'], quero: ['Quero assistir', 'Want to watch'], busca: ['Procure um anime', 'Search an anime'] },
     m: { ic: 'musica', nome: ['Músicas', 'Songs'], fav: ['Música favorita', 'Favorite song'], gosto: ['Músicas que eu gosto', 'Songs I like'], busca: ['Procure ou cole um link (Spotify, Deezer, YouTube Music)', 'Search or paste a link (Spotify, Deezer, YouTube Music)'], q: true, link: true },
     l: { ic: 'disco', nome: ['Álbuns', 'Albums'], fav: ['Álbum favorito', 'Favorite album'], gosto: ['Álbuns que eu gosto', 'Albums I like'], busca: ['Procure ou cole um link de álbum', 'Search or paste an album link'], q: true, link: true },
-    b: { ic: 'livro', nome: ['Livros', 'Books'], fav: ['Livro favorito', 'Favorite book'], gosto: ['Livros que eu gosto', 'Books I like'], quero: ['Quero ler', 'Want to read'], busca: ['Procure um livro (nome, autor ou ISBN)', 'Search a book (title, author or ISBN)'] },
-    j: { ic: 'jogo', nome: ['Jogos', 'Games'], fav: ['Jogo favorito', 'Favorite game'], gosto: ['Jogos que eu gosto', 'Games I like'], quero: ['Quero jogar', 'Want to play'], busca: ['Procure um jogo', 'Search a game'] },
+    b: { ic: 'livro', nome: ['Livros', 'Books'], fav: ['Livro favorito', 'Favorite book'], gosto: ['Livros que eu gosto', 'Books I like'], agora: ['Lendo agora', 'Reading now'], quero: ['Quero ler', 'Want to read'], busca: ['Procure um livro (nome, autor ou ISBN)', 'Search a book (title, author or ISBN)'] },
+    j: { ic: 'jogo', nome: ['Jogos', 'Games'], fav: ['Jogo favorito', 'Favorite game'], gosto: ['Jogos que eu gosto', 'Games I like'], agora: ['Jogando agora', 'Playing now'], quero: ['Quero jogar', 'Want to play'], busca: ['Procure um jogo', 'Search a game'] },
   };
   const ORDEM = ['f', 's', 'a', 'm', 'l', 'b', 'j'], MAX = 100;
   // (0.8.7) a ordem das abas que a pessoa escolheu (arrastando no editor); as que faltam vão no fim
@@ -21,10 +21,10 @@
   MU.ordemDe = ordemDe;
   // (0.8.7) a ordem das seções de cada aba (o favorito não precisa ficar em cima)
   // (0.8.7) músicas e álbuns não têm "quero ouvir" (é só ouvir)
-  const secoesDe = (v, k) => { const ok = ['fav', 'gosto', ...(k && !k.quero ? [] : ['quero'])]; const o = (v && Array.isArray(v.so) ? v.so : []).filter((s) => ok.includes(s)); return [...new Set([...o, ...ok])]; };
+  const secoesDe = (v, k) => { const ok = ['fav', ...(k && k.agora ? ['agora'] : []), 'gosto', ...(k && !k.quero ? [] : ['quero'])]; /* (1.0.2) + "agora" (jogando, assistindo, lendo) */ const o = (v && Array.isArray(v.so) ? v.so : []).filter((s) => ok.includes(s)); return [...new Set([...o, ...ok])]; };
   MU.CATS = CATS; MU.ORDEM = ORDEM;
   MU.capa = (c) => (c ? `${API.servidor}/api/capa?u=${encodeURIComponent(c)}` : '');
-  MU.tem = (m, c) => !!(m && m[c] && (m[c].fav || (m[c].gosto || []).length || (CATS[c] && CATS[c].quero && (m[c].quero || []).length)));
+  MU.tem = (m, c) => !!(m && m[c] && (m[c].fav || (m[c].gosto || []).length || (CATS[c] && CATS[c].quero && (m[c].quero || []).length) || (CATS[c] && CATS[c].agora && (m[c].agora || []).length)));
   // o mural de alguém (guardado até mudar de versão)
   const cache = new Map();
   MU.dados = (codigo, mv) => {
@@ -79,7 +79,9 @@
       if (!cats.length) { corpo.replaceChildren(h('div', { class: 'suave peq mr-vazio' }, T('O mural ainda está vazio.', 'The wall is still empty.'))); return; }
       let atual = cats.includes(aba) ? aba : cats[0];
       const pintar = () => {
+        const tinhaFoco = abas.contains(document.activeElement); // (1.0.2) pelo controle: a seleção fica na aba escolhida (antes voltava para o começo)
         abas.replaceChildren(...cats.map((c) => h('button', { type: 'button', role: 'tab', class: 'mr-aba' + (c === atual ? ' sel' : ''), 'aria-selected': String(c === atual), onclick: () => { if (c === atual) return; atual = c; if (previa) MU.abaVista = c; A.som.tocar('click'); pintar(); } }, A.icone(CATS[c].ic, 15), h('span', {}, T(...CATS[c].nome)))));
+        if (tinhaFoco) { const b = abas.querySelector('.mr-aba.sel'); if (b) b.focus({ preventScroll: true }); }
         const v = m[atual], k = CATS[atual];
         const solta = (b, x) => { if (arrastar) { const c = atual; b.title = T('Arraste para o cartão', 'Drag into the card') + ' · ' + x.t; b.addEventListener('pointerdown', (e) => arrastar(x, c, e)); } };
         const it = (x) => {
@@ -104,7 +106,7 @@
           const abrir = (e) => { if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return; if (e.type === 'keydown') e.preventDefault(); if (!arrastar) MU.detalhe(v.fav, atual, dono); };
           b.addEventListener('click', abrir); b.addEventListener('keydown', abrir); solta(b, v.fav); return b;
         })() : null;
-        const secs = { fav, gosto: grade(k.gosto, v.gosto), quero: k.quero ? grade(k.quero, v.quero) : null };
+        const secs = { fav, agora: k.agora && (v.agora || []).length ? grade(k.agora, v.agora) : null, gosto: grade(k.gosto, v.gosto), quero: k.quero ? grade(k.quero, v.quero) : null };
         corpo.replaceChildren(...secoesDe(v, k).map((s) => secs[s]).filter(Boolean));
       };
       pintar();
@@ -170,7 +172,7 @@
     const pedir = (rota) => fetch(`${API.servidor}/api/${rota}`, { headers: { Authorization: 'Bearer ' + API.token } }).then((r) => r.json());
     const abas = h('div', { class: 'mr-abas mr-abas-ed', role: 'tablist' }), corpo = h('div', { class: 'col mr-ed' });
     let atual = ordemDe(m).includes(MU.abaVista) ? MU.abaVista : ordemDe(m)[0]; // (0.8.7) mudar algo não volta para a primeira aba
-    const cat = (c) => (m[c] = m[c] || { fav: null, gosto: [], quero: [] });
+    const cat = (c) => { m[c] = m[c] || { fav: null, gosto: [], quero: [] }; if (!Array.isArray(m[c].agora)) m[c].agora = []; if (!Array.isArray(m[c].quero)) m[c].quero = []; return m[c]; };
     const mudou = () => { aoMudar(); pintarAbas(); };
     // a nota e o comentário de um item
     const editarItem = (x, depois) => {
@@ -293,7 +295,8 @@
       return h('div', { class: 'col mr-busca' }, campo, res);
     };
     // (0.8.7) as abas na ordem da pessoa: segure e arraste uma para o lado para mudar a ordem (a primeira abre primeiro no perfil)
-    const pintarAbas = () => abas.replaceChildren(...ordemDe(m).map((c) => {
+    const pintarAbas = () => { const tinhaFoco = abas.contains(document.activeElement); pintarAbas0(); if (tinhaFoco) { const x = abas.querySelector('.mr-aba-ed.sel'); if (x) x.focus({ preventScroll: true }); } };
+    const pintarAbas0 = () => abas.replaceChildren(...ordemDe(m).map((c) => {
       const b = h('button', { type: 'button', role: 'tab', class: 'mr-aba-ed' + (c === atual ? ' sel' : '') + (MU.tem(m, c) ? ' tem' : ''), dados: { c }, 'aria-selected': String(c === atual), title: T('Clique para abrir · segure e arraste para mudar a ordem', 'Click to open · hold and drag to reorder') },
         h('span', { class: 'mr-aba-pega', 'aria-hidden': 'true' }), A.orbe(CATS[c].ic, 30), h('span', { class: 'mr-aba-nome' }, T(...CATS[c].nome)));
       b.addEventListener('pointerdown', (e) => {
@@ -357,6 +360,7 @@
       const secs = {
         fav: () => sec('fav', k.fav, [v.fav ? linhaItem(v.fav, null, 0, c, 'fav') : h('div', { class: 'suave peq mr-ed-vazia' }, T('Escolha um ou arraste um para cá (aparece em destaque).', 'Pick one or drag one here (shown highlighted).'))]),
         gosto: () => sec('gosto', k.gosto, v.gosto.length ? v.gosto.map((x, i) => linhaItem(x, v.gosto, i, c, 'gosto')) : [vazia()]),
+        agora: () => sec('agora', k.agora, v.agora.length ? v.agora.map((x, i) => linhaItem(x, v.agora, i, c, 'agora')) : [vazia()]),
         quero: () => sec('quero', k.quero, v.quero.length ? v.quero.map((x, i) => linhaItem(x, v.quero, i, c, 'quero')) : [vazia()]) };
       corpo.replaceChildren(...secoesDe(v, k).map((s) => secs[s]()));
     };

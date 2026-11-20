@@ -39,7 +39,7 @@
   const falta = (j) => (j.rest == null ? null : Math.max(0, j.rest - (Date.now() - (j._rx || Date.now()))));
 
   // ---------- mandar a minha atividade ----------
-  const chave = (x) => (x ? [x.n, x.d, x.s, x.li, x.lt, x.si, x.st, x.tp, x.vb, x.lk, x.o, (x.p || []).join('/')].join('\u0001') : '');
+  const chave = (x) => (x ? [x.n, x.d, x.s, x.li, x.lt, x.si, x.st, x.tp, x.vb, x.lk, x.o, (x.p || []).join('/'), (x.b || []).map((b) => b.l + '>' + b.u).join(' '), x.pj ? 1 : 0].join('\u0001') : '');
   const mandar = (jog) => { if (A.hub && A.hub.enviar) A.hub.enviar({ tipo: 'jogando', jog }); };
   const limpar = () => { if (meu || enviado) { meu = null; enviado = null; mandar(null); J.pintar(); } };
   async function olhar() {
@@ -62,6 +62,8 @@
     sumiuDesde = 0; clearTimeout(timerSumiu);
     const dados = { n: x.n, d: x.d || '', s: x.s || '', li: x.li || '', lt: x.lt || '', si: x.si || '', st: x.st || '', tp: x.tp || 0, o: x.o || 'jogo' };
     if (x.p) dados.p = x.p;
+    if (Array.isArray(x.b) && x.b.length) dados.b = x.b.slice(0, 2); // (1.0.2) os botões do jogo
+    if (x.pj) dados.pj = 1; // (1.0.2) a partida aceita gente entrando
     if (x.vb) dados.vb = String(x.vb).slice(0, 20);
     if (x.lk) dados.lk = x.lk;
     if (x.app) dados.app = x.app;
@@ -88,7 +90,8 @@
 
   // a linha das listas: 🎮 Jogando X (no lugar da música quando os dois estão ligados, como no Discord)
   J.linha = (cod) => { const el = h('div', { class: 'jog-linha', dados: { jogCod: cod || '' }, hidden: true }); preencherLinha(el); return el; };
-  function preencherLinha(el) {
+  function preencherLinha(el) { preencherLinha0(el); if (A.ui && A.ui.atvMais) A.ui.atvMais(el); } // (1.0.2) "+1" com várias atividades
+  function preencherLinha0(el) {
     const j = J.de(el.dataset.jogCod), k = j ? J.rotulo(j) + '|' + j.n : '';
     el.toggleAttribute('data-com-jogo', !!j); const pai = el.parentElement; if (pai) pai.classList.toggle('com-jogo', !!j);
     if (el.dataset.k === k) return;
@@ -141,6 +144,23 @@
         h('div', { class: 'jog-l jog-tempo', hidden: j.dt == null && j.rest == null }, A.icone('controle', 11), h('span', { class: 'jog-t' }, textoTempo(j)))));
   }
   J.corpo = corpo;
+  // (1.0.2) como no Discord: os botões que o jogo manda (abrem no navegador, perguntando antes) e "Pedir para entrar" quando a partida
+  // aceita gente entrando (manda a pergunta na conversa com a pessoa)
+  function botoes(j, cod) {
+    const eu = A.api && A.api.eu && cod === A.api.eu.codigo, l = [];
+    if (j.pj && cod && !eu) l.push(h('button', { type: 'button', class: 'jog-bt jog-bt-entrar', onclick: async (e) => {
+      e.stopPropagation(); const b = e.currentTarget; if (b.disabled || !A.talk) return; b.disabled = true;
+      try {
+        const c = await A.talk.abrirDM(cod), grupo = j.p ? ' (' + (j.s ? j.s + ', ' : '') + j.p[0] + T(' de ', ' of ') + j.p[1] + ')' : j.s ? ' (' + j.s + ')' : '';
+        await A.talk.enviar(c, { texto: T('🎮 Posso entrar na sua partida de ', '🎮 Can I join your ') + j.n + T('', ' game') + grupo + '?' });
+        A.som.tocar('enviar'); A.talk.irPara(c.id);
+      } catch (er) { U().toast(er.message, { tipo: 'erro' }); } finally { b.disabled = false; }
+    } }, A.icone('convidar', 14), T('Pedir para entrar', 'Ask to join')));
+    for (const x of j.b || []) { const u = linkOk(x.u); if (!u) continue; l.push(h('button', { type: 'button', class: 'jog-bt', title: u.hostname, onclick: async (e) => {
+      e.stopPropagation(); if (await U().confirmar(T('Abrir ', 'Open ') + u.hostname + T(' no navegador?', ' in the browser?'), { sim: T('Abrir', 'Open') })) U().abrirFora(u.href);
+    } }, x.l)); }
+    return l.length ? h('div', { class: 'jog-bts' }, ...l) : null;
+  }
 
   // o cartão do perfil: "Jogando", os ícones, o nome, os detalhes, o estado e o tempo
   J.cartao = (cod, opc = {}) => { const el = h('div', { class: 'jog-cartao' + (opc.mini ? ' mini' : ''), dados: { jogCartao: cod || '' }, hidden: true }); preencherCartao(el); setTimeout(J.pintar, 0); return el; };
@@ -150,6 +170,7 @@
       el.dataset.k = k; el.hidden = !j; el.textContent = '';
       if (!j) return;
       el.append(h('div', { class: 'jog-cab' }, J.rotulo(j), h('span', { class: 'jog-selo', title: j.o === 'sdk' || j.o === 'discord' ? T('Informado pelo jogo', 'Reported by the game') : null }, A.icone('controle', 13))), corpo(j));
+      const acoes = botoes(j, el.dataset.jogCartao); if (acoes) el.append(acoes);
     }
     if (j) { const t = el.querySelector('.jog-t'), tx = textoTempo(j); if (t && t.textContent !== tx) t.textContent = tx; }
   }

@@ -278,10 +278,16 @@
   // a vigia das partes protegidas (a mesma das integrações): a skin escondeu uma? volta ao clássico
   function vigiar() {
     clearInterval(tVigia); if (!caixaEstilo || !caixaEstilo.textContent || !A.integ || !A.integ.escondida) return;
+    // (1.0.2) com a janela escondida (abriu na bandeja, minimizada) ou no meio de uma animação, tudo parece "escondido": a skin só sai se
+    // a trava pegar duas vezes seguidas com a janela à vista (antes ela desligava sozinha ao reiniciar o app no Windows)
+    let suspeitas = 0;
     tVigia = setInterval(() => {
-      const susp = [...document.querySelectorAll('[data-protegido]')].filter(A.integ.escondida); if (!susp.length) return;
+      if (document.hidden || innerWidth < 120 || innerHeight < 120) { suspeitas = 0; return; }
+      const susp = [...document.querySelectorAll('[data-protegido]')].filter(A.integ.escondida); if (!susp.length) { suspeitas = 0; return; }
       caixaEstilo.disabled = true; const foi = susp.some((el) => !A.integ.escondida(el)); caixaEstilo.disabled = false;
-      if (foi) { A.log.aviso('skin desligada pela trava: ' + (S.atual && S.atual.manifesto.id)); S.usar(''); }
+      if (!foi) { suspeitas = 0; return; }
+      if (++suspeitas < 2) return;
+      A.log.aviso('skin desligada pela trava: ' + (S.atual && S.atual.manifesto.id)); S.usar('');
     }, 3000);
   }
   // usar uma skin (id) ou voltar ao clássico ('')
@@ -384,6 +390,8 @@
 
   // ---------- ao abrir o app ----------
   addEventListener('keydown', (e) => { if (e.ctrlKey && e.altKey && e.shiftKey && (e.key === 'S' || e.key === 's') && A.cfg.v.skin) S.classico(); }, true);
+  // (1.0.2) fechar o app normalmente (sair, reiniciar para atualizar) logo depois de abrir não conta como "a skin travou o app"
+  addEventListener('pagehide', () => { try { A.store.gravar('aer-testando', ''); } catch (_) { /* ok */ } });
   (async () => {
     try {
       const falhou = A.store.ler('aer-testando', '');

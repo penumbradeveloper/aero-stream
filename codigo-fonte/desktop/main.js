@@ -241,7 +241,20 @@ ipcMain.on('cofre-local', (e, op, v) => {
 });
 
 const nomeSO = { win32: 'Windows', darwin: 'macOS', linux: 'Linux' }[process.platform] || process.platform;
-handle('info', () => ({ maquina: os.hostname(), so: nomeSO, versao: atualizador.versaoRodando(), portal: usaPortal, flagsId: idFlags, gpuModo: modoGpu, electron: process.versions.electron }));
+// (1.0.2) qual Windows ou qual distro (o ícone ao lado do nome, se a pessoa deixar aparecer)
+const versaoSO = (() => {
+  try {
+    if (process.platform === 'win32') { const [ma, mi, b] = os.release().split('.').map(Number); return ma >= 10 ? (b >= 22000 ? 'win11' : 'win10') : ma === 6 && mi >= 2 ? 'win8' : ma === 6 && mi === 1 ? 'win7' : 'winxp'; }
+    if (process.platform === 'darwin') return 'macos';
+    if (process.platform === 'linux') {
+      const t = require('fs').readFileSync('/etc/os-release', 'utf8'), v = (k) => ((t.match(new RegExp('^' + k + '="?([^"\\n]*)', 'm')) || [])[1] || '').toLowerCase();
+      const id = v('ID'), like = v('ID_LIKE');
+      return id.replace(/[^a-z0-9]/g, '').slice(0, 14) + (like ? ':' + like.split(/\s+/)[0].replace(/[^a-z0-9]/g, '').slice(0, 14) : '');
+    }
+  } catch (_) { /* sem ícone */ }
+  return '';
+})();
+handle('info', () => ({ maquina: os.hostname(), so: nomeSO, sov: versaoSO, versao: atualizador.versaoRodando(), portal: usaPortal, flagsId: idFlags, gpuModo: modoGpu, electron: process.versions.electron }));
 handle('ocioso', () => powerMonitor.getSystemIdleTime());
 handle('convite-inicial', () => { const s = conviteInicial; conviteInicial = null; return s; });
 // (1.0.0) skins: um arquivo .aer aberto pelo sistema (duplo clique, "Abrir com"). Só o caminho de um .aer de verdade, até 30 MB; quem confere
@@ -335,7 +348,7 @@ handle('musica-achar', async (o) => {
 // liga sozinho enquanto a tela é compartilhada (sem isso nenhuma mensagem aparecia enquanto você transmitia). Clicar abre a conversa
 // (0.8.6) a notificação mostra a foto e o nome de quem mandou (como no Discord), some sozinha depois de alguns segundos e cada mensagem é
 // uma notificação nova. As notificações ficam guardadas aqui enquanto aparecem: sem isso o sistema podia descartar as seguintes
-const notifVivas = new Set(), fotosNotif = new Map();
+const notifVivas = new Set(), fotosNotif = new Map(), notifGrupo = new Map();
 async function fotoNotif(url) {
   // (1.0.0) a página já manda a foto pronta em PNG (o sistema não abre WebP/GIF)
   if (typeof url === 'string' && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(url) && url.length < 400000) { try { const img = nativeImage.createFromDataURL(url); return img.isEmpty() ? null : img; } catch (e) { return null; } }
@@ -359,7 +372,11 @@ handle('notificar', async (o) => {
     const { Notification } = require('electron');
     if (!Notification.isSupported() || !o) return false;
     const icone = (await fotoNotif(o.icone)) || path.join(__dirname, 'build', 'icon.png');
+    // (1.0.2) com "grupo" (as pessoas escolhidas no não perturbe do Linux): um aviso só por pessoa; o anterior sai antes do novo
+    const grupo = typeof o.grupo === 'string' ? o.grupo.slice(0, 40) : '';
+    if (grupo && notifGrupo.has(grupo)) { try { notifGrupo.get(grupo).close(); } catch (e) { /* ok */ } notifGrupo.delete(grupo); }
     const n = new Notification({ title: String(o.titulo || 'Aero').slice(0, 80), body: String(o.texto || '').slice(0, 200), silent: true, icon: icone, urgency: o.urgente && process.platform === 'linux' ? 'critical' : 'normal', timeoutType: 'default' });
+    if (grupo) { notifGrupo.set(grupo, n); n.on('close', () => { if (notifGrupo.get(grupo) === n) notifGrupo.delete(grupo); }); }
     notifVivas.add(n); const solta = () => notifVivas.delete(n); setTimeout(solta, 60000);
     n.on('close', solta);
     n.on('click', () => { solta(); mostrarJanela(); try { if (janela && !janela.isDestroyed()) janela.webContents.send('notificacao-clique', String(o.cid || '')); } catch (e) { /* ok */ } });
@@ -990,7 +1007,19 @@ function criarJanela() {
     if (pref === 'bandeja') esconderNaBandeja(); else janela.webContents.send('perguntar-fechar');
   });
   // links (Ko-fi, X, GitHub, Spotify...) abrem no navegador padrão do sistema; só https, e nunca dentro do app
-  janela.webContents.setWindowOpenHandler(({ url }) => { if (/^https:\/\/[^\s]+$/i.test(url)) shell.openExternal(url).catch(() => {}); return { action: 'deny' }; });
+  janela.webContents.setWindowOpenHandler(({ url, frameName }) => {
+    // (1.0.2) a janela separada do próprio Aero (uma conversa com a chamada): em branco, do mesmo app, sem menu e sem navegar para fora
+    if (url === 'about:blank' && /^aero-sep-[\w-]{1,40}$/.test(frameName || '')) {
+      return { action: 'allow', overrideBrowserWindowOptions: { width: 560, height: 780, minWidth: 360, minHeight: 420, autoHideMenuBar: true, backgroundColor: '#0f2433', icon: [path.join(__dirname, 'build', 'icon.png'), path.join(__dirname, 'build', 'icon.ico')].find((p) => fs.existsSync(p)), title: 'Aero' } };
+    }
+    if (/^https:\/\/[^\s]+$/i.test(url)) shell.openExternal(url).catch(() => {}); return { action: 'deny' };
+  });
+  // (1.0.2) a janela separada também não navega nem abre outras
+  janela.webContents.on('did-create-window', (filha) => {
+    filha.setMenuBarVisibility(false);
+    filha.webContents.on('will-navigate', (e) => e.preventDefault());
+    filha.webContents.setWindowOpenHandler(({ url }) => { if (/^https:\/\/[^\s]+$/i.test(url)) shell.openExternal(url).catch(() => {}); return { action: 'deny' }; });
+  });
   janela.webContents.on('will-navigate', (e) => e.preventDefault());
   // F11 tela cheia, F12 ferramentas de desenvolvedor (para ajudar a achar problemas)
   janela.webContents.on('before-input-event', (ev, i) => {

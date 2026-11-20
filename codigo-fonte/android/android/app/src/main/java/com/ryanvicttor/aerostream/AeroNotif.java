@@ -15,6 +15,15 @@ import android.graphics.Paint;
 import android.graphics.Shader;
 import android.content.pm.ActivityInfo;
 import android.net.Uri;
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.media.MediaScannerConnection;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.util.Base64;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import android.os.Build;
 import android.view.Window;
 import android.view.WindowManager;
@@ -283,5 +292,45 @@ public class AeroNotif extends Plugin {
                 .setAutoCancel(true);
             nm.notify(RESUMO, r.build());
         }
+    }
+
+    // (1.0.2) baixar foto, vídeo ou anexo no celular: o WebView do Android ignora o "download" dos links, então a interface manda o
+    // arquivo para cá. Foto vai para Imagens/Aero, vídeo para Filmes/Aero (aparecem na galeria) e o resto para Downloads/Aero
+    @PluginMethod
+    public void salvarArquivo(PluginCall call) {
+        final String nome0 = call.getString("nome", "arquivo"), mime0 = call.getString("mime", "application/octet-stream"), b64 = call.getString("dados", "");
+        final String nome = (nome0 == null || nome0.isEmpty() ? "arquivo" : nome0).replaceAll("[\\\\/:*?\"<>|\\x00-\\x1f]", "_");
+        final String mime = mime0 == null || mime0.isEmpty() ? "application/octet-stream" : mime0;
+        if (Build.VERSION.SDK_INT < 29 && ContextCompat.checkSelfPermission(getContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            if (getActivity() != null) ActivityCompat.requestPermissions(getActivity(), new String[] { Manifest.permission.WRITE_EXTERNAL_STORAGE }, 4242);
+            call.reject("permissao"); return;
+        }
+        new Thread(() -> {
+            try {
+                byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+                boolean foto = mime.startsWith("image/"), video = mime.startsWith("video/");
+                if (Build.VERSION.SDK_INT >= 29) {
+                    ContentResolver r = getContext().getContentResolver();
+                    ContentValues v = new ContentValues();
+                    v.put(MediaStore.MediaColumns.DISPLAY_NAME, nome);
+                    v.put(MediaStore.MediaColumns.MIME_TYPE, mime);
+                    v.put(MediaStore.MediaColumns.RELATIVE_PATH, (foto ? Environment.DIRECTORY_PICTURES : video ? Environment.DIRECTORY_MOVIES : Environment.DIRECTORY_DOWNLOADS) + "/Aero");
+                    v.put(MediaStore.MediaColumns.IS_PENDING, 1);
+                    Uri onde = foto ? MediaStore.Images.Media.EXTERNAL_CONTENT_URI : video ? MediaStore.Video.Media.EXTERNAL_CONTENT_URI : MediaStore.Downloads.EXTERNAL_CONTENT_URI;
+                    Uri uri = r.insert(onde, v);
+                    if (uri == null) throw new Exception("sem lugar");
+                    try (OutputStream o = r.openOutputStream(uri)) { if (o == null) throw new Exception("sem lugar"); o.write(bytes); }
+                    v.clear(); v.put(MediaStore.MediaColumns.IS_PENDING, 0); r.update(uri, v, null, null);
+                } else {
+                    File dir = new File(Environment.getExternalStoragePublicDirectory(foto ? Environment.DIRECTORY_PICTURES : video ? Environment.DIRECTORY_MOVIES : Environment.DIRECTORY_DOWNLOADS), "Aero");
+                    if (!dir.exists()) dir.mkdirs();
+                    File f = new File(dir, nome); int n = 1; String base = nome.contains(".") ? nome.substring(0, nome.lastIndexOf('.')) : nome, ext = nome.contains(".") ? nome.substring(nome.lastIndexOf('.')) : "";
+                    while (f.exists()) f = new File(dir, base + " (" + (n++) + ")" + ext);
+                    try (FileOutputStream o = new FileOutputStream(f)) { o.write(bytes); }
+                    MediaScannerConnection.scanFile(getContext(), new String[] { f.getAbsolutePath() }, new String[] { mime }, null);
+                }
+                call.resolve();
+            } catch (Exception e) { call.reject(String.valueOf(e.getMessage())); }
+        }).start();
     }
 }

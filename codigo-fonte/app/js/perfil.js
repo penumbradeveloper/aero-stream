@@ -918,6 +918,50 @@
     } catch (e) { U.toast(e.message, { tipo: 'erro' }); return false; }
   };
 
+  // ---------- (1.0.2) compartilhar o perfil: um link (e o QR dele) que abre o perfil no Aero ----------
+  P.linkDe = (p) => 'https://web.aerostream.workers.dev/app/?perfil=' + encodeURIComponent(p.codigo);
+  P.compartilhar = (p) => {
+    const U = A.ui, link = P.linkDe(p), nome = p.apelido || p.nome;
+    const texto = T('Me encontre no Aero: ', 'Find me on Aero: ') + (p.tag ? '#' + p.tag + ' ' : '');
+    const qr = A.qr ? A.qr(link, 190) : null; if (qr) qr.classList.add('perfil-qr');
+    const campo = h('input', { class: 'campo', value: link, readonly: true, onfocus: (e) => e.target.select() });
+    const botoes = h('div', { class: 'linha', estilo: { gap: '8px', 'flex-wrap': 'wrap', 'justify-content': 'center' } },
+      U.btn(T('Copiar link', 'Copy link'), { icone: 'copiar', onclick: () => U.copiar(link) }),
+      p.tag ? U.btn(T('Copiar #', 'Copy #') + p.tag, { icone: 'copiar', tipo: 'sec', onclick: () => U.copiar('#' + p.tag) }) : null,
+      navigator.share ? U.btn(T('Enviar...', 'Send...'), { icone: 'enviar', tipo: 'sec', onclick: () => navigator.share({ title: nome, text: texto, url: link }).catch(() => {}) }) : null);
+    U.modal(T('Compartilhar o perfil', 'Share profile'), h('div', { class: 'col perfil-compartilhar', estilo: { gap: '12px', 'align-items': 'center' } },
+      h('p', { class: 'peq suave', estilo: { margin: 0, 'text-align': 'center' } }, T('Quem abrir o link (ou ler o QR com a câmera) cai direto no perfil de ', 'Whoever opens the link (or scans the QR) lands right on the profile of ') + nome + '.'),
+      qr, campo, botoes), { largura: 400 });
+  };
+  { // abriu o Aero por um link de perfil
+    const cod = new URLSearchParams(location.search).get('perfil');
+    if (cod && /^[\w-]{1,32}$/.test(cod)) { try { history.replaceState(null, '', location.pathname); } catch (_) { /* ok */ } const tira = A.evt.on('hub:conectou', () => { tira(); setTimeout(() => P.ver(cod), 900); }); }
+  }
+
+  // ---------- (1.0.2) perfil exclusivo: a bio e as cores que só um amigo vê ----------
+  P.editarExclusivo = (p) => {
+    const U = A.ui, x = p.meuExc || {}, eu = API.eu || {};
+    const bio = h('textarea', { class: 'campo', rows: 4, maxlength: 190, placeholder: T('A bio que só ', 'The bio only ') + (p.apelido || p.nome) + T(' vê', ' sees') }); bio.value = x.bio || '';
+    const cor = (k, pad) => h('input', { type: 'color', class: 'perfil-cor', value: x[k] || pad, 'aria-label': k === 'cor1' ? T('Cor principal', 'Main color') : T('Segunda cor', 'Second color') });
+    const c1 = cor('cor1', eu.cor1 || '#2d9ee0'), c2 = cor('cor2', eu.cor2 || '#7fd3ff');
+    const usarCores = U.chave(!!(x.cor1 || x.cor2), (v) => { coresL.classList.toggle('apagado', !v); });
+    const coresL = h('div', { class: 'linha' + (x.cor1 || x.cor2 ? '' : ' apagado'), estilo: { gap: '10px' } }, c1, c2);
+    const salvar = async (apagar) => {
+      try {
+        P.esquecer(p.codigo);
+        const d = await API.req('perfil/exclusivo', apagar ? { codigo: p.codigo, apagar: true } : { codigo: p.codigo, bio: bio.value, ...(usarCores.checked !== false && !coresL.classList.contains('apagado') ? { cor1: c1.value, cor2: c2.value } : {}) });
+        p.meuExc = d.meuExc || undefined; A.som.tocar('sucesso'); m.fechar();
+        U.toast(apagar ? T('Agora ela vê o seu perfil público.', 'They now see your public profile.') : T('Pronto: só ela vê esse perfil.', 'Done: only they see this profile.'), { tipo: 'ok', ms: 2600 });
+      } catch (e) { U.toast(e.message, { tipo: 'erro' }); }
+    };
+    const m = U.modal(T('Perfil para ', 'Profile for ') + (p.apelido || p.nome), h('div', { class: 'col', estilo: { gap: '10px' } },
+      h('p', { class: 'peq suave', estilo: { margin: 0 } }, T('Ela vê o seu perfil com esta bio e estas cores, e pode trocar para o público quando quiser. O resto do perfil continua igual.', 'They see your profile with this bio and colors, and can switch to the public one anytime. The rest stays the same.')),
+      bio, h('div', { class: 'opcao curta' }, h('div', { class: 'cresce' }, T('Cores só para ela', 'Colors just for them')), usarCores), coresL), {
+      largura: 420,
+      acoes: [...(p.meuExc ? [{ texto: T('Apagar', 'Delete'), tipo: 'perigo', onclick: () => salvar(true) }] : []), { texto: T('Salvar', 'Save'), onclick: () => salvar(false) }],
+    });
+  };
+
   // ---------- ver o perfil de alguém ----------
   P.ver = async (codigo) => {
     const U = A.ui;
@@ -953,13 +997,16 @@
     // (0.8.6) offline: há quanto tempo a pessoa esteve online (se as duas deixam)
     const vistoTx = !souEu && p.visto ? (!H.online(codigo) ? A.ui.vistoHa(p.visto) : p.vm === 'atividade' && Date.now() - p.visto > 600000 ? A.ui.ativoHa(p.visto) : '') : '';
     if (souEu) acoes.append(U.btn(T('Editar perfil', 'Edit profile'), { icone: 'lapis', onclick: ir(() => P.editar()) }));
+    acoes.append(U.btn('', { icone: 'link', tipo: 'sec', redondo: true, titulo: T('Compartilhar o perfil', 'Share profile'), onclick: () => P.compartilhar(p) })); // (1.0.2)
     const extras = h('div', { class: 'col', estilo: { gap: '10px', 'margin-top': '12px' } });
     if (vistoTx) extras.append(h('div', { class: 'perfil-visto peq suave' }, A.icone('relogio', 14), vistoTx));
+    if (!souEu && A.aparelhos) extras.append(A.aparelhos.vivo(codigo, { rotulo: true, tam: 15 })); // (1.0.2) os aparelhos conectados agora
     if (amigoOk) {
       extras.append(h('div', { class: 'linha' }, apelido, U.btn(T('Salvar', 'Save'), { peq: true, tipo: 'sec', onclick: async () => { try { P.esquecer(codigo); await API.req('apelido', { codigo, apelido: apelido.value }); U.toast(T('Apelido salvo.', 'Nickname saved.'), { tipo: 'ok', ms: 2000 }); A.talk && A.talk.carregar().catch(() => {}); } catch (e) { U.toast(e.message, { tipo: 'erro' }); } } })));
       if (a) extras.append(h('div', { class: 'opcao curta' }, h('div', { class: 'cresce' }, T('Entra na minha tela sem pedir', 'Joins my screen without asking')), U.chave(a.confia, (v) => API.amigos.confianca(codigo, v).catch((e) => U.toast(e.message, { tipo: 'erro' })))));
       // (0.6.0) avisar quando ESTA pessoa ficar online (o aviso deixou de ser para todo mundo)
       extras.append(h('div', { class: 'opcao curta' }, h('div', { class: 'cresce' }, T('Avisar quando ficar online', 'Notify me when they come online')), U.chave(!!p.avisarOnline, (v) => { P.esquecer(codigo); API.req('amigos/avisar-online', { codigo, sim: v }).catch((e) => U.toast(e.message, { tipo: 'erro' })); })));
+      extras.append(h('div', { class: 'opcao curta' }, h('div', { class: 'cresce' }, h('div', {}, T('Perfil só para esta pessoa', 'Profile just for this person')), h('small', { class: 'suave' }, p.meuExc ? T('Ela vê a bio e as cores que você fez para ela.', 'They see the bio and colors you made for them.') : T('Uma bio e cores que só ela vê (Supporter).', 'A bio and colors only they see (Supporter).'))), U.btn(p.meuExc ? T('Editar', 'Edit') : T('Criar', 'Create'), { peq: true, tipo: 'sec', icone: 'lapis', onclick: () => P.editarExclusivo(p) }))); // (1.0.2)
       extras.append(h('div', { class: 'linha', estilo: { 'justify-content': 'flex-end' } }, U.btn(T('Remover amigo', 'Remove friend'), { tipo: 'perigo', peq: true, onclick: async () => { if (await U.confirmar(T('Remover ', 'Remove ') + p.nome + '?', { perigo: true })) { await API.amigos.remover(codigo).catch((e) => U.toast(e.message, { tipo: 'erro' })); m.fechar(); } } })));
     }
     if (!souEu) extras.append(h('div', { class: 'linha', estilo: { 'justify-content': 'center' } }, U.btn(T('Bloquear', 'Block'), { icone: 'bloquear', tipo: 'link', peq: true, onclick: async () => { if (await P.bloquear(p, true)) m.fechar(); } }), U.btn(T('Denunciar', 'Report'), { icone: 'bandeira', tipo: 'link', peq: true, onclick: () => { m.fechar(); A.admin && A.admin.denunciar(p); } })));
@@ -967,7 +1014,12 @@
     const comMural = A.mural && ['esquerda', 'direita', 'cima', 'baixo'].includes(p.ml), deLado = comMural && (p.ml === 'esquerda' || p.ml === 'direita');
     const opCartao = { verFotos: true, souEu: souEu ? () => { m.fechar(); P.editar(); } : null }, larg0 = Math.max(480, P.arranjoDe(p).w + 40);
     const montar = (q) => (A.mural ? A.mural.juntar(cartao(q, opCartao), q) : cartao(q, opCartao));
-    m = U.modal(null, [montar(p), A.jogando ? A.jogando.cartao(codigo) : null, A.assistindo ? A.assistindo.cartao(codigo) : null, A.ouvindo ? A.ouvindo.cartao(codigo) : null, acoes, extras], { largura: larg0 + (deLado ? 470 : 0), classe: 'perfil-modal perfil-ver', som: ['perfil-abrir', 'perfil-fechar'], aoFechar: () => { P.pararPrevia(); removeEventListener('resize', aoMudar); } }); // fechou o perfil: a música para
+    // (1.0.2) o amigo fez um perfil só para você: abre nele, e dá para ver o público
+    const mesclar = (q) => (q.exc ? { ...q, bio: q.exc.bio || q.bio, cor1: q.exc.cor1 || q.cor1, cor2: q.exc.cor2 || q.cor2 } : q);
+    let cartaoEl = montar(mesclar(p));
+    const trocaExc = p.exc ? U.seg([['exc', T('Feito para você', 'Made for you')], ['pub', T('Público', 'Public')]], 'exc', (v) => { const novo = montar(v === 'exc' ? mesclar(p) : p); cartaoEl.replaceWith(novo); cartaoEl = novo; requestAnimationFrame(() => { caberLargura(); caberMural(); vigiar(); }); }) : null;
+    if (trocaExc) trocaExc.classList.add('perfil-troca-exc');
+    m = U.modal(null, [trocaExc, cartaoEl, A.jogando ? A.jogando.cartao(codigo) : null, A.assistindo ? A.assistindo.cartao(codigo) : null, A.ouvindo ? A.ouvindo.cartao(codigo) : null, acoes, extras], { largura: larg0 + (deLado ? 470 : 0), classe: 'perfil-modal perfil-ver', som: ['perfil-abrir', 'perfil-fechar'], aoFechar: () => { P.pararPrevia(); removeEventListener('resize', aoMudar); } }); // fechou o perfil: a música para
     // (0.8.7) a janela nunca passa da tela: o Mural (em cima ou embaixo) usa todo o espaço que sobra e rola por dentro, os botões ficam
     // à vista
     let ro = null;
@@ -1003,6 +1055,7 @@
     if (miniAberto) { const mesma = miniAberto.codigo === codigo; miniAberto(); if (mesma) return; }
     let p; try { p = await P.buscar(codigo); } catch (e) { U.toast(e.message, { tipo: 'erro' }); return; }
     const eu = API.eu || {}, souEu = codigo === eu.codigo;
+    if (p.exc) p = { ...p, bio: p.exc.bio || p.bio, cor1: p.exc.cor1 || p.cor1, cor2: p.exc.cor2 || p.cor2 }; // (1.0.2) o perfil que o amigo fez só para você
     const c1 = p.cor1 || '#2d9ee0', c2 = p.cor2 || p.cor1 || '#7fd3ff', banner = urlBanner(p.codigo, p.bannerV);
     const ds = H.dispositivosDe ? H.dispositivosDe(codigo) : [];
     const sala = null, on = souEu || ds.length > 0; // (0.9.6) sem salas: a tela é só nas chamadas
@@ -1019,7 +1072,7 @@
       h('button', { type: 'button', class: 'mini-av', title: T('Ver o perfil completo', 'View full profile'), onclick: verCompleto }, av),
       h('div', { class: 'mini-corpo' },
         h('button', { type: 'button', class: 'mini-nome', onclick: verCompleto }, A.ui.aplicarNome(h('span', {}, p.apelido || p.nome), p.nm), p.apelido ? h('small', { class: 'suave' }, ' (' + p.nome + ')') : null),
-        h('div', { class: 'mini-tag' }, p.tag ? '#' + p.tag : '', ' ', U.insignias && !(p.pf && p.pf.si === false) ? U.insignias(p.ins, p.sl, p.pf && p.pf.so) : null),
+        h('div', { class: 'mini-tag' }, p.tag ? '#' + p.tag : '', ' ', A.aparelhos ? A.aparelhos.vivo(codigo) : null, !souEu && A.idiomas ? A.idiomas.relogio(p.fz) : null, ' ', U.insignias && !(p.pf && p.pf.si === false) ? U.insignias(p.ins, p.sl, p.pf && p.pf.so) : null),
         // (0.7.9) não existe imagem da sala aqui: mandar a tela de alguém para quem só abriu o perfil vazaria o que ela mostra só para quem está na sala
         sala ? h('div', { class: 'mini-sala' + (sala.comp ? ' ao-vivo' : '') },
           h('div', { class: 'mini-sala-info' }, h('span', { class: 'mini-sala-ic' }, A.icone(sala.comp ? 'tela' : 'olho', 20)), h('div', { class: 'cresce' }, h('b', {}, onde), sala.comp ? h('span', { class: 'mini-sala-vivo' }, T('AO VIVO', 'LIVE')) : h('small', {}, T('Está na sala, sem transmitir', 'In the room, not sharing')))),

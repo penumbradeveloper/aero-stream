@@ -8,6 +8,7 @@ const destino = join(raiz, 'site-dist');
 rmSync(destino, { recursive: true, force: true });
 mkdirSync(destino, { recursive: true });
 cpSync(join(raiz, 'site'), destino, { recursive: true });
+for (const f of ['worker.js', 'wrangler.jsonc']) rmSync(join(destino, f), { force: true }); // (1.0.2) o código do worker e a config não viram arquivos do site
 cpSync(join(raiz, 'app'), join(destino, 'app'), { recursive: true });
 await (await import('./minificar.mjs')).minificar(join(destino, 'app'), raiz);
 for (const f of ['icon.svg', 'icon-512.png', 'icon-180.png']) cpSync(join(raiz, 'app', f), join(destino, f));

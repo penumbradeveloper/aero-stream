@@ -313,7 +313,9 @@
     s.setProperty('--cx-av', (fotos[ch.foto] || 34) + 'px');
     root.dataset.cxFotos = ch.foto === 'nao' ? '0' : '1';
     // (0.9.1) o lado das suas mensagens: o escolhido em Configurações > Chats; sem escolha, à direita no celular e à esquerda no computador
-    root.dataset.cxlado = ch.lado === 'direita' || ch.lado === 'esquerda' ? ch.lado : A.plat.celular ? 'direita' : 'esquerda';
+    root.dataset.cxlado = ['direita', 'esquerda', 'todasdir', 'invertido'].includes(ch.lado) ? ch.lado : A.plat.celular ? 'direita' : 'esquerda';
+    // (1.0.2) quem mostra o nome e a foto nas mensagens: todos, só o seu, só o dos outros ou ninguém (sem escolha: como o lado manda)
+    for (const [k, d] of [['nomes', 'cxnome'], ['fotosLado', 'cxav']]) { if (['todos', 'meu', 'outros', 'nenhum'].includes(ch[k])) root.dataset[d] = ch[k]; else delete root.dataset[d]; }
     const img = document.getElementById('fundo-img');
     if (img) {
       const url = t.fundoTipo === 'imagem' ? `url("${animUrl(t, t.imagemAnim, t.imagem) || t.imagem}")` : 'none';

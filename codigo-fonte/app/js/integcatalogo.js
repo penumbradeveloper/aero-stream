@@ -13,7 +13,7 @@
   const CHAVE = 'aero.integCatalogo';
 
   // os módulos nativos que este app sabe fazer funcionar
-  C.MODULOS = new Set(['musica', 'celmic', 'gunslol', 'assistindo', 'traducao', 'dicionario', 'horario', 'cartoes']);
+  C.MODULOS = new Set(['musica', 'celmic', 'gunslol', 'assistindo', 'traducao', 'dicionario', 'horario']);
   const TIPOS = ['nativa', 'link', 'janela'], CATS = ['conversa', 'widget'], PLATS = ['pc', 'web', 'celular'], LUGARES = ['chamada'], BLOCOS = ['titulo', 'texto', 'lista', 'link'];
 
   // ---------- a conferência (a mesma do servidor; aqui a entrada errada só fica de fora) ----------

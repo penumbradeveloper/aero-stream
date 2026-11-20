@@ -1369,7 +1369,7 @@
         const soGif = urls.length === 1 && so === urls[0] && (ehGif(so) || ehPaginaKlipy(so)), soFig = /^<fig:[A-Z0-9]{6}:[0-9a-f]{10}>$/i.test(so);
         const soDiscord = urls.length === 1 && so === urls[0] && !!tipoDiscord(so); // (0.6.9) só o link de um anexo do Discord: vira a mídia, sem o texto
         const ehAero = (u) => !!(o.ehLinkMidia && o.ehLinkMidia(u)), soAero = urls.length === 1 && so === urls[0] && ehAero(so); // (0.8.3) link de mídia do Aero
-        const soEmbed = urls.length === 1 && so === urls[0] && (!!idYoutube(so) || !!idTweet(so) || !!(A.perfil && A.perfil.codigoDoLink && A.perfil.codigoDoLink(so)) || (integOn('cartoes') && (ehSpotify(so) || ehReddit(so) || ehLoja(so)))); // (0.9.6) só o link do YouTube/X: fica só o cartão (o link vai no botão direito)
+        const soEmbed = urls.length === 1 && so === urls[0] && (!!idYoutube(so) || !!idTweet(so) || !!(A.perfil && A.perfil.codigoDoLink && A.perfil.codigoDoLink(so)) || ehSpotify(so) || ehReddit(so) || ehLoja(so)); // (0.9.6) só o link do YouTube/X: fica só o cartão (o link vai no botão direito)
         if (soGif) partes.push(ehPaginaKlipy(so) ? gifDePagina(so, m) : midiaGif(so));
         else if (!soDiscord && !soAero && !soEmbed) partes.push(h('div', { class: 'cx-txt' + (soFig ? ' so-figurinha' : '') }, ...comLinks(m.texto, o)));
         if (!soGif && !soDiscord && !soAero && !soEmbed && !soFig && A.idiomas && integOn('traducao')) { const tr = A.idiomas.bloco(m, o.ehMeu(m)); if (tr) partes.push(tr); } // (1.0.2) a tradução embaixo do texto
@@ -1379,9 +1379,9 @@
           if (A.perfil && A.perfil.codigoDoLink && A.perfil.codigoDoLink(u)) { partes.push(A.perfil.cartaoLink(A.perfil.codigoDoLink(u), { menu: menuLink(u, T('Perfil', 'Profile'), () => itensMsg(m)) })); continue; } // (1.0.0) o cartão do perfil
           const yt = idYoutube(u); if (yt) { partes.push(embedYoutube(yt, u, () => itensMsg(m))); continue; }
           if (idTweet(u)) { partes.push(embedTweet(u, grudar, soEmbed, () => itensMsg(m))); continue; }
-          if (integOn('cartoes') && ehReddit(u)) { partes.push(embedReddit(u, grudar, soEmbed, () => itensMsg(m))); continue; } // (1.0.2)
-          if (integOn('cartoes') && ehLoja(u) && A.embeds) { partes.push(A.embeds.loja(u, { dados: dadosEmbed, menu: menuLink(u, T('Loja', 'Store'), () => itensMsg(m)), grudar, soLink: soEmbed })); continue; } // (1.0.2) preço, imposto, fotos e avaliações
-          if (integOn('cartoes') && ehSpotify(u) && A.embeds) { partes.push(A.embeds.spotify(u, { dados: dadosEmbed, menu: menuLink(u, 'Spotify', () => itensMsg(m)), grudar })); continue; } // (1.0.2) com o trecho para ouvir
+          if (ehReddit(u)) { partes.push(embedReddit(u, grudar, soEmbed, () => itensMsg(m))); continue; } // (1.0.2)
+          if (ehLoja(u) && A.embeds) { partes.push(A.embeds.loja(u, { dados: dadosEmbed, menu: menuLink(u, T('Loja', 'Store'), () => itensMsg(m)), grudar, soLink: soEmbed })); continue; } // (1.0.2) preço, imposto, fotos e avaliações
+          if (ehSpotify(u) && A.embeds) { partes.push(A.embeds.spotify(u, { dados: dadosEmbed, menu: menuLink(u, 'Spotify', () => itensMsg(m)), grudar })); continue; } // (1.0.2) com o trecho para ouvir
           if (!soGif && ehGif(u)) { partes.push(midiaGif(u)); continue; }
           if (!soGif && ehPaginaKlipy(u)) { partes.push(gifDePagina(u, m)); continue; }
           const td = tipoDiscord(u); if (td) { partes.push(midiaDiscord(u, td, m)); continue; }

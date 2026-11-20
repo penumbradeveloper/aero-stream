@@ -153,9 +153,32 @@
   // ---------- a seção em Configurações > Aparência: 3 cartões que se arrastam de lado ----------
   const corDe = (v) => { const t = (v && v.tema) || {}; const c = t.cor || '#2d9ee0', f = (t.fundoCores || []).filter(Boolean); return { c, f1: f[0] || (t.escuro ? '#0d1a26' : '#cfe8f7'), f2: f[1] || c, escuro: !!t.escuro }; };
   ES.secao = () => {
+    // (1.0.0) um carrossel de verdade: sem barra de rolagem, com setas e bolinhas; arrastar (mouse ou dedo) encaixa no cartão mais perto.
+    // Passar pelos cartões só mostra: o estilo só troca no "Usar". Cabendo os 3, ficam os 3 lado a lado
     const faixa = h('div', { class: 'estv-faixa', role: 'listbox', 'aria-label': T('Seus estilos', 'Your styles') });
+    const janela = h('div', { class: 'estv-janela', tabindex: '0' }, faixa);
     const pontos = h('div', { class: 'estv-pts' });
-    const caixa = h('div', { class: 'est-caixa' }, h('p', { class: 'peq suave', estilo: { margin: '0 0 10px' } }, T('Guarde até 3 jeitos do app inteiro (cores, fundo, barra, chats, ícone, skin) e troque arrastando de lado em qualquer espaço vazio do app (ou este cartão), com Ctrl+Alt+← / →, ou com dois dedos de lado no celular. Só o estilo em uso fica rodando.', 'Keep up to 3 looks for the whole app (colors, background, bar, chats, icon, skin) and switch by dragging sideways on any empty spot of the app (or this card), with Ctrl+Alt+← / →, or two fingers sideways on the phone. Only the style in use runs.')), faixa, pontos);
+    let idx = 0, todas = false;
+    const seta = (lado) => h('button', { type: 'button', class: 'estv-seta ' + lado, 'aria-label': lado === 'esq' ? T('Anterior', 'Previous') : T('Próximo', 'Next'), onclick: () => ir(idx + (lado === 'esq' ? -1 : 1)) }, A.icone('chevron', 18));
+    const sEsq = seta('esq'), sDir = seta('dir');
+    const carrossel = h('div', { class: 'estv-carrossel' }, sEsq, janela, sDir);
+    const centro = (i) => { const c = faixa.children[i]; return c ? janela.clientWidth / 2 - (c.offsetLeft + c.offsetWidth / 2) : 0; };
+    const posicionar = (anim = true, dx = 0) => {
+      faixa.classList.toggle('sem-anim', !anim);
+      faixa.style.transform = todas ? '' : `translateX(${Math.round(centro(idx) + dx)}px)`;
+      sEsq.disabled = todas || idx <= 0; sDir.disabled = todas || idx >= faixa.children.length - 1;
+      pontos.querySelectorAll('.estv-pt').forEach((p, i) => p.classList.toggle('foco', i === idx));
+      [...faixa.children].forEach((c, i) => c.classList.toggle('perto', todas || i === idx));
+    };
+    const ir = (i) => { const n = faixa.children.length; if (!n) return; const novo = Math.max(0, Math.min(n - 1, i)); if (novo !== idx) A.som.tocar('click'); idx = novo; posicionar(true); };
+    const medir = () => {
+      const n = faixa.children.length;
+      todas = n > 0 && janela.clientWidth >= n * 220 + (n - 1) * 12; // os 3 cabem com folga
+      carrossel.classList.toggle('todas', todas); carrossel.classList.toggle('estreito', carrossel.clientWidth < 420); posicionar(false);
+    };
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(() => { if (!caixa.isConnected) return; medir(); }) : null; if (ro) { ro.observe(janela); ro.observe(carrossel); }
+    const caixa = h('div', { class: 'est-caixa' }, h('p', { class: 'peq suave', estilo: { margin: '0 0 10px' } }, T('Guarde até 3 jeitos do app inteiro (cores, fundo, barra, chats, ícone, skin) e troque arrastando de lado em qualquer espaço vazio do app (ou este cartão), com Ctrl+Alt+← / →, ou com dois dedos de lado no celular. Só o estilo em uso fica rodando.', 'Keep up to 3 looks for the whole app (colors, background, bar, chats, icon, skin) and switch by dragging sideways on any empty spot of the app (or this card), with Ctrl+Alt+← / →, or two fingers sideways on the phone. Only the style in use runs.')), carrossel, pontos);
+    let pintou = false;
     const pintar = async () => {
       const l = await ES.lista(), at = ES.atual();
       faixa.replaceChildren(...l.map((x, i) => {
@@ -170,28 +193,37 @@
         return h('div', { class: 'estv-cartao' + (on ? ' on' : '') + (x ? '' : ' vazio'), role: 'option', 'aria-selected': String(on), dados: { i } },
           prev, h('div', { class: 'estv-nome' }, h('b', {}, x ? x.nome : T('Espaço livre', 'Empty slot')), h('small', { class: 'suave' }, (i + 1) + '/' + N)), h('div', { class: 'estv-acoes' }, ...acoes));
       }));
-      pontos.replaceChildren(...l.map((x, i) => h('button', { type: 'button', class: 'estv-pt' + (at === i ? ' on' : '') + (x ? '' : ' vazio'), 'aria-label': (x && x.nome) || (T('Espaço ', 'Slot ') + (i + 1)), onclick: () => { const c = faixa.children[i]; if (c) c.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); } })));
-      const c = faixa.children[Math.max(0, at)]; if (c) requestAnimationFrame(() => { faixa.scrollLeft = c.offsetLeft - (faixa.clientWidth - c.offsetWidth) / 2; });
+      pontos.replaceChildren(...l.map((x, i) => h('button', { type: 'button', class: 'estv-pt' + (at === i ? ' on' : '') + (x ? '' : ' vazio'), 'aria-label': (x && x.nome) || (T('Espaço ', 'Slot ') + (i + 1)), onclick: () => ir(i) })));
+      if (!pintou) { pintou = true; idx = Math.max(0, at); }
+      requestAnimationFrame(medir);
     };
-    // arrastar a faixa de lado: o cartão que parar no meio (e já tiver estilo) vira o app
-    let tFim = 0;
-    faixa.addEventListener('scroll', () => {
-      clearTimeout(tFim); tFim = setTimeout(async () => {
-        const meio = faixa.getBoundingClientRect().left + faixa.clientWidth / 2;
-        let melhor = -1, dist = 1e9; [...faixa.children].forEach((c, i) => { const r = c.getBoundingClientRect(), d = Math.abs(r.left + r.width / 2 - meio); if (d < dist) { dist = d; melhor = i; } });
-        const l = await ES.lista(), at = ES.atual();
-        pontos.querySelectorAll('.estv-pt').forEach((p, i) => p.classList.toggle('foco', i === melhor));
-        if (melhor >= 0 && melhor !== at && l[melhor] && faixa.dataset.arrastou === '1') { faixa.dataset.arrastou = ''; ES.usar(melhor, melhor > at ? 1 : -1); }
-      }, 160);
-    }, { passive: true });
-    const marcou = () => { faixa.dataset.arrastou = '1'; };
-    faixa.addEventListener('pointerdown', (e) => { // com o mouse também dá para arrastar a faixa
-      marcou(); if (e.pointerType !== 'mouse' || e.button !== 0 || e.target.closest('button')) return;
-      const x0 = e.clientX, s0 = faixa.scrollLeft; faixa.classList.add('arrastando');
-      const mv = (ev) => { faixa.scrollLeft = s0 - (ev.clientX - x0); };
-      const up = () => { faixa.classList.remove('arrastando'); removeEventListener('pointermove', mv); removeEventListener('pointerup', up); };
-      addEventListener('pointermove', mv); addEventListener('pointerup', up);
-    }); faixa.addEventListener('touchstart', marcou, { passive: true }); faixa.addEventListener('wheel', marcou, { passive: true });
+    // arrastar (mouse ou dedo): a faixa segue o ponteiro e, ao soltar, encaixa no cartão mais perto (ou no próximo, com um puxão)
+    let ar = null;
+    faixa.addEventListener('pointerdown', (e) => {
+      if (todas || (e.pointerType === 'mouse' && e.button !== 0) || e.target.closest('button, input')) return;
+      ar = { x: e.clientX, y: e.clientY, t: Date.now(), id: e.pointerId, moveu: false };
+    });
+    faixa.addEventListener('pointermove', (e) => {
+      if (!ar || e.pointerId !== ar.id) return;
+      const dx = e.clientX - ar.x, dy = e.clientY - ar.y;
+      if (!ar.moveu) { if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 6) { ar = null; return; } if (Math.abs(dx) < 6) return; ar.moveu = true; faixa.setPointerCapture(e.pointerId); faixa.classList.add('arrastando'); }
+      const n = faixa.children.length, borda = (idx === 0 && dx > 0) || (idx === n - 1 && dx < 0); // nas pontas, resiste
+      posicionar(false, borda ? dx / 3 : dx);
+    });
+    const soltar = (e) => {
+      if (!ar || (e && e.pointerId !== ar.id)) return;
+      const a = ar; ar = null; faixa.classList.remove('arrastando'); if (!a.moveu) return;
+      const dx = (e ? e.clientX : a.x) - a.x, c = faixa.children[idx], w = c ? c.offsetWidth + 12 : 260, rapido = Math.abs(dx) / Math.max(1, Date.now() - a.t) > 0.5;
+      let passo = Math.round(-dx / w); if (!passo && rapido && Math.abs(dx) > 24) passo = dx < 0 ? 1 : -1;
+      const antes = idx; idx = Math.max(0, Math.min(faixa.children.length - 1, idx + passo)); if (idx !== antes) A.som.tocar('click');
+      posicionar(true);
+    };
+    faixa.addEventListener('pointerup', soltar); faixa.addEventListener('pointercancel', soltar);
+    faixa.addEventListener('click', (e) => { const c = e.target.closest('.estv-cartao'); if (c && !e.target.closest('button') && !todas) ir(+c.dataset.i); }, true);
+    // roda do mouse de lado (touchpad) ou com Shift: um cartão por vez
+    let rodaT = 0;
+    janela.addEventListener('wheel', (e) => { if (todas) return; const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY : 0; if (!d) return; e.preventDefault(); if (Date.now() - rodaT < 350 || Math.abs(d) < 8) return; rodaT = Date.now(); ir(idx + (d > 0 ? 1 : -1)); }, { passive: false });
+    janela.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); ir(idx - 1); } else if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); ir(idx + 1); } });
     const off = A.evt.on('estilos:mudou', () => { if (!caixa.isConnected) { if (typeof off === 'function') off(); return; } pintar(); });
     pintar();
     return caixa;

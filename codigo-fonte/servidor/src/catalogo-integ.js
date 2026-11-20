@@ -78,13 +78,6 @@ export const CATALOGO = [
     desc: { pt: 'O horário de cada amigo aparece no perfil e no topo da conversa, só de quem escolheu mostrar. Você também pode mostrar o seu.', en: 'Each friend\'s local time shows on their profile and at the top of the chat, only for those who chose to show it. You can show yours too.' },
     onde: { pt: 'Para mostrar o seu: Configurações > Chats > Tradução e horário.', en: 'To show yours: Settings > Chats > Translation and time.' },
     seguro: [{ pt: 'Só o fuso horário vai para o perfil, e só se você ligar.', en: 'Only your time zone goes to your profile, and only if you turn it on.' }] },
-  { id: 'cartoes', versao: 1, icone: 'link', cat: 'conversa', plano: 0, plataformas: ['pc', 'web', 'celular'], appMin: '1.0.0',
-    tipo: 'nativa', modulo: 'cartoes',
-    nome: { pt: 'Cartões de links', en: 'Link cards' },
-    resumo: { pt: 'Links do Spotify, Reddit, Amazon e AliExpress viram cartões bonitos.', en: 'Spotify, Reddit, Amazon and AliExpress links become nice cards.' },
-    desc: { pt: 'Com capa, fotos, vídeo, trecho da música, preço e avaliações, direto na conversa.', en: 'With cover, photos, video, song preview, price and ratings, right in the chat.' },
-    onde: { pt: 'Nas conversas, sempre que alguém manda um desses links.', en: 'In chats, whenever someone sends one of these links.' },
-    seguro: [{ pt: 'Os dados do cartão passam pelo servidor do Aero: o seu endereço (IP) não chega nos sites.', en: 'Card data goes through the Aero server: your address (IP) does not reach the sites.' }] },
 ];
 
 // ---------- a conferência (roda ao publicar o worker, nos testes e de novo no app) ----------

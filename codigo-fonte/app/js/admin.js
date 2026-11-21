@@ -119,7 +119,8 @@
   A.evt.on('hub:fb-novos', (r) => { fbMudou(r); if (r.novo) A.som.tocar('feedback-novo'); });
   A.evt.on('hub:eu', () => { if (API.token && API.eu) { ADM.verAvisos(); ADM.contarFb(); } }); // reconectou (ou abriu em outro aparelho): o que ficou sem fechar aparece de novo
   // (0.6.0) e de tempos em tempos (com o app aberto): a resposta da equipe aparece mesmo se o aviso ao vivo se perdeu
-  setInterval(() => { if (API.token && API.eu && !document.hidden) ADM.verAvisos(); }, 60000);
+  // (1.0.0) a cada 30 min (era a cada minuto): o normal é o aviso chegar ao vivo pela conexão, e ao reconectar ele é conferido de novo
+  setInterval(() => { if (API.token && API.eu && !document.hidden) ADM.verAvisos(); }, 30 * 60000);
   // suspensa: avisa e sai da conta (a tela de entrar mostra o motivo se tentar de novo)
   let avisouBan = false;
   A.evt.on('conta:banida', (d) => {

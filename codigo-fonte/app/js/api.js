@@ -178,11 +178,11 @@
     stats: (codigo) => API.req(`amigos/${encodeURIComponent(codigo)}/stats`),
   };
 
-  // Servidores STUN/TURN (guarda por 10 min). API.turn diz se o servidor tem TURN funcionando (e API.turnErro o porquê, se não).
+  // Servidores STUN/TURN (guarda por 6 h; a credencial vale 12 h. (1.0.0) antes eram 10 min, e cada chamada pedia de novo ao servidor). API.turn diz se o servidor tem TURN funcionando (e API.turnErro o porquê, se não).
   let iceCache = null, iceQuando = 0;
   API.turn = null; API.turnErro = '';
   API.ice = async (forcar = false) => {
-    if (!forcar && iceCache && Date.now() - iceQuando < 600000) return iceCache;
+    if (!forcar && iceCache && Date.now() - iceQuando < (API.turn ? 6 * 3600000 : 600000)) return iceCache; // (sem TURN, tenta de novo em 10 min)
     for (let i = 0; i < 3; i++) { // rede ruim (ou outro continente): tenta de novo antes de desistir do TURN
       try {
         const d = await (await fetch(API.servidor + '/ice', { cache: 'no-store', headers: API.token ? { Authorization: 'Bearer ' + API.token } : {} })).json();

@@ -19,8 +19,10 @@ function iceDemais(ip, comConta) {
   return ++r.n > (comConta ? 60 : 12);
 }
 
+const IMG_FIXA = /^\/api\/(avatar|banner|nameplate|fundo|ligacao|mural-fundo|grupo-foto|grupo-banner)\/[A-Za-z0-9_-]{1,40}$/;
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const hub = () => env.HUB.get(env.HUB.idFromName('global'));
 
@@ -153,6 +155,15 @@ export default {
       return json({ erro: 'Não encontrado' }, 404);
     }
 
+    // (1.0.0) fotos de perfil, banners, fundos e afins com versão no endereço (?v=) nunca mudam: ficam no cache da Cloudflare perto de quem
+    // pede, e o servidor central só é acordado na primeira vez em cada lugar do mundo
+    if (request.method === 'GET' && IMG_FIXA.test(url.pathname) && /^\d{1,15}$/.test(url.searchParams.get('v') || '') && typeof caches !== 'undefined' && caches.default) {
+      const chave = new Request(url.origin + url.pathname + '?v=' + url.searchParams.get('v'));
+      const ja = await caches.default.match(chave).catch(() => null); if (ja) return ja;
+      const r = await hub().fetch(request);
+      if (r.status === 200 && !r.headers.get('Content-Encoding') && /immutable/.test(r.headers.get('Cache-Control') || '')) { const p = caches.default.put(chave, r.clone()).catch(() => {}); if (ctx && ctx.waitUntil) ctx.waitUntil(p); }
+      return r;
+    }
     if (url.pathname === '/hub' || url.pathname.startsWith('/api/')) return hub().fetch(request);
 
     if (url.pathname === '/ice') {

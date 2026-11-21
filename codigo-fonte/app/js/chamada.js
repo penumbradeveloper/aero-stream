@@ -36,7 +36,7 @@
   // (1.0.0) o ajuste da câmera (espelhar, de cabeça para baixo, girar): quem mostra escolhe e todo mundo vê a imagem já corrigida
   const ajOk = (a) => ({ h: !!(a && a.h), v: !!(a && a.v), r: a && [90, 180, 270].includes(a.r) ? a.r : 0 });
   const ajCam = () => ajOk(A.cfg.v.camAjuste);
-  const meuEstado = () => ({ aj: ajCam(), mudo: ch.mudo, cam: !!viva(ch.cam), tela: !!ch.tela, cel: !!A.plat.celular, modo: ch.modoTela, cor: corOk((A.cfg.v.entrada || {}).cor), ms: ch.meuMs || undefined });
+  const meuEstado = () => ({ aj: ajCam(), mudo: ch.mudo, cam: !!viva(ch.cam), tela: !!ch.tela, cel: !!A.plat.celular, modo: ch.modoTela, cor: corOk((A.cfg.v.entrada || {}).cor), ms: ch.meuMs || undefined, msDc: 1 }); // (1.0.0) msDc: o ms vai direto entre as pessoas (canal da chamada), sem passar pelo servidor
   const corOk = (c) => (/^#[0-9a-f]{6}$/i.test(c || '') ? c : '');
   const avisarEstado = () => { sinal('*', '', { t: 'estado', ...meuEstado() }); };
 
@@ -273,6 +273,7 @@
   const pintarMsPar = (par) => { const e = par.tile && par.tile.querySelector('.cham-tile-ms'); if (!e) return; const t = par.ms ? par.ms + ' ms' : ''; if (e.textContent !== t) e.textContent = t; e.dataset.nivel = nivelMs(par.ms); e.title = par.ms ? T('Conexão de ', 'Connection of ') + nomeDe(par.codigo) + ': ' + par.ms + ' ms' : ''; };
   const lerEstado = (par, d) => {
     if (d.ms !== undefined) msDoPar(par, d.ms);
+    if (d.msDc) par.msDc = true;
     if (d.cel !== undefined) par.cel = !!d.cel;
     par.aj = ajOk(d.aj);
     par.mudo = !!d.mudo; par.cam = !!d.cam; par.tela = !!d.tela; if (par.tela && !par.telaDesde) par.telaDesde = Date.now(); if (!par.tela) par.telaDesde = 0; A.evt.emit('chamada:tela', par.tela);
@@ -721,6 +722,7 @@
   // o que chega pelos canais: o protocolo do controle fica aqui; o resto (mouse, teclado, controles, cursores) vai para o entrada.js
   function aoDadoCtl(par, dados) {
     if (!ch || ch.pares.get(par.chave) !== par || typeof dados !== 'string' || dados.length > 16384) return;
+    if (dados.startsWith('{"t":"ms"')) { let m; try { m = JSON.parse(dados); } catch (_) { return; } msDoPar(par, m.v); return; } // (1.0.0) o ms da pessoa, direto dela
     if (!dados.startsWith('{"t":"ctlp"')) { A.evt.emit('chctl:dc', { de: par.chave, dados }); return; }
     let m; try { m = JSON.parse(dados); } catch (_) { return; }
     if (m.a === 'lista' && Array.isArray(m.l)) {
@@ -1027,7 +1029,7 @@
     finally { pingVoando = false; }
     if (ch !== c) return;
     c.meuMs = Math.max(1, Math.round(Math.min(...c.pings)));
-    if (Math.abs(c.meuMs - msAvisado) >= 3 || (c.meuMs !== msAvisado && Date.now() - msAvisadoEm > 2000)) /* (0.9.3) a outra pessoa vê o seu ms quase na hora */ { msAvisado = c.meuMs; msAvisadoEm = Date.now(); if (c.pares.size) sinal('*', '', { t: 'ms', v: c.meuMs }); }
+    if (Math.abs(c.meuMs - msAvisado) >= 3 || (c.meuMs !== msAvisado && Date.now() - msAvisadoEm > 2000)) /* (0.9.3) a outra pessoa vê o seu ms quase na hora */ { msAvisado = c.meuMs; msAvisadoEm = Date.now(); if (c.pares.size) { const txt = '{"t":"ms","v":' + c.meuMs + '}'; let faltou = false; for (const par of c.pares.values()) if (!(par.msDc && enviarCtl(par.chave, txt))) faltou = true; if (faltou) sinal('*', '', { t: 'ms', v: c.meuMs }); } } // (1.0.0) direto pelo canal da chamada; pelo servidor só para quem ainda não tem o canal aberto (ou uma versão antiga)
   }
   let sinalN = 0;
   async function medirSinal() {

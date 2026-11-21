@@ -26,7 +26,7 @@
     for (const s of document.querySelectorAll('link[rel="stylesheet"], style')) {
       if (s.tagName === 'LINK') d.head.append(h('link', { rel: 'stylesheet', href: s.href })); else d.head.append(d.importNode(s, true));
     }
-    d.head.append(Object.assign(d.createElement('style'), { textContent: 'html,body{margin:0;height:100%;overflow:hidden}body{display:flex}.sep-raiz{display:flex;flex:1;min-width:0;min-height:0}.sep-raiz>*{flex:1;min-width:0;min-height:0}.sep-casca{display:contents}' }));
+    d.head.append(Object.assign(d.createElement('style'), { textContent: 'html,body{margin:0;height:100%;overflow:hidden}body{display:flex}.sep-raiz{display:flex;flex:1;min-width:0;min-height:0}.sep-raiz>*{flex:1;min-width:0;min-height:0}.sep-casca{display:contents}.sep-el{flex:1 1 auto!important;align-self:stretch!important;width:auto!important;max-width:none!important;min-width:0!important;height:auto!important;max-height:none!important;min-height:0!important;margin:0!important;grid-area:auto!important;transform:none!important}' })); // (1.0.0) o elemento em si estica para a janela toda (as cascas são display: contents, então o flex:1 delas não chegava nele)
     const espelhar = () => { copiarAtributos(document.documentElement, d.documentElement); copiarAtributos(document.body, d.body); };
     espelhar();
     const obs = new MutationObserver(espelhar);
@@ -43,6 +43,7 @@
         A.ui.btn(T('Trazer de volta', 'Bring back'), { icone: 'voltar', tipo: 'sec', onclick: () => api.fechar() })));
     lugar.className += ' ' + el.className; // ocupa o mesmo lugar no layout
     el.replaceWith(lugar);
+    el.classList.add('sep-el');
     dentro.append(d.adoptNode(el));
     d.body.append(raiz);
     const retomar = (lista) => setTimeout(() => lista.forEach((v) => { if (v.isConnected && v.paused) v.play().catch(() => {}); }), 50);
@@ -54,6 +55,7 @@
       fechar() {
         if (fechado) return; fechado = true; abertas.delete(chave); obs.disconnect(); clearInterval(vigia);
         const tocandoAgora = [...el.querySelectorAll('video, audio')].filter((v) => !v.paused);
+        el.classList.remove('sep-el');
         if (lugar.isConnected) lugar.replaceWith(document.adoptNode(el)); else document.adoptNode(el);
         retomar(tocandoAgora);
         try { if (!w.closed) w.close(); } catch (e) {}

@@ -62,7 +62,7 @@
   // que acabou de aparecer. Só a resposta do pedido mais novo vale (as outras esperam por ela)
   let pedidoLista = 0, ultimaLista = null;
   TK.carregar = async () => {
-    const n = ++pedidoLista, p = API.req('conv'); ultimaLista = p;
+    const n = ++pedidoLista, p = API.req('conv'); ultimaLista = p; TK.listaEm = Date.now();
     const d = await p;
     if (n !== pedidoLista) { await ultimaLista.catch(() => {}); return TK.conversas; }
     const antigas = new Map(TK.conversas.map((c) => [c.id, c]));
@@ -411,7 +411,7 @@
     if (migrando || !C.kid) return;
     migrando = true;
     try {
-      if (!TK.conversas.length) await TK.carregar();
+      if (!TK.conversas.length) await (ultimaLista && Date.now() - (TK.listaEm || 0) < 15000 ? ultimaLista.catch(() => {}) : TK.carregar()); // (1.0.2) usa o pedido que acabou de sair
       for (const c of TK.conversas) {
         // refaz a conversa quando muda a MINHA chave ou a de alguém dela (aí o histórico é re-compartilhado com a chave nova)
         const marca = 'aero-migrado:' + c.id + ':' + C.kid + ':' + (await C.kidsDe(codigos(c))) + (C.legado ? ':legado' : '');
@@ -539,10 +539,10 @@
   const juntarRecibos = (velhos, novos) => (novos || []).map((n) => { const v = (velhos || []).find((x) => x.codigo === n.codigo); if (!v) return n;
     return { ...n, entregue: Math.max(n.entregue || 0, v.entregue || 0), lido: n.lido == null ? undefined : Math.max(n.lido || 0, v.lido || 0) }; });
   A.evt.on('hub:conv-recibo', (e) => { const c = TK.conversas.find((x) => x.id === e.cid); if (!c) return; const antes = JSON.stringify(c.recibos || []); c.recibos = juntarRecibos(c.recibos, e.recibos); if (JSON.stringify(c.recibos) !== antes) A.evt.emit('talk:recibos', c.id); });
-  A.evt.on('hub:conv-lido', (e) => { const c = TK.conversas.find((x) => x.id === e.cid); if (!c) return; c.lido = Math.max(c.lido || 0, e.lido || 0); delete TK.mencoes[c.id]; contar(); A.evt.emit('talk:lista'); });
+  A.evt.on('hub:conv-lido', (e) => { const c = TK.conversas.find((x) => x.id === e.cid); if (!c) return; c.lido = Math.max(c.lido || 0, e.lido || 0); delete TK.mencoes[c.id]; contar(); A.evt.emit('talk:lista'); if (c.lido >= (c.seq || 0) && A.ui.tirarNotif) A.ui.tirarNotif(c.id); });
   A.evt.on('hub:conv-marca', (e) => { const c = TK.conversas.find((x) => x.id === e.cid); if (!c) return; c.marca = e.marca || 0; contar(); A.evt.emit('talk:lista'); });
   // chamada em andamento numa conversa (começou, alguém entrou ou saiu, acabou)
-  A.evt.on('hub:conectou', () => { if (TK.conversas && TK.conversas.length) TK.carregar().catch(() => {}); }); // (0.9.0) voltou a conexão: as chamadas em andamento conferidas de novo
+  A.evt.on('hub:conectou', () => { if (TK.conversas && TK.conversas.length && Date.now() - (TK.listaEm || 0) > 15000) TK.carregar().catch(() => {}); }); // (1.0.2) a lista que acabou de chegar (ao abrir o app) não é pedida de novo // (0.9.0) voltou a conexão: as chamadas em andamento conferidas de novo
   A.evt.on('hub:chamada-estado', (e) => { const c = TK.conversas.find((x) => x.id === e.cid); if (c) c.cham = e.cham || null; A.evt.emit('talk:cham', e); A.evt.emit('talk:lista'); });
   A.evt.on('hub:conv-removido', (e) => { TK.carregar().catch(() => {}); if (TK.aberta === e.cid) A.evt.emit('talk:fechar'); });
   // a conversa aberta guarda quem mandou cada mensagem (a edição ao vivo só traz a cifra)
@@ -1222,6 +1222,9 @@
         aoPodarTopo: () => { if (atual !== c) return; mais = true; const tp = cx && cx.lista.querySelector('.tk-carregar'); if (tp) tp.hidden = false; },
       });
       if (A.extras) A.extras.fundoConversa.aplicar(c.id, cx.el); // (1.0.0) o fundo que você escolheu para esta conversa
+      // (1.0.2) clicar (ou entrar com o teclado) na conversa já conta como lida: um pedido só, e só se tem algo não lido (nada fica checando)
+      const lerAoTocar = () => { if (atual !== c || document.hidden) return; const cv = TK.conversas.find((x) => x.id === c.id) || c; if ((cv.seq || 0) > (cv.lido || 0)) TK.marcarLido(cv, cv.seq); };
+      cx.el.addEventListener('pointerdown', lerAoTocar, { passive: true }); cx.el.addEventListener('focusin', lerAoTocar);
       const topoLista = h('div', { class: 'tk-carregar', hidden: true }, U.btn(T('Mensagens anteriores', 'Earlier messages'), { tipo: 'link', peq: true, onclick: () => carregarMais() }));
       cx.lista.prepend(topoLista);
       // (0.7.1) subindo o chat, as mensagens anteriores chegam sozinhas antes de você chegar no topo (o botão fica de reserva)

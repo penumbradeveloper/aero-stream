@@ -894,8 +894,9 @@ input[type=range].ajustando::-webkit-slider-thumb { transform: scale(1.35); }
 .cham-tile.com-video .cham-quadro video { display: block; } .cham-tile.com-video .cham-av { display: none; }
 .cham-tile.eu .cham-quadro video { transform: scaleX(-1); }
 .cham-av .avatar { --t: clamp(60px, 8vw, 96px); box-shadow: 0 0 0 4px rgba(255,255,255,.55), 0 10px 28px rgba(0,0,0,.4); transition: box-shadow .18s, transform .18s; }
-.cham-tile.falando .cham-av .avatar { box-shadow: 0 0 0 5px #5ef08a, 0 0 32px rgba(94,240,138,.8); transform: scale(1.04); }
-.cham-tile.falando .cham-quadro { box-shadow: 0 0 0 3px #5ef08a, 0 0 30px rgba(94,240,138,.45), 0 18px 44px rgba(0,0,0,.5); }
+/* (1.0.2) o anel de quem fala é do tamanho da foto (sem crescer): antes o brilho de 32 px e o aumento passavam por cima de quem estava do lado */
+.cham-tile.falando .cham-av .avatar, .cham-janela.modo-max[data-muitos] .cham-pessoas .cham-tile.falando .cham-av .avatar { box-shadow: 0 0 0 clamp(2px, calc(var(--t, 64px) * .05), 4px) #5ef08a, 0 0 clamp(4px, calc(var(--t, 64px) * .14), 12px) rgba(94,240,138,.65); transform: none; }
+.cham-tile.falando .cham-quadro { box-shadow: 0 0 0 2px #5ef08a, 0 0 6px rgba(94,240,138,.45); }
 .cham-tile.conectando .cham-quadro { opacity: .7; }
 .cham-mudo { position: absolute; right: 10px; top: 10px; display: none; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: rgba(224,72,72,.9); color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
 .cham-tile.mudo .cham-mudo { display: grid; }
@@ -916,7 +917,7 @@ input[type=range].ajustando::-webkit-slider-thumb { transform: scale(1.35); }
 .cham-palco[data-tipo=foto] video { display: none; }
 .cham-palco-av { display: none; position: absolute; inset: 0; place-items: center; background: radial-gradient(circle at 50% 40%, rgba(120,210,255,.35), rgba(6,30,52,.9) 70%); }
 .cham-palco[data-tipo=foto] .cham-palco-av { display: grid; } .cham-palco-av .avatar { --t: clamp(120px, 22vh, 220px); box-shadow: 0 0 0 5px rgba(255,255,255,.55), 0 18px 50px rgba(0,0,0,.5); transition: box-shadow .18s; }
-.cham-palco-av.falando .avatar:not([data-an]) { box-shadow: 0 0 0 6px #5ef08a, 0 0 40px rgba(94,240,138,.8); } /* (1.0.2) sem anel escolhido: o contorno verde de quem fala, como nas janelinhas */
+.cham-palco-av.falando .avatar:not([data-an]) { box-shadow: 0 0 0 4px #5ef08a, 0 0 16px rgba(94,240,138,.6); } /* (1.0.2) sem anel escolhido: o contorno verde de quem fala, como nas janelinhas */
 .cham-palco-ctl { position: absolute; right: 12px; top: 12px; display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 22px; background: rgba(0,0,0,.45); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; transition: opacity .2s; }
 .cham-palco:hover .cham-palco-ctl, .cham-palco:has(:focus-visible) .cham-palco-ctl, .cham-palco.com-zoom .cham-palco-ctl { opacity: 1; }
 /* (1.0.2) vendo a tela de alguém: o nome dela também só aparece com o mouse em cima (os botões já eram assim); o puxador da barra escondida
@@ -1152,7 +1153,7 @@ input[type=range].ajustando::-webkit-slider-thumb { transform: scale(1.35); }
 /* cada pessoa é uma bolha que aparece em sequência */
 .tk-cham-bolha { position: relative; border-radius: 50%; transition: box-shadow .15s, transform .15s; } .tk-cham-bolha.nova { animation: bolhaNasce .5s var(--mola) both; animation-delay: calc(var(--i) * 70ms); }
 .tk-cham-bolha .avatar { box-shadow: 0 0 0 3px rgba(255,255,255,.55), 0 8px 20px rgba(0,0,0,.35); }
-.tk-cham-bolha.falando { transform: scale(1.05); } .tk-cham-bolha.falando .avatar { box-shadow: 0 0 0 4px #5ef08a, 0 0 22px rgba(94,240,138,.8); } /* (0.7.12) a bolha inteira cresce: o microfone vai junto */
+.tk-cham-bolha.falando .avatar { box-shadow: 0 0 0 2px #5ef08a, 0 0 8px rgba(94,240,138,.6); } /* (0.7.12) a bolha inteira cresce: o microfone vai junto */
 .tk-cham-bolha.mudo .avatar { opacity: .85; }
 /* (0.7.12) o microfone segue a foto: tamanho proporcional a ela e preso na borda do círculo (a 45°), não no canto do quadrado em volta */
 .tk-cham-mudo { position: absolute; z-index: 1; right: 2%; bottom: 2%; display: grid; place-items: center; width: clamp(18px, 24%, 44px); aspect-ratio: 1; border-radius: 50%; background: #e04848; color: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
@@ -2939,6 +2940,9 @@ canvas.pelicula { display: block; }
 .avatar.digitando > .pt { opacity: 0; transform: scale(.4); transition: opacity .15s ease, transform .15s ease; }
 .tk-dig { --d: max(5px, calc(var(--t, 46px) * .1)); position: absolute; z-index: 2; right: calc(var(--d) * -1.4); bottom: -3px; display: flex; align-items: center; gap: calc(var(--d) * .45); padding: calc(var(--d) * .6) calc(var(--d) * .75); border-radius: 99px; background: var(--ok); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); pointer-events: none; }
 .tk-av-grupo .tk-dig { --d: 5px; }
+/* (1.0.2) espaços em pixels inteiros: com 2,25 px e 3,75 px o arredondamento empurrava a bolinha do meio para a direita */
+.tk-dig { gap: round(calc(var(--d) * .45), 1px); padding: round(calc(var(--d) * .6), 1px) round(calc(var(--d) * .75), 1px); justify-content: center; }
+.tk-dig b { flex: none; }
 .avatar.digitando:has(> .pt.ausente) > .tk-dig { background: var(--aviso); }
 .avatar.digitando:has(> .pt.ocupado) > .tk-dig { background: #e5473b; }
 .avatar.digitando:has(> .pt.offline) > .tk-dig, .avatar.digitando:has(> .pt.invisivel) > .tk-dig { background: #8a9ba8; }
@@ -5481,11 +5485,14 @@ i.px-mo-coroa { border: 3px solid #f5c542; box-shadow: 0 0 10px rgba(245,197,66,
 .cx-msg[data-bc=vaporwave] .cx-txt:not(.so-figurinha) { border-radius: 4px; border: 2px solid #01cdfe; color: var(--bcf, #fff); font-style: italic; letter-spacing: .3px;
   text-shadow: -1px 0 rgba(1,205,254,.9), 1px 0 rgba(255,113,206,.9), 0 2px 4px rgba(43,10,74,.5);
   background: linear-gradient(90deg, #ff71ce, #b967ff, #01cdfe, #05ffa1, #fffb96) top / 100% 3px no-repeat,
-    radial-gradient(circle at 92% 104%, rgba(255,251,150,.7) 0 16px, rgba(255,251,150,0) 17px),
+    radial-gradient(circle 17px at calc(100% - 26px) calc(100% + 4px), rgba(255,251,150,.7) 94%, rgba(255,251,150,0)), /* (1.0.2) preso no canto: em %, numa mensagem longa o sol ficava para trás */
     repeating-linear-gradient(90deg, rgba(1,205,254,.45) 0 1px, transparent 1px 16px) bottom / 100% 38% no-repeat,
     repeating-linear-gradient(180deg, rgba(1,205,254,.45) 0 1px, transparent 1px 7px) bottom / 100% 38% no-repeat,
     linear-gradient(180deg, color-mix(in srgb, var(--bc, #ff71ce) 70%, #2b0a4a), var(--bc, #ff71ce) 55%, color-mix(in srgb, var(--bc, #ff71ce) 40%, #b967ff));
   box-shadow: 4px 4px 0 #05ffa1, 4px 4px 0 2px rgba(43,10,74,.35); }
+/* (1.0.2) o itálico passava da borda da direita e o "(editada)" ficava em cima do sol e da grade: folga e uma etiquetinha atrás do rodapé */
+.cx-msg[data-bc=vaporwave] .cx-txt:not(.so-figurinha) { padding-right: 16px; }
+.cx-msg[data-bc=vaporwave] .cx-txt .cx-rodape { padding: 2px 6px; margin-right: -6px; border-radius: 8px; background: rgba(43,10,74,.55); text-shadow: none; font-style: normal; }
 .cx-msg[data-bc=doce] .cx-txt:not(.so-figurinha) { border-radius: 22px; border: 2px solid #fff; color: var(--bcf, #5a1f3f); font-weight: 600;
   background: repeating-linear-gradient(45deg, var(--bc, #ffb3d9) 0 10px, color-mix(in srgb, var(--bc, #ffb3d9) 55%, #fff) 10px 20px); box-shadow: 0 0 0 2px color-mix(in srgb, var(--bc, #ffb3d9) 70%, #c04) , 0 4px 10px rgba(200,60,120,.25); text-shadow: 0 1px 0 rgba(255,255,255,.7); }
 .cx-msg[data-bc=galaxia] .cx-txt:not(.so-figurinha) { position: relative; overflow: hidden; border-radius: 18px; border: 1px solid color-mix(in srgb, var(--bc, #3b1d6e) 50%, #b9a4ff); color: var(--bcf, #fff);
@@ -5505,6 +5512,26 @@ i.px-mo-coroa { border: 3px solid #f5c542; box-shadow: 0 0 10px rgba(245,197,66,
 @keyframes lava-b { 50% { transform: translateY(-20%); } }
 .dg-tema.preso { position: relative; }
 .dg-tema .px-selo { position: absolute; top: 3px; right: 3px; }
+/* (1.0.2) molduras da foto e anéis de quem fala feitos por artistas (Integrações da Comunidade): uma imagem em volta da foto. Só números
+   (tamanho, ajuste, giro, pulso, quanto cresce com a voz) e a imagem guardada no servidor; nada de CSS de fora */
+.px-mo.px-mo-arte, .px-fx-arte > .fx-arte { position: absolute; inset: auto; left: calc(50% + var(--fx, 0%)); top: calc(50% + var(--fy, 0%)); width: calc(100% * var(--fe, 1.4)); height: calc(100% * var(--fe, 1.4));
+  translate: -50% -50%; border-radius: 0; background: var(--fi) center / contain no-repeat; pointer-events: none; }
+.px-mo.px-mo-arte { z-index: 2; }
+.px-mo.px-mo-arte.atras { z-index: auto; }
+.px-mo.px-mo-arte::before, .px-mo.px-mo-arte::after { content: none; }
+.px-fx.px-fx-arte { inset: 0; border-radius: 0; }
+.px-fx.px-fx-arte.frente { z-index: 2; }
+.px-fx-arte > .fx-arte { scale: calc(1 + var(--v, .6) * var(--fv, .6) * .3); }
+:is(.px-mo-arte, .fx-arte).gira { animation: px-arte-gira var(--fg, 8s) linear infinite; }
+:is(.px-mo-arte, .fx-arte).pulsa { animation: px-arte-pulsa 2.4s ease-in-out infinite; }
+:is(.px-mo-arte, .fx-arte).gira.pulsa { animation: px-arte-gira var(--fg, 8s) linear infinite, px-arte-pulsa 2.4s ease-in-out infinite; }
+@keyframes px-arte-gira { to { rotate: 360deg; } }
+@keyframes px-arte-pulsa { 50% { transform: scale(1.06); } }
+:is([data-visual=lite], [data-anim=nenhuma]) :is(.px-mo-arte, .fx-arte), :is(.px-mo-arte, .fx-arte).parada { background-image: var(--fip, var(--fi)); animation: none !important; }
+@media (prefers-reduced-motion: reduce) { :is(.px-mo-arte, .fx-arte) { animation: none !important; } }
+/* o estúdio e a vitrine das molduras e anéis: as fotos de exemplo ficam com folga para a arte que sai delas (nada atravessa) */
+.ba-fotos { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 48px; padding: 40px 24px; min-height: 200px; overflow: hidden; }
+.ba-vitrine-fotos .ba-fotos { padding: 28px 12px; min-height: 140px; gap: 24px; }
 /* (1.0.1) o anel de quem fala, refeito: peças próprias (.px-fx) dentro da foto e atrás dela, que só aparecem enquanto a pessoa fala
    (.an-on) e saem suaves quando ela se cala (.an-sai). Fora disso nada anima. Cores: --a1/--a2 (as do anel ou as do perfil)
    (1.0.2) --v é o volume da voz (0 a 1), posto pelo extras.js a cada quadro; os anéis desenhados (canvas .fx-tela) usam o mesmo volume */
@@ -6162,6 +6189,12 @@ button.cx-recolhe > small { margin-left: auto; font-weight: 600; }
 .vi-modal.vi-cheia { width: 100% !important; max-width: none; height: 100%; max-height: none; border-radius: 0; display: flex; flex-direction: column; }
 .vi-modal.vi-cheia .vi-palco, .vi-galeria.vi-cheia .vi-palco { flex: 1; height: auto; min-height: 0; max-height: none; }
 /* (1.0.2) não perturbe do Linux: as pessoas escolhidas */
+.np-busca { width: 100%; box-sizing: border-box; margin-bottom: 6px; }
+.np-opcoes { display: flex; flex-direction: column; gap: 2px; max-height: min(300px, calc(100dvh - 230px)); min-height: 60px; overflow-y: auto; overflow-x: hidden; padding: 2px 4px 2px 2px; }
+.np-opcao { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; padding: 5px 6px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.np-opcao:hover, .np-opcao:focus-visible { background: color-mix(in srgb, var(--cor-2) 16%, transparent); outline: none; }
+.np-opcao-nome { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.np-opcao-nome > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .np-lista { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
 .np-pessoa { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 3px; border-radius: 999px; background: color-mix(in srgb, var(--cor-2) 16%, transparent); max-width: 100%; min-width: 0; }
 .np-pessoa > span:not(.av) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

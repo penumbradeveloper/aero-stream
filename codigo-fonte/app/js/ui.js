@@ -802,6 +802,13 @@
   };
   const contagem = new Map(); // (1.0.2) mensagens novas por pessoa desde a última vez que o app ficou na frente
   addEventListener('focus', () => contagem.clear()); document.addEventListener('visibilitychange', () => { if (!document.hidden) contagem.clear(); });
+  // (1.0.2) a conversa foi lida em outro aparelho (ou aqui): a notificação dela sai do celular na hora, sem esperar abrir o app
+  const gruposDe = new Map(); // cid -> grupos (pessoas) das notificações dela
+  U.tirarNotif = (cid) => {
+    const g = gruposDe.get(cid); if (!g) return; gruposDe.delete(cid);
+    const N = notifCel();
+    for (const x of g) { contagem.delete(x); if (N && N.limpar) try { N.limpar({ grupo: x }).catch(() => {}); } catch (e) { /* ok */ } }
+  };
   U.notificar = (titulo, texto, { cid, pessoa, nome } = {}) => {
     try {
       if (A.focado()) return;
@@ -811,6 +818,7 @@
       const cv = A.cfg.v;
       if ((N || A.plat.toque) && cv.notifCel === false) return; // (1.0.2) notificações do celular desligadas
       const grupo = (pessoa && pessoa.codigo) || cid || 'aero';
+      if (cid) { const g = gruposDe.get(cid) || new Set(); g.add(grupo); gruposDe.set(cid, g); }
       // (1.0.2) "só o total": em vez do texto, quantas mensagens novas chegaram (como no aviso com o app fechado)
       if ((N || A.plat.toque) && cv.notifConteudo !== 'texto') { const n = (contagem.get(grupo) || 0) + 1; contagem.set(grupo, n); texto = n === 1 ? A.T('1 mensagem nova', '1 new message') : n + A.T(' mensagens novas', ' new messages'); }
       if (N && N.mostrar) { if (document.hidden) { A.push && A.push.visto && A.push.visto(); N.mostrar({ grupo, nome: nome || titulo, titulo, texto: String(texto || '').slice(0, 300), icone, cid: cid || '' }).catch(() => {}); } return; }
@@ -921,13 +929,13 @@
   U.fundoBolhas = {
     sig: '', atual: null, geracao: 0,
     quantidade() {
-      const t = A.cfg.v.tema;
+      const t = A.tema.efetivo(A.cfg.v.tema); // (1.0.2) com as cores avançadas desligadas, as bolhas do padrão
       if (!t.bolhas || A.cfg.v.visual === 'lite') return 0;
       return A.plat.celular ? Math.min(t.bolhasQtd, 8) : t.bolhasQtd;
     },
     reconstruir(forcar) {
       const fundo = document.getElementById('fundo'); if (!fundo) return;
-      const t = A.cfg.v.tema, qtd = this.quantidade();
+      const t = A.tema.efetivo(A.cfg.v.tema), qtd = this.quantidade();
       const sig = A.tema.assinaturaBolhas(t) + '|' + qtd + '|' + A.cfg.v.visual + '|' + (A.plat.celular ? 'c' : 'd');
       if (sig === this.sig && !forcar) return;
       this.sig = sig;
@@ -1028,8 +1036,12 @@
       const agora = performance.now(), lite = document.documentElement.dataset.visual === 'lite' || document.documentElement.dataset.assistindo === '1';
       lista = document.getAnimations().filter(infinita);
       for (const a of lista) {
-        if (!a._rel) { a._rel = { base: a.currentTime || 0, t0: agora, leve: soMove(a) }; a.pause(); }
-        a._rel.parada = lite && !UTIL.test(a.animationName || '') ? true : pausadaNoCss(a);
+        // (1.0.2) todas no mesmo relógio (o tempo da página): antes cada uma seguia do ponto em que foi pega, e as bolhas do chat ficavam
+        // cada uma num passo. As que têm atraso de propósito (as estrelinhas em volta da foto) continuam com o atraso delas
+        if (!a._rel) { a._rel = { leve: soMove(a) }; a.pause(); try { a.currentTime = agora; } catch (e) { /* ok */ } }
+        const r = a._rel, lp = lite && !UTIL.test(a.animationName || '');
+        if (lp && !r.lp) { try { a.currentTime = 0; } catch (e) { /* ok */ } } // (1.0.2) paradas no primeiro quadro de verdade: todas iguais
+        r.lp = lp; r.parada = lp ? true : pausadaNoCss(a);
       }
     };
     // (0.8.3) o relógio de 30 quadros só fica ligado quando tem alguma animação andando (antes acordava 30 vezes por segundo à toa) e para
@@ -1046,8 +1058,8 @@
       const agora = performance.now(), nat = rapido();
       for (const a of lista) {
         const r = a._rel; if (!r) continue;
-        if (nat && !r.parada && r.leve) { if (!r.nativo) { try { a.play(); r.nativo = true; } catch (e) { /* segue no relógio */ } } }
-        else if (r.nativo) { try { a.pause(); } catch (e) { /* ok */ } r.nativo = false; r.base = a.currentTime || 0; r.t0 = agora; }
+        if (nat && !r.parada && r.leve) { if (!r.nativo) { try { a.startTime = 0; if (a.playState !== 'running') a.play(); r.nativo = true; } catch (e) { /* segue no relógio */ } } }
+        else if (r.nativo) { try { a.pause(); } catch (e) { /* ok */ } r.nativo = false; }
       }
     };
     const passo = () => {
@@ -1056,8 +1068,8 @@
       for (const a of lista) {
         const r = a._rel;
         if (r.nativo) continue;
-        if (r.parada || parado) { r.base = a.currentTime || 0; r.t0 = agora; continue; }
-        a.currentTime = r.base + (agora - r.t0); anda = true;
+        if (r.parada || parado) continue;
+        a.currentTime = agora; anda = true;
       }
       if (!anda) pararPasso();
     };
@@ -1163,6 +1175,14 @@
   U.ANEL_SABAO = ['#ff9ad5', '#9ad8ff', '#b5ff9a', '#fff59a'];
   // (0.8.2) as bolhas com várias cores (de 2 a 6): o anel da Bolha de sabão e o degradê da Aurora
   U.CORES_VARIAS = { sabao: U.ANEL_SABAO, aurora: ['#3a7bd5', '#8e54e9', '#00d2c6'] };
+  // (1.0.2) as animações das bolhas andam juntas: cada animação sem fim começava quando a sua bolha aparecia (ou voltava a aparecer), e
+  // as mensagens ficavam cada uma num passo. Quando uma delas começa, ela vai para o mesmo relógio (o começo da página), para qualquer
+  // modelo de bolha, inclusive as de arte e as das skins. Só mexe nas que repetem para sempre; as de entrada continuam como são.
+  (() => {
+    const fila = new Set(); let q = 0;
+    const sinc = () => { q = 0; for (const el of fila) { if (!el.isConnected) continue; try { for (const an of el.getAnimations({ subtree: true })) { const t = an.effect && an.effect.getComputedTiming(); if (t && t.iterations === Infinity && an.startTime !== 0 && an.playState === 'running') an.ready.then(() => { if (an.startTime !== 0 && an.playState === 'running') an.startTime = 0; }, () => {}); } } catch (e) { /* ok */ } } fila.clear(); };
+    document.addEventListener('animationstart', (e) => { const el = e.target && e.target.closest && e.target.closest('.cx-msg[data-bc], .bc-modelo'); if (!el) return; fila.add(el); if (!q) q = requestAnimationFrame(sinc); }, true);
+  })();
   U.aplicarBolha = (el, bc) => {
     // (0.9.5) as bolhas de arte (estúdio, bolhaarte.js): se a arte não vale ou quem vê desligou, fica a bolha padrão
     if (A.bolhaArte) A.bolhaArte.limpar(el);

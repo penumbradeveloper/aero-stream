@@ -419,6 +419,16 @@ export class Hub {
     if (a && a.partes) for (let i = 0; i < a.partes; i++) await this.ctx.storage.delete(`${prefixo}${id}:p${i}`);
     await this.ctx.storage.delete(prefixo + id);
   }
+  // (1.0.2) copia uma imagem guardada para outra chave (os perfis salvos levam a cópia das imagens deles), sem descomprimir
+  async copiarImagem(dePre, deId, paraPre, paraId) {
+    const a = await this.get(dePre + deId);
+    await this.apagarImagem(paraPre, paraId);
+    if (!a) return false;
+    if (a.b64) { await this.ctx.storage.put(paraPre + paraId, a); return true; }
+    for (let i = 0; i < a.partes; i++) await this.ctx.storage.put(`${paraPre}${paraId}:p${i}`, await this.get(`${dePre}${deId}:p${i}`));
+    await this.ctx.storage.put(paraPre + paraId, a);
+    return true;
+  }
   async servirImagem(prefixo, codigo) { return this.servirImagemId(prefixo, await this.get('f:' + String(codigo).toUpperCase())); }
   async servirImagemId(prefixo, id) {
     const a = id && (await this.get(prefixo + id));
@@ -1048,7 +1058,9 @@ export class Hub {
       dev: /^[a-z0-9]{12}$/.test(url.searchParams.get('dev') || '') ? url.searchParams.get('dev') : crypto.randomUUID().slice(0, 8), sid: (ses && ses.sid) || tk.slice(0, 10), maquina, // (0.7.4) o mesmo id ao reconectar
       so, sov: /^[a-z0-9]{1,14}$/.test(url.searchParams.get('sov') || '') ? url.searchParams.get('sov') : '', ap: /^(android|ios)$/i.test(so) ? 'cel' : /^web$/i.test(so) ? 'web' : 'pc', semAp: privDe(conta).esconderAparelhos, mostraSo: privDe(conta).mostrarSistema, estado: ['ausente', 'invisivel', 'ocupado'].includes(conta.status) ? conta.status : 'online', sala: null, comp: false, esconder: privDe(conta).esconderAparelho, stc: conta.stc || null,
     });
-    enviar(servidor, { tipo: 'eu', dev: servidor.deserializeAttachment().dev }); // o aparelho fica sabendo o próprio id (chamadas)
+    // (1.0.2) junto vão os avisos da equipe e a hora das configurações da conta: o app não precisa pedir os dois de novo a cada conexão
+    let avisos = null; try { avisos = [...(conta.avisos || []), ...(await this.admin.globaisDe(conta))]; } catch (_) { /* o app pede sozinho */ }
+    enviar(servidor, { tipo: 'eu', dev: servidor.deserializeAttachment().dev, pt: (conta.prefs && conta.prefs.t) || 0, avisos: avisos || undefined }); // o aparelho fica sabendo o próprio id (chamadas)
     await this.sincronizar(conta.id, [servidor]);
     await this.anunciar(servidor);
     try { await this.analytics.marcar({ conta: conta.id }); } catch (_) { /* ok */ }

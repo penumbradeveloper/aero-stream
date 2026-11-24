@@ -241,7 +241,8 @@
   // HUD (botões selecionados, abas, interruptores): três tons a partir de uma cor
   function tonsHud(hex) {
     const [h, s0, l] = rgbParaHsl(...hexParaRgb(hex));
-    return [hsl(h, s0, A.limitar(l + 14, 0, 92)), hex, hsl(h, s0, A.limitar(l - 14, 6, 100))];
+    // (1.0.2) o branco (e as cores bem claras) ficam brancos de verdade: antes o lado claro parava em 92% e o escuro descia 14%, e o botão branco virava cinza
+    return [hsl(h, s0, A.limitar(l + 14, 0, 100)), hex, hsl(h, s0, A.limitar(l - (l > 85 ? 6 : 14), 6, 100))];
   }
 
   // CSS do fundo (gradiente, cor sólida ou imagem), a partir da paleta e das cores escolhidas
@@ -260,9 +261,22 @@
 
   // ---------- aplicar na página ----------
   // Só mexe em variáveis CSS: a página inteira muda de uma vez, sem recriar elementos (sem piscar).
+  // (1.0.2) "Cores avançadas" desligado = o app volta ao automático nessas partes (a cor de destaque, o layout, a fonte, a moldura, o fundo
+  // personalizado e as bolhas). O que você escolheu continua guardado: ligar de novo traz tudo de volta
+  const AVANCADAS = ['destaque', 'vidroTipo', 'vidroCores', 'vidroAngulo', 'vidroImagem', 'vidroAnim', 'hudCor', 'hudTexto', 'textoCor', 'fonte', 'moldura', 'molduraCor',
+    'fundoForma', 'fundoAngulo', 'fundoX', 'fundoY', 'fundoCores', 'bolhasCor1', 'bolhasCor2', 'bolhasGradiente', 'bolhasAngulo', 'bolhasImagem', 'bolhasQtd', 'bolhasTam',
+    'bolhasVel', 'bolhasModo', 'bolhasOpac', 'desfoqueBolhas'];
+  function efetivo(t) {
+    if (!t || t.avancado) return t;
+    const pd = A.cfg.padrao().tema, o = { ...t };
+    for (const k of AVANCADAS) if (k in pd) o[k] = Array.isArray(pd[k]) ? [...pd[k]] : pd[k];
+    if (o.fundoTipo !== 'imagem') o.fundoTipo = 'gradiente'; // o papel de parede (imagem) fica fora das avançadas
+    return o;
+  }
   function aplicar(tema) {
-    const t = sanear(tema || A.cfg.v.tema);
-    A.cfg.v.tema = t;
+    const salvo = sanear(tema || A.cfg.v.tema);
+    A.cfg.v.tema = salvo;
+    const t = efetivo(salvo);
     const p = paleta(t.cor, t.escuro, t.destaque);
     // (0.8.3) a cor principal é SÓ do layout (painéis, HUD, botões): o fundo, a aurora, as bolhas do fundo e as bolhas dos amigos
     // usam sempre a paleta padrão do app, não importa a cor escolhida
@@ -378,5 +392,5 @@
     } finally { URL.revokeObjectURL(url); }
   }
 
-  A.tema = { FONTES, COR_PADRAO, validarHex, hexParaRgb, rgbParaHsl, hslParaRgb, hsl, contraste, paleta, corDaImagem, sanear, aplicar, imagemDeFundo, limparArqs, urlFundoAgora, imagemDeBolha, fundoCSS, assinaturaBolhas, LIM, MODOS_BOLHA };
+  A.tema = { AVANCADAS, efetivo, FONTES, COR_PADRAO, validarHex, hexParaRgb, rgbParaHsl, hslParaRgb, hsl, contraste, paleta, corDaImagem, sanear, aplicar, imagemDeFundo, limparArqs, urlFundoAgora, imagemDeBolha, fundoCSS, assinaturaBolhas, LIM, MODOS_BOLHA };
 })();

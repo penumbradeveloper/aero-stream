@@ -256,7 +256,9 @@ function escolher({ rpcs = [], det = [], pers = [], abertos = new Map(), visto =
 }
 
 // ---------- o serviço ----------
-function criarJogos({ log = () => {}, pastaDados, lerPers = () => [], lerIgnorados = () => [], plataforma = process.platform, pidsProprios = () => [process.pid], listarProcessos = null, buscar = (u, o) => fetch(u, o), varrerMs = VARRER_MS, listaEmbutida = path.join(__dirname, 'jogos-lista.json'), aoMudar = null } = {}) {
+// (1.0.2) o ID do Aero no Discord: o Rich Presence dele mesmo não vira jogo
+function idsDoAero() { try { const j = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, 'discord-id.json'), 'utf8')); return [String(j.appId || ''), String(process.env.AERO_DISCORD_APP_ID || '')].filter((x) => /^\d{15,25}$/.test(x)); } catch (e) { return []; } }
+function criarJogos({ log = () => {}, pastaDados, lerPers = () => [], lerIgnorados = () => [], plataforma = process.platform, pidsProprios = () => [process.pid], idsProprios = idsDoAero, listarProcessos = null, buscar = (u, o) => fetch(u, o), varrerMs = VARRER_MS, listaEmbutida = path.join(__dirname, 'jogos-lista.json'), aoMudar = null } = {}) {
   let base = null, listaEm = 0, ligado = false, timer = 0, varrendo = false, baixando = false;
   let det = [], abertos = new Map(), nomesAbertos = [];
   const visto = new Map(); // quando cada jogo/atividade apareceu (o tempo conta daí se o processo não disser quando abriu)
@@ -324,6 +326,7 @@ function criarJogos({ log = () => {}, pastaDados, lerPers = () => [], lerIgnorad
   }
   function aoRpc0({ chave, origem, clientId, pid, atividade }) {
     if (!atividade) { rpcs.delete(chave); return; }
+    if (clientId && idsProprios().includes(String(clientId))) { rpcs.delete(chave); return; } // (1.0.2) o próprio Aero nunca vira jogo
     if (!ligado) return;
     const em = Date.now(), ent = { origem, clientId, pid, bruta: atividade, at: deRpc(atividade, { appId: clientId }), em, app: null };
     const ant = rpcs.get(chave); if (ant) { ent.app = ant.app; ent.em = ant.em; } // a mesma conexão atualizando não "passa na frente" das outras

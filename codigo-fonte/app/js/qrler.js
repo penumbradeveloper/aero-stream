@@ -13,7 +13,17 @@
     document.head.append(s);
   }));
   // o texto do QR: "AERO-ENTRAR:" + 8 letras e números
-  A.ui.codigoQrEntrada = (txt) => { const m = /^AERO-ENTRAR:([A-Z0-9]{8})$/i.exec(String(txt || '').trim()); return m ? m[1].toUpperCase() : null; };
+  // (1.0.2) o QR agora é um LINK do site (…/app/?qr=XXXXXXXX): lido pela câmera normal do celular, abre o Aero Web já entrando. Antes era só
+  // o texto "AERO-ENTRAR:…", que a câmera do celular não sabia abrir (o "leitor de QR não funciona"). Os dois jeitos continuam valendo
+  A.ui.linkQrEntrada = (id) => (A.SITE || 'https://web.aerostream.workers.dev') + '/app/?qr=' + id;
+  A.ui.codigoQrEntrada = (txt) => {
+    const t = String(txt || '').trim();
+    let m = /^AERO-ENTRAR:([A-Z0-9]{8})$/i.exec(t); if (m) return m[1].toUpperCase();
+    m = /^https:\/\/[a-z0-9.-]+\/app\/?\?(?:.*&)?qr=([A-Z0-9]{8})(?:&.*)?$/i.exec(t); return m ? m[1].toUpperCase() : null;
+  };
+  let qrDoLink = null;
+  { const q = new URLSearchParams(location.search).get('qr'); if (q && /^[A-Z0-9]{8}$/i.test(q)) { qrDoLink = q.toUpperCase(); try { history.replaceState(null, '', location.pathname); } catch (_) { /* ok */ } } }
+  A.ui.qrPendente = () => { const q = qrDoLink; qrDoLink = null; return q; }; // (uma vez só)
 
   // liga a câmera num <video> e chama aoLer(texto) com o que achar; devolve uma promessa com { parar } (ou um erro com a explicação)
   A.ui.cameraQr = async (video, aoLer) => {
@@ -67,7 +77,7 @@
       try { r = await API.qrGerar(atual); } catch (e) { atual = null; erroTxt = e.message; tentarDe = Date.now() + 5000; desenho.replaceChildren(); codigo.textContent = ''; throw e; }
       erroTxt = ''; if (fechado) return;
       atual = r.id; ate = Date.now() + (r.validade || 30000);
-      desenho.replaceChildren(A.qr ? A.qr('AERO-ENTRAR:' + r.id, 200) : h('span'));
+      desenho.replaceChildren(A.qr ? A.qr(A.ui.linkQrEntrada(r.id), 220) : h('span'));
       codigo.textContent = r.id.slice(0, 4) + '-' + r.id.slice(4);
     };
     const pintarTempo = () => {

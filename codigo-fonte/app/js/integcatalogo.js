@@ -82,7 +82,7 @@
   let ultima = 0, pedindo = null;
   C.buscar = (forcar) => {
     if (pedindo) return pedindo;
-    if (!forcar && Date.now() - ultima < 60000) return Promise.resolve(false);
+    if (Date.now() - ultima < (forcar ? 60000 : 30 * 60000)) return Promise.resolve(false); // (1.0.2) o catálogo muda raramente: no máximo a cada 30 min (e nunca duas vezes no mesmo minuto)
     if (!A.api || !A.api.servidor) return Promise.resolve(false);
     ultima = Date.now();
     pedindo = A.api.req('integ-catalogo').then((d) => {
@@ -96,6 +96,6 @@
     return pedindo;
   };
   // ao abrir o app (e de novo quando a conta entra)
-  setTimeout(() => C.buscar(true), 1500);
+  setTimeout(() => C.buscar(), 1500); // (1.0.2) se a conta já pediu ao entrar, não pede de novo
   if (A.evt) A.evt.on('hub:eu', () => C.buscar());
 })();

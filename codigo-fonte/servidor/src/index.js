@@ -164,6 +164,23 @@ export default {
       if (r.status === 200 && !r.headers.get('Content-Encoding') && /immutable/.test(r.headers.get('Cache-Control') || '')) { const p = caches.default.put(chave, r.clone()).catch(() => {}); if (ctx && ctx.waitUntil) ctx.waitUntil(p); }
       return r;
     }
+    // (1.0.2) os dados dos cartões de links (YouTube, Twitter, Reddit, lojas...) e o catálogo das integrações são iguais para todo mundo:
+    // ficam no cache da Cloudflare perto de quem pede (1 h e 5 min, como já era guardado lá dentro), sem acordar o servidor central a cada vez
+    if (request.method === 'GET' && typeof caches !== 'undefined' && caches.default) {
+      const emb = url.pathname === '/api/embed' && /^Bearer .{20,}/.test(request.headers.get('Authorization') || '') && (url.searchParams.get('u') || '').length <= 400;
+      if (emb || url.pathname === '/api/integ-catalogo') {
+        const chave = new Request('https://cache.aero/' + (emb ? 'embed?u=' + encodeURIComponent(url.searchParams.get('u') || '') : 'integ-catalogo'));
+        const ja = await caches.default.match(chave).catch(() => null); if (ja) return ja;
+        const r = await hub().fetch(request);
+        if (r.status === 200 && !r.headers.get('Content-Encoding')) {
+          const corpo = await r.arrayBuffer(), cab = new Headers(r.headers);
+          cab.set('Cache-Control', 'public, max-age=' + (emb ? 3600 : 300)); cab.delete('Set-Cookie');
+          const p = caches.default.put(chave, new Response(corpo, { headers: cab })).catch(() => {}); if (ctx && ctx.waitUntil) ctx.waitUntil(p);
+          return new Response(corpo, { status: 200, headers: r.headers });
+        }
+        return r;
+      }
+    }
     if (url.pathname === '/hub' || url.pathname.startsWith('/api/')) return hub().fetch(request);
 
     if (url.pathname === '/ice') {

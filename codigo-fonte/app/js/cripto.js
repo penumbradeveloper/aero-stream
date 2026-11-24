@@ -36,7 +36,10 @@
   const LETRAS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sem 0/O e 1/I (não confunde)
   C.gerarCodigo = () => { const r = crypto.getRandomValues(new Uint8Array(12)); const s = Array.from(r, (b) => LETRAS[b & 31]).join(''); return `AERO-${s.slice(0, 4)}-${s.slice(4, 8)}-${s.slice(8)}`; };
   // (0.9.6) dá para digitar só as 12 letras, sem o "AERO" e sem os traços (com espaço, minúscula, tudo junto): vira o mesmo código
-  C.normalizar = (cod) => { const n = String(cod || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); return n.length === 12 ? 'AERO' + n : n; };
+  // (1.0.2) o "AERO" é só o começo: o que conta são as letras depois dele (12 nos códigos de hoje, 8 nos das contas de antes da 0.5.7).
+  // Como o "O" nunca sai no sorteio, um "AERO" no começo é sempre o prefixo (digitado ou não, até repetido): vira sempre "AERO" + as letras
+  C.letras = (cod) => { let n = String(cod || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); while (n.startsWith('AERO')) n = n.slice(4); return n; };
+  C.normalizar = (cod) => { const n = C.letras(cod); return n ? 'AERO' + n : ''; };
   const pbkdf2 = async (texto, sal, bits = 256) => {
     const base = await sub().importKey('raw', new TextEncoder().encode(texto), 'PBKDF2', false, ['deriveBits']);
     return new Uint8Array(await sub().deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: typeof sal === 'string' ? new TextEncoder().encode(sal) : sal, iterations: VOLTAS }, base, bits));
@@ -44,8 +47,8 @@
   const chaveAes = (bytes) => sub().importKey('raw', bytes, 'AES-GCM', false, ['encrypt', 'decrypt']);
   const cacheDeriv = new Map();
   // do código: "acesso" (hex, vai para o servidor) e "kek" (abre o cofre; nunca sai daqui)
-  C.derivar = async (codigo) => {
-    const n = C.normalizar(codigo);
+  C.derivar = async (codigo, { bruto = false } = {}) => {
+    const n = bruto ? String(codigo) : C.normalizar(codigo);
     if (cacheDeriv.has(n)) return cacheDeriv.get(n);
     const [a, k] = await Promise.all([pbkdf2(n, 'aero-stream/acesso/v1'), pbkdf2(n, 'aero-stream/cofre/v1')]);
     const r = { acesso: hex(a), kek: await chaveAes(k) };

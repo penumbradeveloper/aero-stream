@@ -117,7 +117,7 @@
   const fbMudou = (r) => { ADM.fb = { n: r.n || 0, porTipo: r.porTipo || {}, porPessoa: r.porPessoa || {} }; A.evt.emit('fb:novos', ADM.fb); };
   ADM.contarFb = async () => { if (!API.eu || API.eu.cargo !== 'dev') return; try { fbMudou(await API.req('admin/feedbacks-novos')); } catch (e) { /* ok */ } };
   A.evt.on('hub:fb-novos', (r) => { fbMudou(r); if (r.novo) A.som.tocar('feedback-novo'); });
-  A.evt.on('hub:eu', () => { if (API.token && API.eu) { ADM.verAvisos(); ADM.contarFb(); } }); // reconectou (ou abriu em outro aparelho): o que ficou sem fechar aparece de novo
+  A.evt.on('hub:eu', (m) => { if (API.token && API.eu) { if (m && Array.isArray(m.avisos)) m.avisos.forEach(mostrarAviso); else ADM.verAvisos(); ADM.contarFb(); } }); // (1.0.2) os avisos já vêm junto com a conexão // reconectou (ou abriu em outro aparelho): o que ficou sem fechar aparece de novo
   // (0.6.0) e de tempos em tempos (com o app aberto): a resposta da equipe aparece mesmo se o aviso ao vivo se perdeu
   // (1.0.0) a cada 30 min (era a cada minuto): o normal é o aviso chegar ao vivo pela conexão, e ao reconectar ele é conferido de novo
   setInterval(() => { if (API.token && API.eu && !document.hidden) ADM.verAvisos(); }, 30 * 60000);

@@ -103,7 +103,7 @@
     const anel = h('div', { class: 'aq-anel', role: 'slider', tabindex: '0', 'aria-label': T('Tom', 'Hue'), 'aria-valuemin': '0', 'aria-valuemax': '359' }, conta, gota);
     const faixa = (rot, min, max, v, on) => { const r = h('input', { type: 'range', min, max, value: v, class: 'aq-faixa', 'aria-label': rot }); r.addEventListener('input', () => on(+r.value)); return r; };
     const fViv = faixa(T('Vivacidade', 'Vividness'), 0, 100, s, (x) => { s = x; mudou(); });
-    const fLuz = faixa(T('Luz', 'Light'), 4, 96, l, (x) => { l = x; mudou(); });
+    const fLuz = faixa(T('Luz', 'Light'), 0, 100, l, (x) => { l = x; mudou(); }); // (1.0.2) de 0 a 100: chega no branco e no preto puros (antes parava em 96% e o branco ficava com o tom do anel, tipo #f2ebff)
     const gotas = h('div', { class: 'aq-recentes' }, ...recentes().map((c) => { const b = h('button', { type: 'button', class: 'aq-rec', title: c, estilo: { '--c': c } }); b.addEventListener('click', () => { [hh, s, l] = hslDe(c); fViv.value = s; fLuz.value = l; mudou(c); }); return b; }));
     const meio = h('button', { type: 'button', class: 'aq-meio', title: T('Vivacidade e luz no meio', 'Vividness and light to the middle'), 'aria-label': T('Vivacidade e luz no meio', 'Vividness and light to the middle'), onclick: () => { s = 50; l = 50; fViv.value = s; fLuz.value = l; mudou(); } }, A.icone('atualizar', 15));
     const pop = h('div', { class: 'aquarela vidro', role: 'dialog', 'aria-label': T('Escolher cor', 'Pick a color') }, anel,

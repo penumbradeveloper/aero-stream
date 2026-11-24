@@ -43,9 +43,16 @@ export class Push {
     const k = 'pt:' + (await sha(t)), ap = await this.st.get(k);
     if (!ap) return resposta({ fim: true });
     if (!(await this.st.get(ap.s))) { await this.tirar(ap.c, k); return resposta({ fim: true }); } // a sessão acabou: o push acaba junto
-    const lista = ((await this.st.get('pn:' + ap.c)) || []).filter((x) => x.t >= (ap.desde || 0) && Date.now() - x.t < VIDA_AVISO);
-    ap.desde = Date.now() + 1; await this.st.put(k, ap);
-    return resposta({ novas: lista.slice(-15) });
+    // (1.0.2) os avisos do mesmo milissegundo da última busca que ela ainda não tinha (ap.vn: os que ela já mandou) também vêm
+    const de0 = ap.desde || 0, vn = ap.vn || [];
+    const lista = ((await this.st.get('pn:' + ap.c)) || []).filter((x) => (x.t >= de0 || (x.t === de0 - 1 && !vn.includes(x.cid))) && Date.now() - x.t < VIDA_AVISO);
+    // (1.0.2) as conversas lidas em outro aparelho desde a última pergunta: este aparelho tira a notificação delas
+    const pl = (await this.st.get('pl:' + ap.c)) || {}, desde = ap.ultima || 0;
+    // (as lidas no mesmo milissegundo da última busca já foram mandadas nela: ap.lv guarda quais, para não mandar de novo)
+    const lidas = Object.keys(pl).filter((cid) => (pl[cid] > desde || (pl[cid] === desde && !(ap.lv || []).includes(cid))) && !lista.some((x) => x.cid === cid && x.t > pl[cid]));
+    const agora = Date.now(); ap.desde = agora + 1; ap.ultima = agora; ap.lv = Object.keys(pl).filter((cid) => pl[cid] === agora).slice(0, 30); if (!ap.lv.length) delete ap.lv;
+    ap.vn = lista.filter((x) => x.t === agora).map((x) => x.cid).slice(0, 30); if (!ap.vn.length) delete ap.vn; await this.st.put(k, ap);
+    return resposta({ novas: lista.slice(-15), lidas: lidas.slice(0, 30) });
   }
 
   async rota(conta, rota, metodo, b, chaveSessao) {
@@ -91,6 +98,19 @@ export class Push {
     await this.st.delete(k);
     const l = (await this.st.get('pd:' + contaId)) || [];
     if (l.includes(k)) await this.st.put('pd:' + contaId, l.filter((x) => x !== k));
+  }
+
+  // (1.0.2) a conversa foi lida (em qualquer aparelho): os avisos dela que ainda não foram buscados somem, e os aparelhos que já mostraram
+  // a notificação fecham ela na próxima vez que perguntarem. Uma leitura só do que já existe: sem aviso pendente, não grava nada
+  async lida(contaId, cid) {
+    const av = (await this.st.get('pn:' + contaId)) || [], agora = Date.now();
+    if (!av.some((x) => x.cid === cid)) return; // nenhum aviso dessa conversa: nenhum aparelho mostrou notificação dela
+    const pl = (await this.st.get('pl:' + contaId)) || {};
+    const resto = av.filter((x) => x.cid !== cid && agora - x.t < VIDA_AVISO);
+    for (const [c, t] of Object.entries(pl)) if (agora - t > VIDA_AVISO) delete pl[c];
+    pl[cid] = agora;
+    const ks = Object.keys(pl); if (ks.length > 40) for (const c of ks.sort((a, b) => pl[a] - pl[b]).slice(0, ks.length - 40)) delete pl[c];
+    await this.st.put({ ['pn:' + contaId]: resto, ['pl:' + contaId]: pl });
   }
 
   // mensagem nova: vai para cada aparelho com push que não está com o Aero na tela agora (fechado, no fundo ou sem conexão)

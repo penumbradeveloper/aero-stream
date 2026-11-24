@@ -214,7 +214,7 @@
     const caixas = Array.from({ length: 12 }, () => h('span', { class: 'cod-caixa', 'aria-hidden': 'true' }));
     const codBox = h('div', { class: 'cod-acesso' }, h('span', { class: 'cod-prefixo', 'aria-hidden': 'true' }, 'AERO'),
       h('div', { class: 'cod-caixas' }, h('div', { class: 'cod-grupo' }, ...caixas.slice(0, 4)), h('div', { class: 'cod-grupo' }, ...caixas.slice(4, 8)), h('div', { class: 'cod-grupo' }, ...caixas.slice(8)), loginId));
-    const limparCodigo = (v) => { let n = String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); if (n.length > 12 && n.startsWith('AERO')) n = n.slice(4); return n.slice(0, 12); };
+    const limparCodigo = (v) => A.cripto.letras(v).slice(0, 12); // (1.0.2) o "AERO" colado ou digitado sai sempre (nunca conta como letra do código)
     const pintarCaixas = () => {
       const v = loginId.value, ativo = document.activeElement === loginId, pos = Math.min(loginId.selectionStart == null ? v.length : loginId.selectionStart, 11);
       caixas.forEach((c, i) => { c.textContent = v[i] || ''; c.classList.toggle('cheia', !!v[i]); c.classList.toggle('atual', ativo && i === pos); });
@@ -331,7 +331,7 @@
 
     async function acao() {
       if (!API.definirServidor(servidor.value)) return dizer(T('Cole o endereço do servidor primeiro.', 'Paste the server address first.'), 'erro');
-      if (modo === 'entrar' && como === 'codigo' && loginId.value.length !== 12) { loginId.focus(); return dizer(T('O código tem 12 letras e números depois do AERO.', 'The code has 12 letters and numbers after AERO.'), 'erro'); }
+      if (modo === 'entrar' && como === 'codigo' && loginId.value.length !== 12 && loginId.value.length !== 8) { loginId.focus(); return dizer(T('O código tem 12 letras e números depois do AERO (contas bem antigas: 8).', 'The code has 12 letters and numbers after AERO (very old accounts: 8).'), 'erro'); }
       enviar.disabled = true;
       try {
         if (modo === 'entrar') {
@@ -382,6 +382,8 @@
     seg.style.marginTop = '16px';
     const servidorBloco = h('div', { hidden: true }, rs, servidor); // o servidor agora é fixo (api.js); o campo fica só para testes
     trocar('entrar');
+    // (1.0.2) abriu o site pelo QR (a câmera normal do celular leu o QR, que agora é um link): já vai para o QR code e confere o código
+    { const q = A.ui.qrPendente && A.ui.qrPendente(); if (q) setTimeout(() => { if (!el.isConnected || modo !== 'entrar') return; const b = comoSeg.querySelectorAll('button')[2]; if (b) b.click(); usarCodigo(q); }, 80); }
     [loginId, tagLogin, senhaCampo, nome, tag, email, codigoMail].forEach((i) => i.addEventListener('keydown', (e) => { if (e.key === 'Enter') acao(); }));
     // atualização já na tela de entrar: quem não consegue entrar (versão velha) também atualiza, sem precisar logar
     const versaoTxt = h('span', {}, 'v' + A.versao);

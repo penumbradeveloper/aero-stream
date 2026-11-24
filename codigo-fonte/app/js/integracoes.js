@@ -128,10 +128,12 @@
     const lista = (l, n) => (Array.isArray(l) ? l : []).slice(0, n).map((b) => (b && slug(b.id, 20) ? { id: slug(b.id, 20), nome: txt(b.nome, 30) || slug(b.id, 20) } : null)).filter(Boolean);
     // (0.9.5) as bolhas: as de CSS (só id e nome) e as de arte do estúdio (reconferidas em bolhaarte.js)
     const bolhasDe = (l) => lista(l, 6).map((b, i) => { const o = (Array.isArray(l) ? l : []).find((z) => z && slug(z.id, 20) === b.id); if (!o || o.arte === undefined) return b; const arte = A.bolhaArte && A.bolhaArte.validar(o.arte); return arte ? { ...b, arte } : null; void i; }).filter(Boolean);
+    // (1.0.2) molduras da foto e anéis de quem fala (só a imagem e números, reconferidos em bolhaarte.js)
+    const fotosDe = (l, anel) => (Array.isArray(l) ? l : []).slice(0, 6).map((b) => { const id = b && slug(b.id, 20), arte = id && A.bolhaArte && A.bolhaArte.validarFoto(b.arte, anel); return arte ? { id, nome: txt(b.nome, 30) || id, arte } : null; }).filter(Boolean);
     const presets = (Array.isArray(j.presets) ? j.presets : []).slice(0, 8).map((p) => (p && p.tema && typeof p.tema === 'object' ? { nome: txt(p.nome, 30) || 'Preset', tema: p.tema } : null)).filter(Boolean);
     const css = String(j.css || '').slice(0, 60000);
     const r = I.sanitizar(css, id);
-    return { id, nome, autor: txt(j.autor, 40), desc: txt(j.descricao || j.desc, 600), versao: txt(j.versao, 12), imagem: imagemOk(j.imagem), css, opcoes, sons, barras: lista(j.barras, 6), bolhas: bolhasDe(j.bolhas), presets, tirados: r.tirados };
+    return { id, nome, autor: txt(j.autor, 40), desc: txt(j.descricao || j.desc, 600), versao: txt(j.versao, 12), imagem: imagemOk(j.imagem), css, opcoes, sons, barras: lista(j.barras, 6), bolhas: bolhasDe(j.bolhas), presets, molduras: fotosDe(j.molduras, false), aneis: fotosDe(j.aneis, true), tirados: r.tirados };
   };
   // as opções, as barras e as bolhas de cada integração ligada viram atributos no <body>; os sons entram nos sons de digitação
   const marcados = new Set();
@@ -172,6 +174,7 @@
       if (typeof v === 'number' && !Number.isFinite(v)) continue;
       if (typeof v === 'object') continue;
       t[k] = v; n++;
+      if (A.tema && A.tema.AVANCADAS && A.tema.AVANCADAS.includes(k)) t.avancado = true; // (1.0.2) senão a cor do pacote não aparecia
     }
     if (n) { A.cfg.salvar(); if (A.tema && A.tema.aplicar) A.tema.aplicar(); A.evt.emit('tema'); }
     return n;
@@ -439,7 +442,7 @@
     async function instalarCom(x) {
       const d = await A.api.req('integ/' + x.id + '/pacote');
       const p = I.lerPacote(JSON.stringify({ ...d.pac, id: x.id, autor: d.autor, imagem: d.imagem || '' }));
-      if (!I.sanitizar(p.css, p.id).css && !p.opcoes.length && !p.sons && !p.presets.length && !p.bolhas.some((b) => b.arte)) throw new Error(T('Esta integração não passou nas travas de segurança.', 'This integration did not pass the safety locks.'));
+      if (!I.sanitizar(p.css, p.id).css && !p.opcoes.length && !p.sons && !p.presets.length && !p.bolhas.some((b) => b.arte) && !(p.molduras || []).length && !(p.aneis || []).length) throw new Error(T('Esta integração não passou nas travas de segurança.', 'This integration did not pass the safety locks.'));
       I.instalarPacote(p, 'com-' + x.id, { id: x.id, atual: d.atual || 0, cat: d.cat });
       try { await A.api.req('integ/' + x.id + '/instalar', { sim: true }); } catch (e) { /* só estatística */ }
       return d;
@@ -494,14 +497,20 @@
       if (aberta !== x) return;
       Object.assign(x, { atual: dados.atual, oculta: dados.oculta }); pintarAcao();
       { const p = I.lerPacote(JSON.stringify({ ...dados.pac, id: x.id }));
-        const it = [p.css && T('Visual novo (CSS)', 'New look (CSS)'), p.opcoes.length && p.opcoes.length + (p.opcoes.length === 1 ? T(' opção nas Configurações', ' option in Settings') : T(' opções nas Configurações', ' options in Settings')), p.sons && T('Sons de digitação', 'Typing sounds'), p.barras.length && p.barras.length + (p.barras.length === 1 ? T(' barra das abas', ' tab bar') : T(' barras das abas', ' tab bars')), p.bolhas.length && p.bolhas.length + (p.bolhas.length === 1 ? T(' bolha de conversa', ' chat bubble') : T(' bolhas de conversa', ' chat bubbles')), p.presets.length && p.presets.length + (p.presets.length === 1 ? T(' preset de cores', ' color preset') : T(' presets de cores', ' color presets')), p.tirados.length && T('As travas deste aparelho tiram ', 'This device\'s locks remove ') + p.tirados.length + T(' trecho(s) não permitido(s)', ' disallowed part(s)')].filter(Boolean);
+        const it = [p.css && T('Visual novo (CSS)', 'New look (CSS)'), p.opcoes.length && p.opcoes.length + (p.opcoes.length === 1 ? T(' opção nas Configurações', ' option in Settings') : T(' opções nas Configurações', ' options in Settings')), p.sons && T('Sons de digitação', 'Typing sounds'), p.barras.length && p.barras.length + (p.barras.length === 1 ? T(' barra das abas', ' tab bar') : T(' barras das abas', ' tab bars')), p.bolhas.length && p.bolhas.length + (p.bolhas.length === 1 ? T(' bolha de conversa', ' chat bubble') : T(' bolhas de conversa', ' chat bubbles')), p.presets.length && p.presets.length + (p.presets.length === 1 ? T(' preset de cores', ' color preset') : T(' presets de cores', ' color presets')), p.molduras.length && p.molduras.length + (p.molduras.length === 1 ? T(' moldura da foto', ' photo frame') : T(' molduras da foto', ' photo frames')), p.aneis.length && p.aneis.length + (p.aneis.length === 1 ? T(' anel de voz', ' voice ring') : T(' anéis de voz', ' voice rings')), p.tirados.length && T('As travas deste aparelho tiram ', 'This device\'s locks remove ') + p.tirados.length + T(' trecho(s) não permitido(s)', ' disallowed part(s)')].filter(Boolean);
         detalhes.replaceChildren(...it.map((t) => h('li', {}, t)));
         const vt = A.bolhaArte && !x.oculta && A.bolhaArte.vitrine(x.id, p.bolhas, async (b) => {
           if (!comInstalada(x.id)) { await instalarCom(x); pintarAcao(); }
           await A.bolhaArte.usar(x.id, b.id);
           U.toast(T('Pronto! Suas mensagens agora usam a bolha "' + b.nome + '".', 'Done! Your messages now use the "' + b.nome + '" bubble.'), { tipo: 'ok' });
         });
-        vitrine.replaceChildren(...(vt ? [vt] : [])); }
+        // (1.0.2) as molduras e os anéis de voz dela, com "Usar"
+        const vf = A.bolhaArte && !x.oculta && A.bolhaArte.vitrineFotos && A.bolhaArte.vitrineFotos(x.id, p.molduras, p.aneis, async (b, anel) => {
+          if (!comInstalada(x.id)) { await instalarCom(x); pintarAcao(); }
+          await A.bolhaArte.usarFoto(x.id, b.id, anel);
+          U.toast(anel ? T('Pronto! Seu anel de voz agora é "' + b.nome + '".', 'Done! Your voice ring is now "' + b.nome + '".') : T('Pronto! Sua foto agora usa a moldura "' + b.nome + '".', 'Done! Your photo now uses the "' + b.nome + '" frame.'), { tipo: 'ok' });
+        });
+        vitrine.replaceChildren(...[vt, vf].filter(Boolean)); }
       // as avaliações (as mesmas rotas das oficiais)
       let d = null; try { d = await A.api.req('integ/' + x.id); } catch (e) { coment.replaceChildren(h('div', { class: 'suave peq' }, e.message)); return; }
       if (aberta !== x) return;
@@ -567,7 +576,7 @@
       area.addEventListener('keydown', (e) => e.stopPropagation());
       const conferirJa = () => {
         if (!area.value.trim()) { info.textContent = ''; return null; }
-        try { const p = I.lerPacote(area.value); const extra = [p.opcoes.length && p.opcoes.length + (p.opcoes.length === 1 ? T(' opção', ' option') : T(' opções', ' options')), p.sons && T('sons de digitação', 'typing sounds'), p.barras.length && p.barras.length + (p.barras.length === 1 ? T(' barra', ' bar') : T(' barras', ' bars')), p.bolhas.length && p.bolhas.length + (p.bolhas.length === 1 ? T(' bolha', ' bubble') : T(' bolhas', ' bubbles')), p.presets.length && p.presets.length + ' presets'].filter(Boolean);
+        try { const p = I.lerPacote(area.value); const extra = [p.opcoes.length && p.opcoes.length + (p.opcoes.length === 1 ? T(' opção', ' option') : T(' opções', ' options')), p.sons && T('sons de digitação', 'typing sounds'), p.barras.length && p.barras.length + (p.barras.length === 1 ? T(' barra', ' bar') : T(' barras', ' bars')), p.bolhas.length && p.bolhas.length + (p.bolhas.length === 1 ? T(' bolha', ' bubble') : T(' bolhas', ' bubbles')), p.presets.length && p.presets.length + ' presets', p.molduras.length && p.molduras.length + T(' moldura(s)', ' frame(s)'), p.aneis.length && p.aneis.length + T(' anel(éis) de voz', ' voice ring(s)')].filter(Boolean);
           info.textContent = '"' + p.nome + '"' + (extra.length ? ' · ' + extra.join(', ') : '') + (p.tirados.length ? ' · ' + T('as travas tiraram ', 'the locks removed ') + p.tirados.length + T(' trecho(s) que não são permitidos', ' disallowed part(s)') : '')
             + (() => { const ja = cfg()['loc-' + p.id]; if (!ja) return ''; const va = (ja.pac && ja.pac.versao) || '?', vn = p.versao || '?'; return ' · ' + (va !== vn ? T('atualiza da v', 'updates from v') + va + T(' para a v', ' to v') + vn : T('já instalada: instalar de novo atualiza', 'already installed: installing again updates it')); })(); return p;
         } catch (e) { info.textContent = e.message; return null; }
@@ -579,7 +588,7 @@
         h('p', { class: 'peq suave' }, T('As opções viram data-ig-<id>-<opção> e --ig-<id>-<opção> no body; a barra e a bolha escolhidas viram data-ig-barra e data-ig-bolha. Nada de script, nada de internet: as Configurações, esta aba e as partes protegidas não mudam.', 'Options become data-ig-<id>-<option> and --ig-<id>-<option> on body; the chosen bar and bubble become data-ig-barra and data-ig-bolha. No scripts, no internet: Settings, this tab and protected parts never change.')));
       let cat = (op.de && op.de.cat) || 'tema';
       const catSeg = pub ? h('div', { class: 'col', estilo: { gap: '6px' } }, h('b', { class: 'peq' }, T('Categoria', 'Category')), ((x) => { x.classList.add('quebra'); return x; })(U.seg(Object.entries(CATS()).map(([k, v]) => [k, v[0], v[1]]), cat, (v) => { cat = v; }))) : null;
-      if (op.pac) area.value = JSON.stringify({ nome: op.pac.nome, descricao: op.pac.desc, versao: op.pac.versao, css: op.pac.css, opcoes: op.pac.opcoes, sons: op.pac.sons || undefined, barras: op.pac.barras, bolhas: op.pac.bolhas, presets: op.pac.presets }, null, 2);
+      if (op.pac) area.value = JSON.stringify({ nome: op.pac.nome, descricao: op.pac.desc, versao: op.pac.versao, css: op.pac.css, opcoes: op.pac.opcoes, sons: op.pac.sons || undefined, barras: op.pac.barras, bolhas: op.pac.bolhas, presets: op.pac.presets, molduras: op.pac.molduras, aneis: op.pac.aneis }, null, 2);
       // (0.9.5) o estúdio de bolhas: monta as bolhas de arte e devolve para o pacote (as imagens já vão para o servidor)
       const abrirEstudio = () => {
         let pkg = {}; const v = area.value.trim();
@@ -587,6 +596,16 @@
         if (!pkg || typeof pkg !== 'object' || Array.isArray(pkg)) pkg = {};
         A.bolhaArte.estudio(Array.isArray(pkg.bolhas) ? pkg.bolhas : [], (bolhas) => {
           pkg.bolhas = bolhas; if (!pkg.nome) pkg.nome = (bolhas.find((b) => b.arte) || {}).nome || '';
+          area.value = JSON.stringify(pkg, null, 2); conferirJa();
+        });
+      };
+      // (1.0.2) o estúdio de molduras e anéis de voz
+      const abrirEstudioFotos = () => {
+        let pkg = {}; const v = area.value.trim();
+        if (v) { if (v.startsWith('{')) { try { pkg = JSON.parse(v); } catch (e) { U.toast(T('Arrume o pacote .json antes de abrir o estúdio.', 'Fix the .json package before opening the studio.'), { tipo: 'erro' }); return; } } else pkg = { css: v }; }
+        if (!pkg || typeof pkg !== 'object' || Array.isArray(pkg)) pkg = {};
+        A.bolhaArte.estudioFotos(Array.isArray(pkg.molduras) ? pkg.molduras : [], Array.isArray(pkg.aneis) ? pkg.aneis : [], (molduras, aneis) => {
+          pkg.molduras = molduras; pkg.aneis = aneis; if (!pkg.nome) pkg.nome = ((molduras[0] || aneis[0]) || {}).nome || '';
           area.value = JSON.stringify(pkg, null, 2); conferirJa();
         });
       };
@@ -606,10 +625,10 @@
       };
       const m = U.modal(pub ? (op.de ? T('Atualizar a publicação', 'Update the upload') : T('Publicar na Comunidade', 'Publish to Community')) : T('Instalar a sua integração', 'Install your own integration'), h('div', { class: 'col', estilo: { gap: '10px' } },
         pub ? h('p', { class: 'peq suave' }, T('Ela passa pelas travas antes de entrar: nada de links, @import, fontes de fora ou código. Quem instala pode avaliar e denunciar.', 'It goes through the locks first: no links, @import, external fonts or code. People who install can rate and report it.')) : null, catSeg,
-        h('div', { class: 'linha', estilo: { gap: '8px', 'flex-wrap': 'wrap' } }, U.btn(T('Abrir arquivo', 'Open file'), { icone: 'pasta', tipo: 'sec', peq: true, onclick: () => arq.click() }), U.btn(T('Imagem', 'Image'), { icone: 'imagem', tipo: 'sec', peq: true, onclick: () => imgArq.click() }), pub && A.bolhaArte ? U.btn(T('Estúdio de bolhas', 'Bubble studio'), { icone: 'bolhas', tipo: 'sec', peq: true, onclick: abrirEstudio }) : null, h('span', { class: 'peq suave' }, '.css · .json')), arq, imgArq, imgPrev, area, info, exemplo),
+        h('div', { class: 'linha', estilo: { gap: '8px', 'flex-wrap': 'wrap' } }, U.btn(T('Abrir arquivo', 'Open file'), { icone: 'pasta', tipo: 'sec', peq: true, onclick: () => arq.click() }), U.btn(T('Imagem', 'Image'), { icone: 'imagem', tipo: 'sec', peq: true, onclick: () => imgArq.click() }), pub && A.bolhaArte ? U.btn(T('Estúdio de bolhas', 'Bubble studio'), { icone: 'bolhas', tipo: 'sec', peq: true, onclick: abrirEstudio }) : null, pub && A.bolhaArte && A.bolhaArte.estudioFotos ? U.btn(T('Molduras e anéis', 'Frames and rings'), { icone: 'imagem', tipo: 'sec', peq: true, onclick: abrirEstudioFotos }) : null, h('span', { class: 'peq suave' }, '.css · .json')), arq, imgArq, imgPrev, area, info, exemplo),
       { largura: 620, acoes: [{ texto: T('Cancelar', 'Cancel'), tipo: 'sec', valor: false }, pub ? { texto: op.de ? T('Atualizar', 'Update') : T('Publicar', 'Publish'), tipo: 'ok', onclick: () => enviarPub() } : { texto: T('Instalar', 'Install'), tipo: 'ok', onclick: () => {
         const p = conferirJa(); if (!p) { U.toast(T('Cole um CSS ou um pacote primeiro.', 'Paste a CSS or package first.'), { tipo: 'erro' }); return; }
-        if (!I.sanitizar(p.css, p.id).css && !p.opcoes.length && !p.sons && !p.presets.length && !p.bolhas.some((b) => b.arte)) { U.toast(T('Não sobrou nada depois das travas.', 'Nothing left after the locks.'), { tipo: 'erro' }); return; }
+        if (!I.sanitizar(p.css, p.id).css && !p.opcoes.length && !p.sons && !p.presets.length && !p.bolhas.some((b) => b.arte) && !(p.molduras || []).length && !(p.aneis || []).length) { U.toast(T('Não sobrou nada depois das travas.', 'Nothing left after the locks.'), { tipo: 'erro' }); return; }
         const ja = cfg()['loc-' + p.id];
         if (imgEsc) p.imagem = imgEsc; else if (!p.imagem && ja && ja.pac && ja.pac.imagem) p.imagem = ja.pac.imagem;
         I.instalarPacote(p); m.fechar(); U.toast(ja ? T('Atualizada, com as suas opções de antes.', 'Updated, keeping your previous options.') : T('Instalada. As opções dela ficam em Configurações > Integrações.', 'Installed. Its options are in Settings > Integrations.'), { tipo: 'ok' }); pintar();

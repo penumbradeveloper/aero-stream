@@ -3,17 +3,55 @@
 const LINGUA = /^[a-z]{2,3}(?:-[A-Za-z]{2,4})?$/;
 const UA = { 'User-Agent': 'AeroStream/1.0 (+https://web.aerostream.workers.dev)' };
 
-export async function traduzir(texto, para, de = 'auto') {
-  texto = String(texto || '').slice(0, 2000); if (!texto.trim()) return { texto: '', de: '' };
-  if (!LINGUA.test(para)) throw new Error('Língua inválida.');
-  if (de !== 'auto' && !LINGUA.test(de)) de = 'auto';
-  const u = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${de}&tl=${para}&dt=t&dt=rm&q=${encodeURIComponent(texto)}`;
-  const r = await fetch(u, { headers: UA }); if (!r.ok) throw new Error('O tradutor não respondeu.');
+// (1.0.2) o tradutor do Google passou a recusar o endereço antigo (translate_a/single) vindo de servidores ("429 Sorry"): a tradução
+// parou de funcionar. Agora tenta o endereço da extensão do Chrome primeiro, o antigo depois e o MyMemory por último, e guarda a
+// tradução no cache do Cloudflare (a mesma mensagem traduzida por várias pessoas de um grupo vira um pedido só)
+const comTempo = (u, o = {}) => fetch(u, { ...o, headers: { ...UA, ...(o.headers || {}) }, signal: AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined });
+async function viaExtensao(texto, para, de) {
+  const r = await comTempo(`https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=${de}&tl=${para}&q=${encodeURIComponent(texto)}`);
+  if (!r.ok) return null;
+  const d = await r.json(), x = Array.isArray(d) ? d[0] : null;
+  if (Array.isArray(x) && typeof x[0] === 'string') return { texto: x[0], de: typeof x[1] === 'string' ? x[1] : de };
+  if (typeof x === 'string') return { texto: x, de };
+  return null;
+}
+async function viaGtx(texto, para, de) {
+  const r = await comTempo(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${de}&tl=${para}&dt=t&dt=rm&q=${encodeURIComponent(texto)}`);
+  if (!r.ok) return null;
   const d = await r.json();
   const partes = Array.isArray(d && d[0]) ? d[0] : [];
   const out = partes.map((p) => (Array.isArray(p) && typeof p[0] === 'string' ? p[0] : '')).join('');
   const rom = partes.map((p) => (Array.isArray(p) && typeof p[3] === 'string' ? p[3] : '')).join(' ').trim(); // como se lê (japonês, russo...)
-  return { texto: out.slice(0, 4000), de: typeof d[2] === 'string' ? d[2].slice(0, 8) : de, rom: rom.slice(0, 400) || undefined };
+  return out ? { texto: out, de: typeof d[2] === 'string' ? d[2] : de, rom: rom || undefined } : null;
+}
+async function viaMyMemory(texto, para, de) {
+  if (de === 'auto' || texto.length > 500) return null; // ele precisa saber a língua de origem
+  const r = await comTempo(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(texto)}&langpair=${de}|${para}`);
+  if (!r.ok) return null;
+  const d = await r.json(), t = d && d.responseData && d.responseData.translatedText;
+  return typeof t === 'string' && t && d.responseStatus === 200 ? { texto: t, de } : null;
+}
+
+export async function traduzir(texto, para, de = 'auto') {
+  texto = String(texto || '').slice(0, 2000); if (!texto.trim()) return { texto: '', de: '' };
+  if (!LINGUA.test(para)) throw new Error('Língua inválida.');
+  if (de !== 'auto' && !LINGUA.test(de)) de = 'auto';
+  const cache = typeof caches !== 'undefined' && caches.default ? caches.default : null;
+  let chave = null;
+  if (cache) {
+    try {
+      const h = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(de + '|' + para + '|' + texto))), (b) => b.toString(16).padStart(2, '0')).join('');
+      chave = new Request('https://cache.aero/traduzir/' + h);
+      const c = await cache.match(chave); if (c) return await c.json();
+    } catch (_) { chave = null; }
+  }
+  let r = null;
+  for (const via of [viaExtensao, viaGtx]) { try { r = await via(texto, para, de); } catch (_) { r = null; } if (r) break; }
+  if (!r) { try { r = await viaMyMemory(texto, para, de); } catch (_) { r = null; } }
+  if (!r) throw new Error('O tradutor não respondeu.');
+  const out = { texto: String(r.texto).slice(0, 4000), de: String(r.de || de).slice(0, 8), rom: r.rom ? String(r.rom).slice(0, 400) : undefined };
+  if (cache && chave) { try { await cache.put(chave, new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'max-age=604800' } })); } catch (_) { /* sem cache */ } }
+  return out;
 }
 
 // o verbete do Wikcionário daquela língua (pt.wiktionary para português, en.wiktionary para inglês...): só a parte da própria língua

@@ -77,6 +77,8 @@
     if (!alvo) return;
     alvo.querySelectorAll(':scope > .px-mo').forEach((e) => e.remove());
     if (!mo || !mo.t) return;
+    // (1.0.2) a de um artista da Comunidade: uma imagem em volta da foto (na frente dela ou atrás)
+    if (mo.t === 'arte') { const el = A.bolhaArte && A.bolhaArte.foto(mo.a, false, { meu: !!(A.api && A.api.eu && alvo.dataset.cod === A.api.eu.codigo) }); if (!el) return; alvo.classList.add('px-mo-alvo'); if (el.classList.contains('atras')) alvo.prepend(el); else alvo.append(el); return; }
     const c = mo.c || [];
     const pd = { anel: ['#ff4f7a', '#ffb3c8'], faiscas: ['#ff3fd2', '#38e8ff'] }[mo.t] || []; // (1.0.0) Corações e Neon nascem nas cores deles (a pessoa ainda pode trocar)
     const el = h('i', { class: 'px-mo px-mo-' + mo.t, 'aria-hidden': 'true', estilo: { '--m1': c[0] || pd[0] || c1 || '#7fd3ff', '--m2': c[1] || pd[1] || c2 || '#9b6cff' } });
@@ -452,13 +454,23 @@
     const amostraMo = (id) => h('span', { class: 'px-op-amostra' }, (() => { const a = h('span', { class: 'avatar', estilo: { '--t': '34px' } }); pintarMo(a, id); amostrasMo.push([a, id]); return a; })());
     // a prévia do editor é redesenhada no quadro seguinte: espera o cartão novo para tocar nele
     const tocarPrevia = () => setTimeout(() => { const c = document.querySelector('.perfil-previa .perfil-cartao'); if (c && st.ab) X.abertura(c, st.ab); }, 80);
+    // (1.0.2) as molduras e os anéis das integrações da Comunidade que você instalou (de graça para todos, como as bolhas de arte)
+    const gradeArtistas = (anel, atual, escolher) => {
+      const l = A.bolhaArte ? A.bolhaArte.fotosInstaladas(anel) : []; if (!l.length) return null;
+      const sel = atual && atual.t === 'arte' ? atual.ig + '/' + atual.id : '';
+      const amostra = (x) => { if (anel) return X.amostraAnel('arte', null, { ig: x.ig, id: x.id, a: x.a }); const av = h('span', { class: 'avatar', estilo: { '--t': '34px' } }); X.moldura(av, { t: 'arte', a: x.a }); return h('span', { class: 'px-op-amostra' }, av); };
+      const porId = new Map(l.map((x) => [x.ig + '/' + x.id, x]));
+      return h('div', { class: 'col', estilo: { gap: '4px' } }, h('small', { class: 'suave' }, T('De artistas (Integrações)', 'By artists (Integrations)')),
+        X.grade(l.map((x) => [x.ig + '/' + x.id, x.nome, x.nome, 0]), sel, (k) => { const x = porId.get(k); escolher(x ? { t: 'arte', ig: x.ig, id: x.id, n: x.nome, a: x.a } : null); }, { nenhum: false, desenho: (k) => amostra(porId.get(k)) }));
+    };
     function refazer() {
       const n = X.nivel(), nAc = X.ACESSORIOS_MAX(Math.max(n, 3)), niv = (l, id) => nivelEm(l, id);
       const acs = st.ac || (st.ac = []); amostrasMo = [];
       const lAc = X.listaAcessorios(acs, { refazer, pintar });
       caixa.replaceChildren(
         rot(T('Moldura da foto', 'Photo frame')), X.grade(X.MOLDURAS, st.mo && st.mo.t, (id) => { st.mo = id ? { t: id, c: lembradas('mo') } : null; refazer(); pintar(); }, { desenho: amostraMo }),
-        st.mo ? linhaCores(st.mo, (re) => { if (re) refazer(); else amostrasMo.forEach(([a, id]) => pintarMo(a, id)); pintar(); }, null, (l) => guardarCores('mo', l)) : null, st.mo ? X.faixaPrevia(niv(X.MOLDURAS, st.mo.t)) : null,
+        gradeArtistas(false, st.mo, (x) => { st.mo = x; refazer(); pintar(); }),
+        st.mo && st.mo.t !== 'arte' ? linhaCores(st.mo, (re) => { if (re) refazer(); else amostrasMo.forEach(([a, id]) => pintarMo(a, id)); pintar(); }, null, (l) => guardarCores('mo', l)) : null, st.mo && st.mo.t !== 'arte' ? X.faixaPrevia(niv(X.MOLDURAS, st.mo.t)) : null,
         rot(T('Animação ao abrirem seu perfil', 'Animation when your profile opens')), X.grade(X.ABERTURAS, st.ab, (id) => { st.ab = id || ''; refazer(); pintar(); if (id) tocarPrevia(); }, { desenho: (id) => X.amostraAbertura(id, st.cor1, st.cor2) }),
         st.ab ? h('div', { class: 'linha', estilo: { gap: '8px', 'align-items': 'center', 'flex-wrap': 'wrap' } }, A.ui.btn(T('Ver no meu cartão', 'Play on my card'), { icone: 'play', tipo: 'sec', peq: true, onclick: tocarPrevia }), X.faixaPrevia(niv(X.ABERTURAS, st.ab))) : null,
         rot(T('Acessórios no cartão', 'Card accessories')), lAc,
@@ -466,7 +478,8 @@
         acs.length ? X.faixaPrevia(3) : dica(T('Até 3 no Donator e até 8 no Supporter.', 'Up to 3 on Donator and up to 8 on Supporter.')),
         rot(T('Na chamada', 'In calls')),
         h('small', { class: 'suave' }, T('Anel quando você fala', 'Ring when you speak')), X.grade(X.ANEIS, st.an && st.an.t, (id) => { st.an = id ? { t: id, c: lembradas('an').slice(0, X.MAX_CORES_ANEL(id)) } : null; refazer(); pintar(); }, { desenho: (id) => X.amostraAnel(id, st.an && st.an.c) }),
-        st.an ? linhaCores(st.an, (re) => { if (re) refazer(); else caixa.querySelectorAll('.px-anel-am').forEach((el) => X.coresAnel(el, st.an.t, st.an.c)); pintar(); }, { min: 2, max: X.MAX_CORES_ANEL(st.an.t), padrao: X.CORES_ANEL[st.an.t] || X.CORES_ANEL.padrao, rotPadrao: T('Cores do anel', 'Ring colors') }, lembrarAnel) : null, st.an ? X.faixaPrevia(niv(X.ANEIS, st.an.t)) : null,
+        gradeArtistas(true, st.an, (x) => { st.an = x; refazer(); pintar(); }),
+        st.an && st.an.t !== 'arte' ? linhaCores(st.an, (re) => { if (re) refazer(); else caixa.querySelectorAll('.px-anel-am').forEach((el) => X.coresAnel(el, st.an.t, st.an.c)); pintar(); }, { min: 2, max: X.MAX_CORES_ANEL(st.an.t), padrao: X.CORES_ANEL[st.an.t] || X.CORES_ANEL.padrao, rotPadrao: T('Cores do anel', 'Ring colors') }, lembrarAnel) : null, st.an && st.an.t !== 'arte' ? X.faixaPrevia(niv(X.ANEIS, st.an.t)) : null,
         h('small', { class: 'suave' }, T('Som quando você entra (quem não quiser ouvir desliga)', 'Sound when you join (anyone can turn it off)')), X.grade(X.SONS_ENTRAR, st.se, (id) => { st.se = id || ''; refazer(); }, { desenho: () => h('span', { class: 'px-op-amostra' }, '🔔'), ouvir: (id) => A.som.tocar('entrar-' + id) }),
         st.se ? X.faixaPrevia(niv(X.SONS_ENTRAR, st.se)) : null,
         h('small', { class: 'suave' }, T('Moldura da sua câmera (desenhada na tela de quem assiste)', 'Your camera frame (drawn on the viewer\'s screen)')), X.grade(X.MOLDURAS_CAMERA, st.mc && st.mc.t, (id) => { st.mc = id ? { t: id, c: lembradas('mc').slice(0, X.CORES_CAMERA[id] ? X.CORES_CAMERA[id][1] : 2) } : null; refazer(); }, { desenho: (id) => { const am = h('span', { class: 'px-cam-am px-cam-' + id, 'data-mc': id }); X.pintarCamera(am, st.mc && st.mc.t === id ? st.mc : { t: id }); return h('span', { class: 'px-op-amostra' }, am); } }),
@@ -697,7 +710,7 @@
     const e = X.extrasDe(cod);
     if (e.an && e.an.t) { el.dataset.an = e.an.t; X.coresAnel(el, e.an.t, e.an.c); } else { delete el.dataset.an; delete el.dataset.anc; }
     if (e.mc && e.mc.t) { el.dataset.mc = e.mc.t; X.pintarCamera(el, e.mc); } else delete el.dataset.mc;
-    const av = el.querySelector('.avatar'); X.anelFx(av, e.an && e.an.t); if (av) av._cod = cod; // (1.0.2) o volume da voz dela chega por esse código
+    const av = el.querySelector('.avatar'); X.anelFx(av, e.an && e.an.t, e.an); if (av) av._cod = cod; // (1.0.2) o volume da voz dela chega por esse código
     if (av && av.dataset.an && el.classList.contains('falando') !== av.classList.contains('an-on')) X.fala(el, el.classList.contains('falando'));
     return el;
   };
@@ -724,9 +737,21 @@
     equalizador: ['fx-anel fx-base', ...Array(32).fill('fx-barra')], sonar: ['fx-tela', 'fx-anel fx-fio'], notas: ['fx-halo', 'fx-anel fx-fio', 'fx-tela'],
     orbita: ['fx-trilho', 'fx-lua', 'fx-lua', 'fx-anel fx-fio'], aurora: ['fx-tela'], coracoes: ['fx-halo', 'fx-anel fx-tubo', 'fx-anel fx-reflexo', 'fx-tela'] };
   const sorteio = (k) => { const x = Math.sin(k * 12.9898) * 43758.5453; return x - Math.floor(x); };
-  X.anelFx = (av, t) => {
+  X.anelFx = (av, t, an) => {
     if (!av) return;
     let fx = av.querySelector(':scope > .px-fx');
+    // (1.0.2) o anel de um artista da Comunidade: a imagem dele em volta da foto, crescendo com a voz (--v) o quanto o artista escolheu
+    if (t === 'arte') {
+      const chave = an && an.ig + '/' + an.id + '/' + (an.v || 0);
+      if (fx && fx.dataset.t === 'arte' && fx.dataset.k === chave) return;
+      const pc = an && A.bolhaArte && A.bolhaArte.foto(an.a, true, { meu: !!(A.api && A.api.eu && av.dataset.cod === A.api.eu.codigo) });
+      if (fx) fx.remove();
+      if (!pc) { delete av.dataset.an; av.classList.remove('an-on', 'an-sai'); return; }
+      av.dataset.an = 'arte';
+      fx = h('b', { class: 'px-fx px-fx-arte' + (pc.classList.contains('atras') ? '' : ' frente'), 'aria-hidden': 'true' }, pc); fx.dataset.t = 'arte'; fx.dataset.k = chave;
+      if (pc.classList.contains('atras')) av.prepend(fx); else av.append(fx);
+      return;
+    }
     if (!t || !FX_ANEL[t]) { if (fx) fx.remove(); delete av.dataset.an; av.classList.remove('an-on', 'an-sai'); return; }
     av.dataset.an = t;
     if (fx && fx.dataset.t === t) return;
@@ -1022,11 +1047,11 @@
     s.fixo = null;
   }
   // a amostra na grade do editor: a sua foto pequena num círculo de chamada, com o anel parado; com o mouse ou o teclado em cima ele "fala"
-  X.amostraAnel = (id, cores) => {
+  X.amostraAnel = (id, cores, an) => {
     const eu = A.api && A.api.eu, av = eu && A.ui && A.ui.avatar ? A.ui.avatar(eu, 28) : h('span', { class: 'avatar', estilo: { '--ah': '205' } });
     const caixa = h('span', { class: 'px-anel-am' }, av);
     X.coresAnel(caixa, id, cores);
-    X.anelFx(av, id); av.classList.add('an-on');
+    X.anelFx(av, id, an); av.classList.add('an-on');
     const s = estado(av); s.amostra = true;
     const tocar = (on) => { s.tocando = on; if (on) ligar(av); };
     setTimeout(() => { const op = caixa.closest('.px-op') || caixa; op.addEventListener('pointerenter', () => tocar(true)); op.addEventListener('pointerleave', () => tocar(false)); op.addEventListener('focusin', () => tocar(true)); op.addEventListener('focusout', () => tocar(false)); }, 0);

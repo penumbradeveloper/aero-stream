@@ -38,7 +38,25 @@
   // estrelas de 0 a 10 (meias estrelas)
   const estrelas = (n, cls = '') => h('span', { class: 'mr-estrelas ' + cls, 'aria-label': n ? (n / 2) + ' / 5' : '' }, ...[1, 2, 3, 4, 5].map((i) => h('i', { class: n >= i * 2 ? 'cheia' : n === i * 2 - 1 ? 'meia' : '' }, '★')));
   MU.estrelas = estrelas;
-  const imagem = (x, c) => h('div', { class: 'mr-img' + (CATS[c].q ? ' q' : '') }, x.c ? h('img', { src: MU.capa(x.c), alt: '', loading: 'lazy', draggable: 'false', referrerpolicy: 'no-referrer', onerror: (e) => e.target.remove() }) : null, h('span', { class: 'mr-img-ic' }, A.icone(CATS[c].ic, 22)));
+  // (1.0.2) a capa guardada não abriu (o site trocou o arquivo: a Wikipédia mudou o logo do League of Legends e do Valorant, por exemplo) ou o
+  // item ficou sem capa: procura a capa de agora pelo nome, uma vez por item, e mostra essa (no próprio aparelho; nada é salvo)
+  const novaCapa = new Map();
+  const normT = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\(.*?\)/g, '').replace(/[^a-z0-9]+/g, '');
+  MU.capaAtual = (x, c) => {
+    const k = c + ':' + normT(x.t); if (!x.t || !API.token || !CATS[c]) return Promise.resolve('');
+    if (!novaCapa.has(k)) novaCapa.set(k, fetch(`${API.servidor}/api/busca?tipo=${c}&q=${encodeURIComponent(String(x.t).slice(0, 100))}`, { headers: { Authorization: 'Bearer ' + API.token } })
+      .then((r) => r.json()).then((d) => { const l = (d && d.itens) || []; const it = l.find((y) => normT(y.t) === normT(x.t) && y.c) || null; return it && it.c !== x.c ? it.c : ''; }).catch(() => ''));
+    return novaCapa.get(k);
+  };
+  MU.imgCapa = (x, c, capa = MU.capa) => {
+    const img = h('img', { alt: '', loading: 'lazy', draggable: 'false', referrerpolicy: 'no-referrer' });
+    let tentou = false;
+    const trocar = () => { if (tentou) { img.remove(); return; } tentou = true; MU.capaAtual(x, c).then((u) => { if (u) img.src = capa(u); else img.remove(); }); };
+    img.onerror = trocar;
+    if (x.c) img.src = capa(x.c); else trocar();
+    return img;
+  };
+  const imagem = (x, c) => h('div', { class: 'mr-img' + (CATS[c].q ? ' q' : '') }, x.c || c === 'j' ? MU.imgCapa(x, c) : null, h('span', { class: 'mr-img-ic' }, A.icone(CATS[c].ic, 22)));
   const NOME_LINK = (u) => (/imdb\.com/.test(u) ? 'IMDb' : /anilist/.test(u) ? 'AniList' : /kitsu\.app/.test(u) ? 'Kitsu' : /deezer/.test(u) ? 'Deezer' : /spotify/.test(u) ? 'Spotify' : /music\.youtube/.test(u) ? 'YouTube Music' : /steampowered/.test(u) ? 'Steam' : /wikipedia\.org/.test(u) ? 'Wikipedia' : /letterboxd/.test(u) ? 'Letterboxd' : T('o site', 'the site'));
 
   // (0.8.7) músicas do Mural tocam como a música do perfil: o trecho de 30 s escolhido (YouTube) ou, sem trecho, a prévia achada pelo nome

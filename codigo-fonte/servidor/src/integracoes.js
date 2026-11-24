@@ -35,8 +35,26 @@ export function validarArte(a) {
   if (!o.moldura && !o.fundo && !o.pers && !o.cor.fundo) return null;
   return o;
 }
+// (1.0.2) molduras da foto e anéis de quem fala feitos por artistas (Supporter): uma imagem (PNG, WebP ou GIF, com a versão parada) em
+// volta da foto, e só números e escolhas de listas. Nada de código nem CSS: quem desenha é o app, com as mesmas travas em qualquer lugar
+export function validarArteFoto(a, anel) {
+  if (!a || typeof a !== 'object' || Array.isArray(a)) return null;
+  const img = imgArte(a.img); if (!img) return null;
+  const o = { v: 1, img, escala: inteiro(a.escala, 100, 220, 140), x: inteiro(a.x, -40, 40, 0), y: inteiro(a.y, -40, 40, 0), camada: umDe(a.camada, ['frente', 'atras'], 'frente'), giro: inteiro(a.giro, 0, 60, 0), pulso: !!a.pulso };
+  if (anel) o.voz = inteiro(a.voz, 0, 100, 60);
+  return o;
+}
 // os códigos das imagens que uma arte usa (com as versões paradas dos GIFs)
-export const imagensDaArte = (a) => { const l = []; const um = (i) => { if (i) { l.push(i.h); if (i.p) l.push(i.p); } }; if (a) { um(a.moldura && a.moldura.img); um(a.fundo && a.fundo.img); for (const x of a.pers || []) um(x.img); } return l; };
+export const imagensDaArte = (a) => { const l = []; const um = (i) => { if (i) { l.push(i.h); if (i.p) l.push(i.p); } }; if (a) { um(a.moldura && a.moldura.img); um(a.fundo && a.fundo.img); for (const x of a.pers || []) um(x.img); if (!a.moldura && !a.fundo && !a.pers) um(a.img); } return l; };
+// as molduras e os anéis de um pacote
+const fotosDe = (l, anel) => (Array.isArray(l) ? l : []).slice(0, 6).map((b) => {
+  if (!b || typeof b !== 'object') return null;
+  const id = String(b.id || '').toLowerCase(); if (!/^[a-z0-9-]{1,20}$/.test(id)) return null;
+  const nome = String(b.nome == null ? '' : b.nome).replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 30) || id;
+  const arte = validarArteFoto(b.arte, anel); return arte ? { id, nome, arte } : null;
+}).filter(Boolean);
+// todas as artes de um pacote (bolhas, molduras e anéis)
+const artesDoPacote = (pac) => [...((pac && pac.bolhas) || []).map((x) => x.arte), ...((pac && pac.molduras) || []).map((x) => x.arte), ...((pac && pac.aneis) || []).map((x) => x.arte)].filter(Boolean);
 // as bolhas de um pacote: as de CSS (só id e nome) e as de arte
 const bolhasDe = (l) => (Array.isArray(l) ? l : []).slice(0, 6).map((b) => {
   if (!b || typeof b !== 'object') return null;
@@ -101,9 +119,9 @@ export function validarPacote(b) {
     return undefined;
   };
   const pac = { nome: limpa(p.nome, 40), desc: limpa(p.descricao || p.desc, 600), versao: limpa(p.versao, 12), css,
-    opcoes: seguro(p.opcoes) || [], sons: p.sons ? seguro(p.sons) : null, barras: seguro(p.barras) || [], bolhas: bolhasDe(p.bolhas), presets: seguro(p.presets) || [] };
+    opcoes: seguro(p.opcoes) || [], sons: p.sons ? seguro(p.sons) : null, barras: seguro(p.barras) || [], bolhas: bolhasDe(p.bolhas), presets: seguro(p.presets) || [], molduras: fotosDe(p.molduras, false), aneis: fotosDe(p.aneis, true) };
   if (!pac.nome) throw new Error('Dê um nome para a integração.');
-  if (!css.trim() && !pac.opcoes.length && !pac.sons && !pac.presets.length && !pac.bolhas.some((x) => x.arte)) throw new Error('A integração está vazia.');
+  if (!css.trim() && !pac.opcoes.length && !pac.sons && !pac.presets.length && !pac.bolhas.some((x) => x.arte) && !pac.molduras.length && !pac.aneis.length) throw new Error('A integração está vazia.');
   if (JSON.stringify(pac).length > MAX_PAC) throw new Error('A integração é grande demais.');
   return { pac, imagem: imagemOk(p.imagem) };
 }
@@ -143,7 +161,7 @@ export class Integracoes {
       if (!cat) return erro('Escolha a categoria.');
       let v; try { v = validarPacote(b.pac); } catch (e) { return erro(e.message); }
       // (0.9.5) as imagens das bolhas de arte precisam já estar no servidor (o estúdio manda antes de publicar)
-      for (const bo of v.pac.bolhas) for (const h of imagensDaArte(bo.arte)) { const im = await this.hub.get('igam:' + h); if (!im || im.bloq) return erro('Uma imagem da bolha "' + bo.nome + '" não está no servidor. Abra o estúdio e salve de novo.'); }
+      for (const bo of [...v.pac.bolhas, ...v.pac.molduras, ...v.pac.aneis]) for (const h of imagensDaArte(bo.arte)) { const im = await this.hub.get('igam:' + h); if (!im || im.bloq) return erro('Uma imagem de "' + bo.nome + '" não está no servidor. Abra o estúdio e salve de novo.'); }
       let x = b.id ? await this.hub.get('igc:' + String(b.id)) : null;
       if (b.id && (!x || x.dono !== conta.id)) return erro('Só quem publicou pode atualizar.', 403);
       if (!x) {
@@ -187,7 +205,7 @@ export class Integracoes {
 
   // (0.9.5) em revisão (ou apagada pela moderação): as imagens das bolhas dela deixam de ser entregues, e quem usava volta à bolha padrão
   async marcarArtes(x, bloq) {
-    for (const bo of (x.pac && x.pac.bolhas) || []) for (const h of imagensDaArte(bo.arte)) {
+    for (const arte of artesDoPacote(x.pac)) for (const h of imagensDaArte(arte)) {
       const im = await this.hub.get('igam:' + h); if (im && !!im.bloq !== bloq) { im.bloq = bloq; await this.hub.put({ ['igam:' + h]: im }); }
     }
   }
@@ -222,6 +240,16 @@ export class Integracoes {
     const a = bo && validarArte(bo.arte); if (!a) return null;
     for (const h of imagensDaArte(a)) { const im = await this.hub.get('igam:' + h); if (!im || im.bloq) return null; }
     return { m: 'arte', ig, b: bo.id, n: bo.nome, a, v: pk.atual || 0 };
+  }
+
+  // (1.0.2) a moldura da foto ou o anel de quem fala de um pacote da Comunidade: fica guardado no perfil como estava (igual às bolhas)
+  async fotoArte(conta, ig, id, anel) {
+    const pk = /^c-[a-f0-9]{10}$/.test(String(ig || '')) ? await this.hub.get('igc:' + ig) : null;
+    if (!pk || (pk.oculta && pk.dono !== conta.id)) return null;
+    const it = ((pk.pac && pk.pac[anel ? 'aneis' : 'molduras']) || []).find((z) => z && z.id === id);
+    const a = it && validarArteFoto(it.arte, anel); if (!a) return null;
+    for (const h of imagensDaArte(a)) { const im = await this.hub.get('igam:' + h); if (!im || im.bloq) return null; }
+    return { t: 'arte', ig, id: it.id, n: it.nome, a, v: pk.atual || 0 };
   }
 
   async rota(conta, rota, metodo, b) {

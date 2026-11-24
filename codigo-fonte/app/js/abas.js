@@ -51,9 +51,21 @@
         lista.replaceChildren(...sel.map((cod) => { const a = amigos().find((x) => x.codigo === cod) || { codigo: cod, nome: cod };
           return h('span', { class: 'np-pessoa' }, U.avatar(a, 22), h('span', {}, a.apelido || a.nome), h('button', { type: 'button', class: 'np-tirar', title: T('Tirar', 'Remove'), onclick: () => { A.cfg.v.npExclusivos = sel.filter((x) => x !== cod); A.cfg.salvar(); pintar(); } }, A.icone('fechar', 12))); }),
         U.btn(T('Escolher', 'Choose'), { icone: 'mais', tipo: 'sec', peq: true, onclick: (e) => {
-          const ja = new Set(A.cfg.v.npExclusivos || []), opc = amigos().filter((a) => !ja.has(a.codigo));
-          if (!opc.length) { U.toast(T('Todos os seus amigos já estão aqui.', 'All your friends are already here.')); return; }
-          U.menuContexto(e, opc.slice(0, 40).map((a) => ({ texto: a.apelido || a.nome, icone: 'pessoa', onclick: () => { A.cfg.v.npExclusivos = [...(A.cfg.v.npExclusivos || []), a.codigo].slice(0, 30); A.cfg.salvar(); pintar(); } })));
+          // (1.0.2) uma lista com busca e as fotos (antes era um menu com todos os amigos, sem foto e sem procurar)
+          if (!amigos().some((a) => !(A.cfg.v.npExclusivos || []).includes(a.codigo))) { U.toast(T('Todos os seus amigos já estão aqui.', 'All your friends are already here.')); return; }
+          const busca = h('input', { class: 'campo np-busca', type: 'search', placeholder: T('Procurar amigo', 'Search friend'), autocomplete: 'off', spellcheck: 'false' });
+          const res = h('div', { class: 'np-opcoes' });
+          const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          const listar = () => {
+            const q = norm(busca.value.trim()), ja = new Set(A.cfg.v.npExclusivos || []);
+            const l = amigos().filter((a) => !ja.has(a.codigo) && (!q || [a.apelido, a.nome, a.tag].some((x) => norm(x).includes(q)))).sort((x, y) => norm(x.apelido || x.nome).localeCompare(norm(y.apelido || y.nome))).slice(0, 60);
+            res.replaceChildren(...(l.length ? l.map((a) => h('button', { type: 'button', class: 'np-opcao', onclick: () => { A.cfg.v.npExclusivos = [...(A.cfg.v.npExclusivos || []), a.codigo].slice(0, 30); A.cfg.salvar(); pintar(); listar(); } },
+              U.avatar(a, 28), h('span', { class: 'np-opcao-nome' }, h('b', {}, a.apelido || a.nome), a.tag ? h('small', { class: 'suave' }, '#' + a.tag) : null), A.icone('mais', 14))) : [h('div', { class: 'peq suave', estilo: { padding: '8px' } }, T('Ninguém com esse nome.', 'Nobody with that name.'))]));
+          };
+          busca.addEventListener('input', listar); busca.addEventListener('keydown', (ev) => ev.stopPropagation());
+          listar();
+          U.popover(e.currentTarget || e.target, [busca, res], { largura: 300, titulo: T('Quem pode passar', 'Who gets through') });
+          setTimeout(() => busca.focus(), 60);
         } }));
       };
       pintar();

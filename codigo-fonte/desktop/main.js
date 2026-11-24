@@ -62,6 +62,15 @@ if (temTrava) {
     console.log('[aero] placa de vídeo: voltando ao automático (estava em "' + c.gpuModo + '" por falhas que podem ter sido só o app fechando)');
     c.gpuModo = 'auto'; c.gpuFalhas = 0; c.gpuRevisto = true; delete c.gpuDesceuT; delete c.gpuSubiu; delete c.gpuFixo; delete c.avisoGpu; gravarCfg(c);
   } }
+// (1.0.2) Linux no Wayland: com o Mesa 26.3 o processo da GPU do Chromium cai ao abrir (sinal 132) em QUALQUER modo com placa, e a escada
+// abaixo acabava no "sem GPU" (tudo desenhado pelo processador). Pelo XWayland (X11) a mesma placa funciona normal. Quem desceu por quedas
+// assim volta ao automático, agora pelo X11 (uma vez); se cair também pelo X11, a escada segue como antes
+const sessaoWayland = process.platform === 'linux' && (String(process.env.XDG_SESSION_TYPE || '').toLowerCase() === 'wayland' || !!process.env.WAYLAND_DISPLAY);
+{ const c = lerCfg();
+  if (sessaoWayland && !c.gpuX11 && !c.gpuManual && c.gpuFalhaT && (c.gpuModo === 'software' || c.gpuModo === 'semgpu')) {
+    console.log('[aero] placa de vídeo: tentando o automático pelo X11 (estava em "' + c.gpuModo + '")');
+    c.gpuModo = 'auto'; c.gpuX11 = true; c.gpuFalhas = 0; delete c.gpuDesceuT; delete c.gpuSubiu; delete c.gpuFixo; delete c.avisoGpu; gravarCfg(c);
+  } }
 const cfg = lerCfg();
 // (0.7.6) o modo mais seguro escolhido SOZINHO (depois de falhas do driver) não fica para sempre: passadas 2 h sem falha, na próxima abertura
 // o app tenta um degrau acima (sem GPU -> sem aceleração de vídeo -> automático). Num PC fraco o "sem GPU nenhuma" desenha e decodifica tudo
@@ -135,6 +144,17 @@ if (perfilPlaca) {
 }
 if (modoGpu === 'software' || modoGpu === 'semgpu') { app.commandLine.appendSwitch('disable-accelerated-video-encode'); app.commandLine.appendSwitch('disable-accelerated-video-decode'); }
 if (modoGpu === 'semgpu') app.commandLine.appendSwitch('disable-gpu');
+// (1.0.2) X11 (XWayland): pelo app.commandLine o Electron já escolheu Wayland ou X11 antes deste arquivo rodar (o switch não pegava, nem o
+// do perfil "x11"). Então, quando precisa, o app se reabre uma vez com --ozone-platform=x11 na linha de comando, antes de abrir qualquer janela
+const querX11 = linux && modoGpu !== 'semgpu' && ((sessaoWayland && cfg.gpuX11) || (perfilPlaca && perfilPlaca.chaves.some(([k, v]) => k === 'ozone-platform' && v === 'x11')));
+if (querX11 && !process.argv.some((a) => /^--ozone-platform(=|$)/.test(String(a)))) {
+  const argv = [...process.argv, '--ozone-platform=x11'];
+  const r = require('./sandbox').relancarAppImage({ argv });
+  let foi = false;
+  if (r) try { require('child_process').spawn(r.cmd, r.args, r.opcoes).unref(); foi = true; } catch (e) { /* cai no relaunch */ }
+  if (!foi) app.relaunch({ args: argv.slice(1) });
+  app.exit(0); return; // eslint-disable-line no-useless-return
+}
 // (0.6.0) WebRTC: o fps da transmissão não cai quando a cena se mexe. Em cena com muito movimento (jogo despausado) o codificador da placa
 // passa da taxa-alvo, e o WebRTC descartava quadros para compensar ("frame dropper" e a janela de congestionamento com "DropFrame"): a tela
 // de quem assiste caía de fps sempre que o jogo se mexia e voltava quando pausava. Agora a taxa é ajustada pelo controle de banda (a
@@ -170,7 +190,7 @@ if (semSandbox) app.commandLine.appendSwitch('no-sandbox');
 // que a pessoa escolhe lá. Então o app NÃO mostra um seletor próprio: o seletor do sistema é o único.
 const usaPortal = process.platform === 'linux' && (String(process.env.XDG_SESSION_TYPE || '').toLowerCase() === 'wayland' || (!!process.env.WAYLAND_DISPLAY && !process.env.DISPLAY));
 // Identifica o conjunto de flags: quando muda, o resultado guardado do teste da placa deixa de valer
-const idFlags = require('crypto').createHash('sha1').update(JSON.stringify([process.platform, modoGpu, ligar, desligar, perfilPlaca && perfilPlaca.id])).digest('hex').slice(0, 10);
+const idFlags = require('crypto').createHash('sha1').update(JSON.stringify([process.platform, modoGpu, ligar, desligar, perfilPlaca && perfilPlaca.id, sessaoWayland && cfg.gpuX11 ? "x11" : ""])).digest('hex').slice(0, 10);
 
 // Se o processo de GPU do Chromium cair 2 vezes, o app passa para um modo mais seguro e reinicia sozinho
 const ESCADA = { auto: 'software', forcar: 'software', software: 'semgpu' };
@@ -198,7 +218,11 @@ app.on('child-process-gone', (_e, d) => {
     const c = lerCfg();
     if (Date.now() - (c.gpuFalhaT || 0) > 600000) c.gpuFalhas = 0; // (0.7.6) só conta falhas seguidas (2 em 10 min): antes 2 falhas em semanas diferentes já desciam o modo
     c.gpuFalhas = (c.gpuFalhas || 0) + 1; c.gpuFalhaT = Date.now();
-    if (c.gpuFalhas >= 2) {
+    if (c.gpuFalhas >= 2 && sessaoWayland && !c.gpuX11) {
+      // (1.0.2) no Wayland, antes de tirar a placa, tenta o mesmo modo pelo X11 (XWayland)
+      c.gpuX11 = true; c.gpuFalhas = 0; c.gpuRevisto = true;
+      gravarCfg(c); reiniciarLimpo();
+    } else if (c.gpuFalhas >= 2) {
       c.gpuModo = ESCADA[modoGpu]; c.gpuFalhas = 0; c.gpuDesceuT = Date.now(); c.gpuRevisto = true; if ((c.gpuSubiu || 0) >= 2) c.gpuFixo = true;
       c.avisoGpu = `O driver de vídeo falhou. Mudei para o modo "${c.gpuModo}" automaticamente.`;
       gravarCfg(c); reiniciarLimpo();
@@ -683,7 +707,10 @@ const jogos = require('./jogos').criarJogos({ log, pastaDados: app.getPath('user
   aoMudar: () => { if (janela && !janela.isDestroyed()) janela.webContents.send('jogo-mudou'); } }); // mudou o jogo: o app manda na hora
 const ponteJogos = ponteRpc.criarPonte({ aoAtividade: (x) => jogos.aoRpc(x), log, caminhosDiscord: () => require('./discord').caminhos() });
 function caminhosDoDiscord() { // o Discord de verdade, para o discord.js (nunca a própria ponte)
-  const meu = ponteJogos.caminho(), l = require('./discord').caminhos().filter((c) => c !== meu);
+  // (1.0.2) no Windows o mesmo pipe tem dois nomes (\\?\pipe\... e \\.\pipe\...): tirar só um deixava o Rich Presence do Aero entrar na
+  // própria ponte, e o Aero aparecia como "jogo" dele mesmo
+  const nomePipe = (c) => String(c || '').replace(/^\\\\[?.]\\pipe\\/i, '').toLowerCase();
+  const meu = ponteJogos.caminho(), l = require('./discord').caminhos().filter((c) => c !== meu && !(meu && process.platform === 'win32' && nomePipe(c) === nomePipe(meu)));
   if (meu && process.platform !== 'win32') l.unshift(ponteJogos._real0());
   return l;
 }
@@ -789,6 +816,7 @@ function sondarUm(id) {
   return new Promise((resolve) => {
     const args = [...(app.isPackaged ? [] : [app.getAppPath()]), '--aero-sonda=' + id];
     if (app.commandLine.hasSwitch('no-sandbox') || process.argv.includes('--no-sandbox')) args.push('--no-sandbox'); // a cópia precisa das mesmas condições do app
+    if (linux && (perfis.montar(id).chaves.some(([k, v]) => k === 'ozone-platform' && v === 'x11') || (sessaoWayland && lerCfg().gpuX11))) args.push('--ozone-platform=x11'); // (1.0.2) só vale na linha de comando
     const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
     let saida = '', feito = false;
     const fim = (r) => { if (feito) return; feito = true; clearTimeout(t); try { p.kill(); } catch (e) { /* ok */ } resolve(r); };

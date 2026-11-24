@@ -10,6 +10,8 @@ import { resposta, erro, txt, umEmoji } from './util.js';
 import { limitesDe, MAX_GRUPO_TETO } from './bolha.js';
 import { nivelDe, limparPerfil, nmPublico, bcPublico, EFEITOS_NOME as EFEITOS_PAGOS, NOME_LEGADO } from './extras.js';
 const PERFIL_MODELO = ['bio', 'cor1', 'cor2', 'fundo1', 'fundo2', 'discord', 'spotify', 'nm', 'fd', 'np', 'pf', 'bc', 'ml', 'lb', 'gl', 'mf']; // o que um perfil salvo guarda
+const IMGS_MODELO = [['fd', 'fdV'], ['np', 'npV'], ['mf', 'mfV']]; // (1.0.2) as imagens que o perfil salvo leva junto
+const PERFIL_MODELO_X = ['mo', 'ab', 'ac', 'an', 'se', 'mc']; // (1.0.2) e os extras do Aero Bubble (moldura, abertura, acessórios, anel, som de entrada, moldura da câmera)
 
 export const MAX_ANEXO = 10 * 1024 * 1024 + 64 * 1024;   // (0.7.14) 10 MB (+ a "etiqueta" da cifra)
 const PEDACO = 1024 * 1024;                               // anexos guardados em pedaços de 1 MB (limite de valor do armazenamento)
@@ -290,6 +292,15 @@ export class Social {
         if (Array.isArray(x.so)) { const so = x.so.filter((v, i, l) => typeof v === 'string' && /^[si]:/.test(v) && v.length <= 42 && l.indexOf(v) === i).slice(0, 30); if (so.length) p.pf.so = so; } // (1.0.0) quais esconder, uma por uma
       } else p.pf = null;
     }
+    // (1.0.2) moldura da foto e anel de quem fala feitos por artistas da Comunidade: a arte vem do pacote publicado (instalar é para todos)
+    for (const [k, anel] of [['mo', false], ['an', true]]) {
+      const x = b[k]; if (!x || x.t !== 'arte') continue;
+      const a = await this.hub.integ.fotoArte(conta, x.ig, x.id, anel);
+      delete b[k];
+      // a que já estava no perfil e saiu do ar só sai dele (salvar o resto do perfil continua funcionando)
+      if (!a) { if (p[k] && p[k].t === 'arte' && p[k].ig === x.ig && p[k].id === x.id) { delete p[k]; continue; } return erro(anel ? 'Esse anel não está mais disponível.' : 'Essa moldura não está mais disponível.', 404); }
+      p[k] = a;
+    }
     limparPerfil(b, p, nivelDe(conta)); // (1.0.0) os extras do Aero Bubble: moldura, abertura, acessórios, anel, som de entrar, moldura de câmera, cartão de ligação
     await this.st.put('c:' + conta.id, conta);
     await this.hub.mudou([conta.id, ...Object.keys(conta.amigos)]);
@@ -357,15 +368,21 @@ export class Social {
     if (!(i >= 0 && i < max)) return erro('Esse espaço não existe.');
     if (b.acao === 'salvar') {
       const e = conta.extra || {}, dados = {};
-      for (const k of PERFIL_MODELO) if (e[k] !== undefined) dados[k] = e[k];
-      lista[i] = { nome: txt(String(b.nome || ''), 30) || 'Perfil ' + (i + 1), quando: Date.now(), dados };
+      for (const k of [...PERFIL_MODELO, ...PERFIL_MODELO_X]) if (e[k] !== undefined) dados[k] = e[k];
+      // (1.0.2) as imagens (fundo do cartão, nameplate e fundo do Mural) vão junto, numa cópia só deste espaço
+      const img = {};
+      for (const [pre, v] of IMGS_MODELO) img[pre] = e[v] && (await this.hub.copiarImagem(pre + ':', conta.id, 'ps' + pre + ':', conta.id + ':' + i)) ? 1 : 0;
+      lista[i] = { nome: txt(String(b.nome || ''), 30) || 'Perfil ' + (i + 1), quando: Date.now(), dados, x: 1, img };
     } else if (b.acao === 'usar') {
       if (!lista[i]) return erro('Esse espaço está vazio.');
       const e = conta.extra = conta.extra || {};
-      for (const k of PERFIL_MODELO) { if (lista[i].dados[k] !== undefined) e[k] = lista[i].dados[k]; else delete e[k]; }
+      for (const k of [...PERFIL_MODELO, ...(lista[i].x ? PERFIL_MODELO_X : [])]) { if (lista[i].dados[k] !== undefined) e[k] = lista[i].dados[k]; else delete e[k]; } // os salvos antes da 1.0.2 não mexem nos extras
+      if (lista[i].img) for (const [pre, v] of IMGS_MODELO) {
+        if (lista[i].img[pre] && (await this.hub.copiarImagem('ps' + pre + ':', conta.id + ':' + i, pre + ':', conta.id))) e[v] = (e[v] || 0) + 1; // versão nova: ninguém fica com a imagem antiga no cache
+      }
       if (e.nm && EFEITOS_EXCLUSIVOS.includes(e.nm.e) && !limitesDe(conta).exclusivo) e.nm.e = 'solido';
       if (e.nm && EFEITOS_PAGOS[e.nm.e] && EFEITOS_PAGOS[e.nm.e] > nivelDe(conta)) e.nm.e = 'solido'; // (0.9.7) o perfil salvo não traz efeito de um plano que a pessoa não tem
-    } else if (b.acao === 'apagar') lista[i] = null;
+    } else if (b.acao === 'apagar') { lista[i] = null; for (const [pre] of IMGS_MODELO) await this.hub.apagarImagem('ps' + pre + ':', conta.id + ':' + i); }
     else return erro('Ação desconhecida.');
     for (let k = 0; k < max; k++) if (lista[k] === undefined) lista[k] = null;
     await this.st.put('c:' + conta.id, conta);
@@ -574,7 +591,9 @@ export class Social {
       this.avisar([id], { tipo: 'conv-msg', cid: cv.id, msg: bl ? { id: msg.id, seq: msg.seq, de: eu.codigo, t: msg.t, bloqueada: true } : { ...msg, de: eu.codigo }, nome: cv.nome || '', deNome: eu.nome });
       if (this.online(id)) { r.entregue = cv.seq; mudou = true; }
       // (0.9.2) o push é por aparelho: o celular no fundo (ou fechado) recebe mesmo com o PC da pessoa aberto
-      if (!bl && !r.mudo && c.status !== 'ocupado') await this.hub.push.avisar(id, { cid: cv.id, de: eu.nome || '', cod: eu.codigo, av: eu.av, g: cv.tipo === 'dm' ? '' : (cv.nome || '') }).catch(() => {}); // (0.9.1) push
+      // (1.0.2) quem está na chamada com quem mandou não recebe push: já está ali com a pessoa
+      const juntos = !!(cv.cham && cv.cham.quem && cv.cham.quem[id] && cv.cham.quem[conta.id]);
+      if (!bl && !r.mudo && c.status !== 'ocupado' && !juntos) await this.hub.push.avisar(id, { cid: cv.id, de: eu.nome || '', cod: eu.codigo, av: eu.av, g: cv.tipo === 'dm' ? '' : (cv.nome || '') }).catch(() => {}); // (0.9.1) push
       if (mudou) await this.st.put('c:' + id, c);
     }
     this.avisar([conta.id], { tipo: 'conv-msg', cid: cv.id, msg: { ...msg, de: eu.codigo }, nome: cv.nome || '', deNome: eu.nome });
@@ -645,7 +664,7 @@ export class Social {
     const antes = r.lido || 0;
     r.lido = Math.min(cv.seq || 0, Math.max(antes, parseInt(b.seq, 10) || 0)); r.entregue = Math.max(r.entregue || 0, r.lido); conta.convs[cv.id] = r;
     await this.st.put('c:' + conta.id, conta);
-    if (r.lido !== antes) { this.avisar([conta.id], { tipo: 'conv-lido', cid: cv.id, lido: r.lido }); await this.avisarRecibos(cv, conta.id); } // (0.6.0) os outros aparelhos da conta tiram o contador na hora
+    if (r.lido !== antes) { this.avisar([conta.id], { tipo: 'conv-lido', cid: cv.id, lido: r.lido }); await this.avisarRecibos(cv, conta.id); if (r.lido >= (cv.seq || 0)) await this.hub.push.lida(conta.id, cv.id).catch(() => {}); } // (0.6.0) os outros aparelhos da conta tiram o contador na hora
     return resposta({ ok: true, lido: r.lido });
   }
   // (0.6.0) "marcar como não lida": guarda de onde a pessoa quer continuar (a mensagem); não muda o "lida" que os outros veem
@@ -988,15 +1007,25 @@ export class Social {
       if (cv.tipo === 'dm' && !this.amigos(conta, alvos[0])) return erro('Só dá para ligar para amigos.', 403);
       // já tem uma chamada acontecendo nesta conversa: quem "liga" entra nela (não toca de novo)
       if (cv.cham && Date.now() - (cv.cham.inicio || 0) > 15000) await this.podarChamada(cv); // (1.0.0) antes, confere se quem "está" na chamada ainda está mesmo
-      if (cv.cham && Object.keys(cv.cham.quem || {}).length) { await this.chamadaEntrar(cv, conta.id, dev, cv.cham.id); return resposta({ ok: true, entrou: cv.cham.id, convidados: [] }); }
+      if (cv.cham && Object.keys(cv.cham.quem || {}).length) {
+        await this.chamadaEntrar(cv, conta.id, dev, cv.cham.id);
+        // (1.0.2) na conversa a dois, quem não está na chamada é chamado de novo (antes "ligar" só entrava, sem tocar o telefone dela)
+        const fora = cv.tipo === 'dm' && cv.canal !== 'voz' ? alvos.filter((x) => !(cv.cham.quem || {})[x]) : [];
+        if (fora.length) this.avisar(fora, { tipo: 'chamada', cid: cv.id, id: cv.cham.id, video: !!cv.cham.video, de: eu, grupo: '' });
+        return resposta({ ok: true, entrou: cv.cham.id, convidados: [] });
+      }
       await this.chamadaEntrar(cv, conta.id, dev, id, !!b.video);
       // (0.7.14) chamada de voz de dentro de um grupo: como uma sala de voz, quem quiser entra (não toca o telefone de ninguém)
       if (cv.canal !== 'voz') this.avisar(alvos, { tipo: 'chamada', cid: cv.id, id, video: !!b.video, de: eu, grupo: cv.tipo === 'grupo' ? cv.nome : '' });
     } else if (acao === 'entrar') {
       if (cv.tipo === 'dm' && !this.amigos(conta, alvos[0])) return erro('Só dá para ligar para amigos.', 403); // (0.9.6) amizade desfeita: não entra mais
       if (cv.cham && Date.now() - (cv.cham.inicio || 0) > 15000) { await this.podarChamada(cv); if (!cv.cham && !b.retomar) return erro('Essa chamada já acabou.', 409); } // só tinha quem já tinha caído
-      if (!cv.cham || cv.cham.id !== id) { if (cv.cham && Object.keys(cv.cham.quem || {}).length) return erro('Essa chamada já acabou.', 409); }
-      await this.chamadaEntrar(cv, conta.id, dev, id, false, !!b.retomar);
+      // (1.0.2) tem chamada viva na conversa: entra NELA, mesmo que o app mande o número de uma anterior (a faixa ficou com o número velho).
+      // Antes isso dava "Essa chamada já acabou" e o "Entrar na chamada" não funcionava, só o "Ligar"
+      const viva = cv.cham && Object.keys(cv.cham.quem || {}).length ? cv.cham.id : null;
+      if (!viva && !b.retomar) return erro('Essa chamada já acabou.', 409);
+      await this.chamadaEntrar(cv, conta.id, dev, viva || id, false, !!b.retomar);
+      return resposta({ ok: true, entrou: cv.cham ? cv.cham.id : id, convidados: [] });
     } else if (acao === 'sair') await this.chamadaSair(cv, conta.id, dev);
     else if (acao === 'cancelar') { this.avisar(alvos, { tipo: 'chamada-fim', cid: cv.id, id }); await this.chamadaSair(cv, conta.id, dev); }
     else if (acao === 'recusar') this.avisar(Object.keys(cv.membros), { tipo: 'chamada-recusada', cid: cv.id, id, de: eu }); // inclui os seus outros aparelhos (param de tocar)

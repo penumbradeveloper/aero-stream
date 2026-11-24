@@ -163,6 +163,41 @@
     return r.bc;
   };
 
+  // ---------- (1.0.2) molduras da foto e anéis de quem fala feitos por artistas ----------
+  // uma imagem em volta da foto, com tamanho, ajuste, camada, giro e pulso (o anel ainda cresce com a voz). A mesma conferência do servidor
+  BA.validarFoto = (a, anel, local) => {
+    if (!a || typeof a !== 'object' || Array.isArray(a)) return null;
+    const img = imgOk(a.img, local); if (!img) return null;
+    const o = { v: 1, img, escala: inteiro(a.escala, 100, 220, 140), x: inteiro(a.x, -40, 40, 0), y: inteiro(a.y, -40, 40, 0), camada: umDe(a.camada, ['frente', 'atras'], 'frente'), giro: inteiro(a.giro, 0, 60, 0), pulso: !!a.pulso };
+    if (anel) o.voz = inteiro(a.voz, 0, 100, 60);
+    return o;
+  };
+  // a peça desenhada (vai dentro do .avatar): a moldura fica sempre à vista; o anel só aparece enquanto a pessoa fala (como os do app)
+  BA.foto = (arte, anel, op = {}) => {
+    const a = BA.validarFoto(arte, anel, op.local); if (!a) return null;
+    const parada = !op.meu && !pref().animar;
+    const el = h('i', { class: (anel ? 'fx-arte' : 'px-mo px-mo-arte') + (a.camada === 'atras' ? ' atras' : '') + (a.giro ? ' gira' : '') + (a.pulso ? ' pulsa' : '') + (parada ? ' parada' : ''), 'aria-hidden': 'true',
+      estilo: { '--fe': String(a.escala / 100), '--fx': a.x + '%', '--fy': a.y + '%', '--fi': css(urlDe(a.img)), ...(temParada(a.img) ? { '--fip': css(urlDe(a.img, true)) } : {}), ...(a.giro ? { '--fg': a.giro + 's' } : {}), ...(anel ? { '--fv': (a.voz / 100).toFixed(2) } : {}) } });
+    return el;
+  };
+  // as das integrações instaladas (para escolher no editor do perfil)
+  BA.fotosInstaladas = (anel) => {
+    const v = (A.cfg.v && A.cfg.v.integ) || {}, out = [];
+    for (const [chave, x] of Object.entries(v)) {
+      if (!x || !x.pac || !x.com || !/^com-c-[a-f0-9]{10}$/.test(chave)) continue;
+      for (const b of x.pac[anel ? 'aneis' : 'molduras'] || []) { const a = b && BA.validarFoto(b.arte, anel); if (a) out.push({ ig: x.com.id, id: b.id, nome: b.nome, de: x.pac.nome, a }); }
+    }
+    return out;
+  };
+  // usar uma: o servidor pega a arte do pacote publicado (nunca a que veio daqui)
+  BA.usarFoto = async (ig, id, anel) => {
+    const API = A.api, k = anel ? 'an' : 'mo';
+    const r = await API.req('perfil-extra', { [k]: { t: 'arte', ig, id } });
+    if (API.eu && r && r.extra) API.eu[k] = r.extra[k] || null;
+    A.evt.emit('perfil');
+    return API.eu && API.eu[k];
+  };
+
   // ---------- as imagens do estúdio ----------
   const gifAnimado = (b) => { let n = 0; for (let i = 0; i + 2 < b.length; i++) if (b[i] === 0x21 && b[i + 1] === 0xf9 && b[i + 2] === 0x04 && ++n > 1) return true; return false; };
   const webpAnimado = (b) => b.length > 21 && String.fromCharCode(b[12], b[13], b[14], b[15]) === 'VP8X' && !!(b[20] & 0x02);
@@ -226,6 +261,7 @@
     if (arte.moldura) arte.moldura.img = await uma(arte.moldura.img);
     if (arte.fundo) arte.fundo.img = await uma(arte.fundo.img);
     for (const p of arte.pers || []) p.img = await uma(p.img);
+    if (arte.img) arte.img = await uma(arte.img); // (1.0.2) molduras e anéis
     return arte;
   }
 
@@ -382,6 +418,108 @@
       salvando = false;
     } }] });
     return md;
+  };
+
+  // ---------- (1.0.2) o estúdio de molduras da foto e anéis de voz ----------
+  // molduras, aneis: as do pacote. aoSalvar(molduras, aneis) com as imagens já no servidor
+  const avatarFoto = (arte, anel, tam, op = {}) => {
+    const eu = (A.api && A.api.eu) || { nome: '?' }, av = U().avatar(eu, tam);
+    const pc = BA.foto(arte, anel, { local: op.local, meu: true });
+    if (pc) {
+      if (anel) { const fx = h('b', { class: 'px-fx px-fx-arte' + (pc.classList.contains('atras') ? '' : ' frente'), 'aria-hidden': 'true', estilo: { '--v': String(op.v == null ? 0.6 : op.v) } }, pc); av.classList.add('an-on'); av.dataset.an = 'arte'; if (pc.classList.contains('atras')) av.prepend(fx); else av.append(fx); }
+      else { av.classList.add('px-mo-alvo'); if (pc.classList.contains('atras')) av.prepend(pc); else av.append(pc); }
+    }
+    return av;
+  };
+  BA.estudioFotos = (molduras, aneis, aoSalvar) => {
+    const copia = (l) => (l || []).filter((b) => b && b.arte).map((b) => ({ id: b.id, nome: b.nome, arte: JSON.parse(JSON.stringify(b.arte)) }));
+    const listas = { mo: copia(molduras), an: copia(aneis) };
+    let tipo = listas.mo.length || !listas.an.length ? 'mo' : 'an', sel = 0, voz = 0.6;
+    const atual = () => listas[tipo][sel];
+    const abas = h('div', { class: 'ba-abas' }), palco = h('div', { class: 'ba-palco ba-palco-foto' }), ctrl = h('div', { class: 'ba-ctrl' });
+    const nova = (img) => ({ id: '', nome: tipo === 'an' ? T('Meu anel', 'My ring') : T('Minha moldura', 'My frame'), arte: { img, escala: 140, x: 0, y: 0, camada: 'frente', giro: 0, pulso: false, ...(tipo === 'an' ? { voz: 60 } : {}) } });
+    const pintarPrevia = () => {
+      const b = atual();
+      if (!b) { palco.replaceChildren(h('p', { class: 'peq suave' }, tipo === 'an' ? T('Escolha a imagem do anel (PNG, WebP ou GIF com o meio transparente).', 'Pick the ring image (PNG, WebP or GIF with a transparent middle).') : T('Escolha a imagem da moldura (PNG, WebP ou GIF com o meio transparente).', 'Pick the frame image (PNG, WebP or GIF with a transparent middle).'))); return; }
+      palco.replaceChildren(h('div', { class: 'ba-fotos' }, avatarFoto(b.arte, tipo === 'an', 120, { local: true, v: voz }), avatarFoto(b.arte, tipo === 'an', 56, { local: true, v: voz }), avatarFoto(b.arte, tipo === 'an', 34, { local: true, v: voz })));
+    };
+    const pintarAbas = () => abas.replaceChildren(
+      U().seg([['mo', T('Molduras da foto', 'Photo frames')], ['an', T('Anéis de voz', 'Voice rings')]], tipo, (v) => { tipo = v; sel = 0; tudo(); }),
+      ...listas[tipo].map((b, i) => h('button', { type: 'button', class: 'ba-aba' + (i === sel ? ' sel' : ''), onclick: () => { sel = i; tudo(); } }, b.nome || T('Sem nome', 'Untitled'))),
+      listas[tipo].length < 6 ? U().btn(tipo === 'an' ? T('Novo anel', 'New ring') : T('Nova moldura', 'New frame'), { icone: 'mais', tipo: 'sec', peq: true, onclick: async () => { const i = await escolherImagem(); if (!i) return; listas[tipo].push(nova(i)); sel = listas[tipo].length - 1; tudo(); } }) : null);
+    const linha = (rot, ctl) => h('label', { class: 'ba-linha' }, h('span', {}, rot), ctl);
+    const barra = (rot, min, max, get, put, un = '') => {
+      const v = h('small', { class: 'suave ba-val' }, get() + un);
+      const sl = U().slider({ min, max, valor: get(), oninput: (n) => { put(n); v.textContent = n + un; pintarPrevia(); } });
+      return h('label', { class: 'ba-linha' }, h('span', {}, rot), sl, v);
+    };
+    function pintarCtrl() {
+      const b = atual(); if (!b) { ctrl.replaceChildren(); return; }
+      const a = b.arte, anel = tipo === 'an';
+      const nome = h('input', { class: 'campo', type: 'text', maxlength: '30', value: b.nome || '', placeholder: T('Nome', 'Name') });
+      nome.addEventListener('input', () => { b.nome = nome.value.slice(0, 30); pintarAbas(); });
+      nome.addEventListener('keydown', (e) => e.stopPropagation());
+      ctrl.replaceChildren(linha(T('Nome', 'Name'), nome),
+        h('section', { class: 'ba-sec vidro interno' }, h('h4', {}, T('Imagem', 'Image')), h('p', { class: 'peq suave' }, T('Desenhe com o meio transparente: a foto da pessoa aparece no buraco. Fica igual em qualquer tamanho de foto.', 'Draw it with a transparent middle: the person\'s photo shows through the hole. It looks the same at any photo size.')),
+          h('div', { class: 'linha ba-botoes' }, U().btn(T('Trocar imagem', 'Change image'), { icone: 'imagem', tipo: 'sec', peq: true, onclick: async () => { const i = await escolherImagem(); if (i) { a.img = i; tudo(); } } })),
+          barra(T('Tamanho', 'Size'), 100, 220, () => a.escala, (n) => { a.escala = n; }, '%'),
+          barra(T('Ajuste para o lado', 'Nudge sideways'), -40, 40, () => a.x, (n) => { a.x = n; }),
+          barra(T('Ajuste para cima/baixo', 'Nudge up/down'), -40, 40, () => a.y, (n) => { a.y = n; }),
+          linha(T('Camada', 'Layer'), U().seg([['frente', T('Na frente da foto', 'In front of the photo')], ['atras', T('Atrás da foto', 'Behind the photo')]], a.camada, (v) => { a.camada = v; pintarPrevia(); }))),
+        h('section', { class: 'ba-sec vidro interno' }, h('h4', {}, T('Movimento', 'Motion')),
+          barra(T('Uma volta a cada (0 = parada)', 'One turn every (0 = still)'), 0, 60, () => a.giro, (n) => { a.giro = n; }, ' s'),
+          linha(T('Pulsar', 'Pulse'), U().chave(!!a.pulso, (v) => { a.pulso = v; pintarPrevia(); })),
+          anel ? barra(T('Quanto cresce com a voz', 'How much it grows with the voice'), 0, 100, () => a.voz, (n) => { a.voz = n; }, '%') : null,
+          anel ? barra(T('Simular voz (só aqui)', 'Simulate voice (only here)'), 0, 100, () => Math.round(voz * 100), (n) => { voz = n / 100; }, '%') : null),
+        U().btn(anel ? T('Apagar este anel', 'Delete this ring') : T('Apagar esta moldura', 'Delete this frame'), { icone: 'lixo', tipo: 'perigo', peq: true, onclick: () => { listas[tipo].splice(sel, 1); sel = 0; tudo(); } }));
+    }
+    function tudo() { pintarAbas(); pintarCtrl(); pintarPrevia(); }
+    tudo();
+    let salvando = false;
+    const md = U().modal(T('Estúdio de molduras e anéis', 'Frames and rings studio'), h('div', { class: 'ba-est' },
+      h('p', { class: 'peq suave' }, T('Molduras ficam em volta da foto no perfil; anéis aparecem em volta da foto de quem fala na chamada. Use PNG, WebP ou GIF (até 4 MB e 1600 × 1600). É só a imagem: quem usar não muda mais nada do app.', 'Frames go around the photo on the profile; rings show around the photo of whoever is talking in a call. Use PNG, WebP or GIF (up to 4 MB and 1600 × 1600). It\'s only the image: whoever uses it changes nothing else in the app.')),
+      abas, h('div', { class: 'ba-corpo' }, h('div', { class: 'ba-palco-fixo' }, palco), ctrl)),
+    { largura: 900, classe: 'ba-modal', acoes: [{ texto: T('Cancelar', 'Cancel'), tipo: 'sec', valor: false }, { texto: T('Salvar no pacote', 'Save to package'), tipo: 'ok', onclick: async () => {
+      if (salvando) return; salvando = true;
+      try {
+        const pronto = {};
+        for (const k of ['mo', 'an']) {
+          const usadas = new Set(); pronto[k] = [];
+          for (const b of listas[k]) {
+            const v = BA.validarFoto(b.arte, k === 'an', true); if (!v) continue;
+            const arte = await enviarImagens(v);
+            let id = b.id || String(b.nome || (k === 'an' ? 'anel' : 'moldura')).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 14) || (k === 'an' ? 'anel' : 'moldura');
+            if (usadas.has(id)) { let n = 2; while (usadas.has(id.slice(0, 17) + '-' + n)) n++; id = id.slice(0, 17) + '-' + n; }
+            usadas.add(id);
+            const ok = BA.validarFoto(arte, k === 'an'); if (!ok) throw new Error(T('Não consegui preparar "' + b.nome + '".', 'Could not prepare "' + b.nome + '".'));
+            pronto[k].push({ id, nome: (b.nome || id).slice(0, 30), arte: ok });
+          }
+        }
+        aoSalvar(pronto.mo, pronto.an); md.fechar(true);
+        U().toast(T('Salvo no pacote. Publique para todo mundo poder usar.', 'Saved to the package. Publish so everyone can use them.'), { tipo: 'ok', ms: 4000 });
+      } catch (e) { U().toast(e.message, { tipo: 'erro', ms: 5000 }); }
+      salvando = false;
+    } }] });
+    return md;
+  };
+  // a vitrine das molduras e dos anéis de uma integração, com "Usar"
+  BA.vitrineFotos = (ig, molduras, aneis, usar) => {
+    const l = [...(molduras || []).map((b) => ({ ...b, anel: false, a: b && BA.validarFoto(b.arte, false) })), ...(aneis || []).map((b) => ({ ...b, anel: true, a: b && BA.validarFoto(b.arte, true) }))].filter((b) => b.a);
+    if (!l.length) return null;
+    const grade = h('div', { class: 'ba-vitrine ba-vitrine-fotos' });
+    const pintar = () => {
+      const eu = (A.api && A.api.eu) || {};
+      grade.replaceChildren(...l.map((b) => {
+        const cur = eu[b.anel ? 'an' : 'mo'], usando = cur && cur.t === 'arte' && cur.ig === ig && cur.id === b.id;
+        return h('div', { class: 'ba-cartao vidro interno' }, h('div', { class: 'ba-fotos' }, avatarFoto(b.a, b.anel, 72)),
+          h('small', { class: 'suave' }, b.anel ? T('Anel de voz (na chamada)', 'Voice ring (in calls)') : T('Moldura da foto', 'Photo frame')),
+          h('div', { class: 'linha entre' }, h('b', {}, b.nome), usando ? h('span', { class: 'ig-selo ok' }, T('Em uso', 'In use'))
+            : U().btn(T('Usar', 'Use'), { icone: 'ok', peq: true, onclick: async (e) => { const bt = e.currentTarget; bt.disabled = true; try { await usar(b, b.anel); pintar(); } catch (er) { U().toast(er.message, { tipo: 'erro' }); bt.disabled = false; } } })));
+      }));
+    };
+    pintar();
+    return h('section', { class: 'vidro pad' }, h('h3', {}, A.icone('imagem', 16), T('Molduras e anéis de voz', 'Frames and voice rings')),
+      h('p', { class: 'peq suave' }, T('De graça: use uma e todo mundo vê na sua foto.', 'Free: use one and everyone sees it on your photo.')), grade);
   };
 
   // ---------- a vitrine (página da integração): as bolhas de arte dela, com "Usar" ----------

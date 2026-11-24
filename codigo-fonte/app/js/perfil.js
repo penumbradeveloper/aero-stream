@@ -399,7 +399,7 @@
   // uma capa com o nome embaixo; clicar abre o link (IMDb, AniList, Spotify, Deezer ou YouTube Music) no navegador
   const capaItem = (x, cat, comNome) => {
     const el = h('div', { class: 'fav-capa' + (quadrado(cat) ? ' q' : ''), title: x.t + (x.a ? ' · ' + x.a : ''), tabindex: x.u ? '0' : null, role: x.u ? 'link' : null },
-      h('div', { class: 'fav-img' }, x.c ? h('img', { src: P.capa(x.c), alt: '', loading: 'lazy', draggable: 'false', referrerpolicy: 'no-referrer' }) : A.icone(CATS_FAV[cat] ? CATS_FAV[cat][0] : 'video', 22)),
+      h('div', { class: 'fav-img' }, x.c ? (A.mural && A.mural.imgCapa ? A.mural.imgCapa(x, cat) : h('img', { src: P.capa(x.c), alt: '', loading: 'lazy', draggable: 'false', referrerpolicy: 'no-referrer' })) : A.icone(CATS_FAV[cat] ? CATS_FAV[cat][0] : 'video', 22)),
       comNome ? h('div', { class: 'fav-tx' }, h('b', {}, x.t), x.a ? h('small', {}, x.a) : null) : null);
     if (x.u) { const ir = (e) => { if (e.type === 'keydown' && e.key !== 'Enter') return; if (el.closest('.editando')) return; e.stopPropagation(); A.ui.abrirFora(x.u); }; el.addEventListener('click', ir); el.addEventListener('keydown', ir); }
     return el;
@@ -411,7 +411,7 @@
     Promise.resolve(mural).then((m) => {
       const v = (m || {})[ref.k] || {}, x = [v.fav, ...(v.gosto || []), ...(v.quero || [])].find((y) => y && y.t === ref.t);
       if (!x) { el.classList.add('sumiu'); return; }
-      if (x.c) el.append(h('img', { src: P.capa(x.c), alt: '', loading: 'lazy', draggable: 'false', referrerpolicy: 'no-referrer', onerror: (e) => e.target.remove() }));
+      if (x.c || ref.k === 'j') el.append(A.mural && A.mural.imgCapa ? A.mural.imgCapa(x, ref.k) : h('img', { src: P.capa(x.c), alt: '', loading: 'lazy', draggable: 'false', referrerpolicy: 'no-referrer', onerror: (e) => e.target.remove() })); // (1.0.2) capa trocada no site: procura a de agora
       el.title = x.t + (x.a ? ' · ' + x.a : '');
       const abrir = (e) => { if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return; if (el.closest('.editando')) return; e.preventDefault(); e.stopPropagation(); A.mural.detalhe(x, ref.k, dono); };
       el.addEventListener('click', abrir); el.addEventListener('keydown', abrir);
@@ -1870,7 +1870,8 @@
       const fazer = async (acao, i, extra = {}) => {
         try {
           const x = await API.req('perfis-salvos', { acao, i, ...extra });
-          if (acao === 'usar') { m.fechar(false); setTimeout(() => P.editar(), 320); return; }
+          // (1.0.2) o editor reabre com o perfil que acabou de entrar: antes ele voltava com o perfil antigo da memória (e salvar desfazia a troca)
+          if (acao === 'usar') { m.fechar(false); try { await API.carregarEu(); } catch (_) { /* ok */ } P.esquecer(eu.codigo); A.evt.emit('perfil'); U.toast(T('Perfil trocado!', 'Profile switched!'), { tipo: 'ok', ms: 2200 }); setTimeout(() => P.editar(), 320); return; }
           pintarSalvos(x);
         } catch (e) { U.toast(e.message, { tipo: 'erro' }); }
       };

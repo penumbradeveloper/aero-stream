@@ -286,7 +286,17 @@
       parte(tit(T('Cores avançadas', 'Advanced colors')),
       opcao(T('Cores avançadas', 'Advanced colors'), chaveAv, T('Escolha a cor de cada parte, o layout, a fonte, o fundo e as bolhas.', 'Pick the color of each part, the layout, the font, the background and the bubbles.')),
       avancado,
-      h('div', { class: 'linha', estilo: { 'margin-top': '6px' } }, U.btn(T('Restaurar aparência', 'Reset appearance'), { tipo: 'sec', peq: true, onclick: async () => { if (await U.confirmar(T('Voltar a aparência ao padrão?', 'Reset the appearance to default?'))) { A.cfg.restaurarTema(); if (A.animPerfil) A.animPerfil.aplicar(); A.tema.aplicar(); U.reconstruir(); } } }))),
+      h('div', { class: 'linha', estilo: { 'margin-top': '6px' } }, U.btn(T('Restaurar aparência', 'Reset appearance'), { tipo: 'sec', peq: true, onclick: async () => {
+        if (!(await U.confirmar(T('Voltar a aparência inteira ao padrão? Cores, fundo, vidro, layout, fonte, bolhas, skin, ícone e o estilo das suas mensagens voltam ao original (os seus estilos salvos continuam guardados).', 'Reset the whole appearance to default? Colors, background, glass, layout, font, bubbles, skin, icon and your message style go back to the original (your saved styles stay stored).')))) return;
+        // (1.0.2) restaura TUDO da aba Aparência, não só o tema: antes a skin, o ícone, o estilo em uso, as imagens guardadas e o estilo das mensagens ficavam
+        A.cfg.restaurarTema();
+        A.cfg.v.estiloAtual = -1; A.cfg.v.iconeApp = ''; A.cfg.v.chamJuntos = false; A.cfg.salvar();
+        await A.tema.limparArqs();
+        try { if (A.aer && A.cfg.v.skin) await A.aer.usar(''); } catch (e) { A.log.aviso('restaurar: skin', e && e.message); }
+        try { if (A.extras && A.extras.aplicarIcone) await A.extras.aplicarIcone(); } catch (e) { /* ok */ }
+        try { const bc = A.api.eu && A.api.eu.bc; if (bc && (bc.m && bc.m !== 'padrao' || bc.c || bc.f || bc.g)) await A.api.salvarPerfil({ bc: { m: 'padrao', c: '', f: '' } }); } catch (e) { A.log.aviso('restaurar: bolhas das mensagens', e && e.message); }
+        if (A.animPerfil) A.animPerfil.aplicar(); A.tema.aplicar(); A.evt.emit('estilos:mudou'); A.evt.emit('arranjo', { peca: 'barra' }); U.reconstruir();
+      } }))),
     ];
     const el = h('div', { class: 'col aparencia estudio' }, ...partes);
     el.partes = partes;

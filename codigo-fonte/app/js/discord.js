@@ -44,8 +44,12 @@
       estado = 'aba:' + onde.aba; linha1 = T(...ABAS[onde.aba]);
     } else if (eu && op.onde) linha1 = T('No menu', 'In the menu');
     else if (!eu) linha1 = T('Abrindo o Aero', 'Opening Aero');
+    // (1.0.2) longe do computador (ou "ausente" escolhido): no Discord aparece "Ausente", mesmo com status personalizado ou não perturbe
+    // (no app eles continuam como estão). Invisível: o Rich Presence some de vez
+    const invisivel = !!(eu && eu.status === 'invisivel');
+    if (eu && !invisivel && estado !== 'chamada' && !naSala && (eu.status === 'ausente' || (A.hub && A.hub.estado === 'ausente'))) { estado = 'ausente'; linha1 = T('Ausente', 'Away'); linha2 = ''; }
     return {
-      ativo: cfg.ativo !== false && !!eu, appId: cfg.appId || '', estado, tempo: op.tempo,
+      ativo: cfg.ativo !== false && !!eu && !invisivel, appId: cfg.appId || '', estado, tempo: op.tempo,
       linha1, linha2,
       grande: foto || logo, grandeTexto: op.conta && eu ? `${eu.nome} #${eu.tag}` : 'Aero',
       pequeno: foto ? logo : '', pequenoTexto: 'Aero', semFoto: !foto,
@@ -68,7 +72,7 @@
 
   D.iniciar = () => {
     if (!ponte()) return;
-    ['tela', 'perfil', 'discord:config', 'idioma', 'onde', 'chamada:entrou', 'chamada:fim', 'chamada:tela', 'talk:lista'].forEach((n) => A.evt.on(n, D.agendar));
+    ['tela', 'perfil', 'discord:config', 'idioma', 'onde', 'chamada:entrou', 'chamada:fim', 'chamada:tela', 'talk:lista', 'hub:estado', 'status'].forEach((n) => A.evt.on(n, D.agendar));
     ['estado', 'fechada', 'local', 'stream', 'stream-fim', 'aprovado'].forEach((n) => A.evt.on('sala:' + n, D.agendar));
     setInterval(() => { D._ultimo = ''; D.enviar(); }, 60000); // reenvia de vez em quando (se o Discord foi aberto depois do Aero)
     D.agendar();

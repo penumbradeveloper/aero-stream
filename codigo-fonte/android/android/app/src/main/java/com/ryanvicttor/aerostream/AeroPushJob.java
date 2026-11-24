@@ -110,6 +110,12 @@ public class AeroPushJob extends JobService {
         con.disconnect();
         JSONObject d = new JSONObject(buf.toString("UTF-8"));
         if (d.optBoolean("fim")) { sp.edit().clear().apply(); cancelar(ctx); return; }
+        // (1.0.2) as conversas lidas em outro aparelho: a notificação delas sai daqui
+        JSONArray lidas = d.optJSONArray("lidas");
+        if (lidas != null && lidas.length() > 0) {
+            NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) for (int i = 0; i < lidas.length(); i++) nm.cancel(("push-" + lidas.optString(i, "")).hashCode());
+        }
         JSONArray l = d.optJSONArray("novas");
         if (l == null || l.length() == 0) return;
         Map<String, JSONObject> ult = new LinkedHashMap<>();

@@ -73,8 +73,9 @@ export async function reddit(url) {
   const fotos = new Map();
   for (const x of html.matchAll(/https:\/\/(?:preview|i)\.redd\.it\/([A-Za-z0-9_-]{6,80})\.(?:jpe?g|png|gif|webp)(?:\?[^\s"'<>\\]*)?/g)) {
     const u = imgReddit(desHtml(x[0])); if (!u) continue;
-    const w = +((/[?&]width=(\d+)/.exec(u) || [])[1] || 9999), ja = fotos.get(x[1]);
-    if (!ja || (w > ja.w && w <= 1600) || (ja.w > 1600 && w < ja.w)) fotos.set(x[1], { u, w });
+    // (1.0.2) a mesma foto vem como i.redd.it/<id> e preview.redd.it/<titulo>-v0-<id>: a chave é só o <id> (antes a foto aparecia duas vezes)
+    const chave = x[1].replace(/^.*-v\d+-/, ''), w = +((/[?&]width=(\d+)/.exec(u) || [])[1] || 9999), ja = fotos.get(chave);
+    if (!ja || (w > ja.w && w <= 1600) || (ja.w > 1600 && w < ja.w)) fotos.set(chave, { u, w });
     if (fotos.size >= 24) break;
   }
   if (post.url && imgReddit(post.url) && !fotos.size) fotos.set('p', { u: post.url, w: 0 });
@@ -147,11 +148,14 @@ export async function loja(url) {
     d.incluso = /amazon\.com\.br/.test(dom); // na Amazon Brasil o preço já vem com os impostos
   } else {
     const og = meta(html, 'og:title'); d.titulo = txt(og.replace(/\s*-\s*AliExpress.*$/i, ''), 300);
+    if (!d.titulo) { const tt = /<title>([^<]{4,400})<\/title>/.exec(html); if (tt) d.titulo = txt(desHtml(tt[1]).replace(/\s*-\s*AliExpress.*$/i, ''), 300); }
     const blob = /window\.runParams\s*=\s*\{[\s\S]{0,40}data:\s*(\{[\s\S]*?\})\s*\};/.exec(html) || /_init_data_\s*=\s*\{\s*data:\s*(\{[\s\S]*?\})\s*\}/.exec(html);
     let j = null; try { j = blob ? JSON.parse(blob[1]) : null; } catch (_) { j = null; }
     const procura = (o, k, prof = 0) => { if (!o || typeof o !== 'object' || prof > 8) return undefined; if (k in o) return o[k]; for (const v of Object.values(o)) { const r = procura(v, k, prof + 1); if (r !== undefined) return r; } return undefined; };
     const imgs = (j && (procura(j, 'imagePathList') || [])) || [];
     d.fotos = (Array.isArray(imgs) ? imgs : []).map(imgLoja).filter(Boolean).slice(0, 20);
+    // (1.0.2) a página nova não tem mais o bloco de dados inteiro: a lista de fotos vem solta no HTML (antes ficava só a primeira foto)
+    if (d.fotos.length < 2) { const lp = /"imagePathList":\[([^\]]{1,6000})\]/.exec(html); if (lp) for (const x of lp[1].matchAll(/"(https:\/\/[^"]+)"/g)) { const u = imgLoja(x[1]); if (u && !d.fotos.includes(u)) d.fotos.push(u); if (d.fotos.length >= 20) break; } }
     if (!d.fotos.length) { const u = imgLoja(meta(html, 'og:image')); if (u) d.fotos.push(u); }
     const pr = j && (procura(j, 'formatedActivityPrice') || procura(j, 'formatedPrice') || procura(j, 'formattedPrice'));
     const prTxt = pr || (/"(?:minActivityAmount|minAmount)":\{"value":([\d.]+),"currency":"([A-Z]{3})"/.exec(html) || [])[0] || '';

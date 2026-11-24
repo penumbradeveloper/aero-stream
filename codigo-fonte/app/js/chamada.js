@@ -113,7 +113,7 @@
     sinal('*', '', { t: 'entrar', ...meuEstado() });
     ch.pronto = true; ch.fila.splice(0).forEach(tratarSinal);
     const meu = ch;
-    try { await avisarServidor('entrar'); }
+    try { adotarId(meu, await avisarServidor('entrar')); }
     catch (e) {
       if (ch === meu) encerrar(false);
       // a chamada já tinha acabado (alguém caiu sem desligar e ela ficou aparecendo): some a faixa e, se era para ligar, liga de novo
@@ -124,9 +124,16 @@
     A.som.tocar('cham-entrei'); A.evt.emit('chamada:entrou', { cid: c.id }); // (0.7.0) o som de entrar
     setTimeout(vigiarSozinho, 15000);
   };
+  // (1.0.2) o servidor diz em qual chamada a pessoa entrou de verdade: se o app tinha um número velho (a chamada recomeçou enquanto a
+  // faixa mostrava a antiga), passa a usar o certo e se apresenta de novo. Antes cada um ficava numa "chamada" e ninguém aparecia no meio
+  function adotarId(c, r) {
+    if (!c || c !== ch || !r || !r.entrou || r.entrou === c.id) return;
+    c.id = r.entrou; c.saindo = false;
+    sinal('*', '', { t: 'entrar', ...meuEstado() }); A.evt.emit('talk:cham', { cid: c.cid });
+  }
   // o Hub reconectou (o aparelho ganhou outro id): continua na chamada com o id novo
   A.evt.on('hub:eu', () => {
-    if (ch && ch.pronto && !ch.saindo) avisarServidor('entrar', { retomar: true }).catch(() => {});
+    if (ch && ch.pronto && !ch.saindo) { const c = ch; avisarServidor('entrar', { retomar: true }).then((r) => adotarId(c, r)).catch(() => {}); }
     if (ch) for (const p of ch.pares.values()) if (p.caiuDesde && p.pc.signalingState === 'stable') ofertar(p, true).catch(() => {}); // (0.7.4) o sinal voltou: tenta já
   }); // (0.7.0) volta sem o aviso de "iniciou uma chamada"
 
@@ -184,7 +191,12 @@
     montarJanela();
     sinal('*', '', { t: 'entrar', ...meuEstado() });
     ch.pronto = true; ch.fila.splice(0).forEach(tratarSinal); // o que chegou enquanto o microfone abria
-    avisarServidor('entrar').catch(() => {}); A.evt.emit('chamada:entrou', { cid: e.cid }); A.som.tocar('cham-entrei');
+    const meu = ch;
+    avisarServidor('entrar').then((r) => adotarId(meu, r)).catch((x) => {
+      // (1.0.2) a chamada acabou enquanto tocava: em vez de ficar sozinho numa chamada que não existe, liga de volta
+      if (x && x.status === 409 && ch === meu) { encerrar(false); const c2 = conversa(e.cid); if (c2) { c2.cham = null; CH.ligar(c2, video); } }
+    });
+    A.evt.emit('chamada:entrou', { cid: e.cid }); A.som.tocar('cham-entrei');
   }
   A.evt.on('hub:chamada-fim', (e) => { if (tocando && tocando.id === e.id) { fecharTocando(); A.ui.toast(T('Chamada perdida de ', 'Missed call from ') + (conversa(e.cid) ? A.talk.titulo(conversa(e.cid)) : '?')); } });
   A.evt.on('hub:chamada-recusada', (e) => {
@@ -234,8 +246,15 @@
       // as duas pontas mandaram oferta ao mesmo tempo: a de chave menor cede (joga a dela fora e responde a outra)
       if (par && par.pc.signalingState === 'have-local-offer') {
         if ((eu().codigo + '/' + H.dev) > par.chave) return;
-        const guardados = par.ice; removerPar(par, { semSom: true }); par = null;
-        par = criarPar(e, d); par.ice.push(...guardados);
+        if (par.pc.currentRemoteDescription) {
+          // (1.0.2) no MEIO da chamada (mostrar a tela, ligar a câmera, trocar o formato): cede só a própria oferta (rollback) e responde a
+          // dele; a minha mudança vai numa oferta logo depois. Antes a conexão inteira era jogada fora e uma nova respondia uma oferta que não
+          // era para ela: a tela ficava preta ou congelada até reiniciar a chamada
+          await par.pc.setLocalDescription({ type: 'rollback' }); par.refazerOferta = true;
+        } else {
+          const guardados = par.ice; removerPar(par, { semSom: true }); par = null;
+          par = criarPar(e, d); par.ice.push(...guardados);
+        }
       }
       if (!par) par = criarPar(e, d);
       lerEstado(par, d);
@@ -246,6 +265,7 @@
       await soltarIce(par);
       if (par.refazerOferta) { par.refazerOferta = false; renegociar(par); }
     } else if (d.t === 'resposta' && par) {
+      if (par.pc.signalingState !== 'have-local-offer') return; // (1.0.2) resposta de uma oferta que já foi desfeita (as duas cruzaram)
       await par.pc.setRemoteDescription({ type: 'answer', sdp: somDaTela(d.sdp) });
       await soltarIce(par);
       if (par.refazerOferta) { par.refazerOferta = false; renegociar(par); }
@@ -1283,6 +1303,7 @@
     if (!cam) ui.euVideo.srcObject = null;
     ui.euTile.classList.toggle('com-video', !!cam);
     ui.euTile.classList.toggle('mudo', ch.mudo);
+    ui.euTile.classList.toggle('na-tela', !!minhaTela()); // (1.0.2) o selo TELA também no seu quadro quando você mostra a tela
     // palco (tela compartilhada)
     // (1.0.2) a tela (ou câmera) que estava grande sumiu (a pessoa parou de mostrar ou saiu): volta para a chamada normal e sai da tela
     // cheia, em vez de ficar um quadro vazio

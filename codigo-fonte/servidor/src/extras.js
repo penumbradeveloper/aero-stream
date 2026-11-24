@@ -66,10 +66,10 @@ export function nmPublico(nm, nivel) {
 // os extras que os outros veem (e o próprio app): só o que o plano de agora cobre
 export function extrasPublicos(e, nivel) {
   const o = {};
-  if (e.mo && MOLDURAS[e.mo.t] <= nivel) o.mo = e.mo;
+  if (e.mo && (e.mo.t === 'arte' || MOLDURAS[e.mo.t] <= nivel)) o.mo = e.mo; // (1.0.2) as de artistas da Comunidade valem para todos
   if (e.ab && ABERTURAS[e.ab] <= nivel) o.ab = e.ab;
   if (Array.isArray(e.ac) && nivel >= 3) o.ac = e.ac.slice(0, nivel >= 4 ? ACESSORIOS_MAX[4] : ACESSORIOS_MAX[3]);
-  if (e.an && ANEIS[e.an.t] <= nivel) o.an = e.an;
+  if (e.an && (e.an.t === 'arte' || ANEIS[e.an.t] <= nivel)) o.an = e.an;
   if (e.se && SONS_ENTRAR[e.se] <= nivel) o.se = e.se;
   if (e.mc && MOLDURAS_CAMERA[e.mc.t] <= nivel) o.mc = e.mc;
   if (e.cl && e.clV && nivel >= 3) o.clV = e.clV;

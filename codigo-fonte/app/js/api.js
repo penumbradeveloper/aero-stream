@@ -74,7 +74,15 @@
     const so = (await A.maquina().catch(() => ({}))).so || '';
     let d;
     try { d = await API.req('entrar', { acesso, so, ...extra }); }
-    catch (e) { if (e.status !== 404) throw e; d = await API.req('entrar', { acesso, so, loginId: API.formatarCodigo(codigo), ...extra }); } // conta de antes da 0.5.7 (troca o código aberto pelo hash)
+    catch (e) {
+      if (e.status !== 404) throw e;
+      try { d = await API.req('entrar', { acesso, so, loginId: API.formatarCodigo(codigo), ...extra }); } // conta de antes da 0.5.7 (troca o código aberto pelo hash)
+      catch (e2) {
+        // (1.0.2) código antigo (8 letras) que virou hash pelo caminho que repetia o "AERO" (0.9.6 a 1.0.1): também entra
+        if (e2.status !== 404 || A.cripto.letras(codigo).length !== 8) throw e2;
+        d = await API.req('entrar', { acesso: (await A.cripto.derivar('AERO' + A.cripto.normalizar(codigo), { bruto: true })).acesso, so, ...extra });
+      }
+    }
     if (d.precisa) throw Object.assign(new Error(d.precisa === '2fa' ? A.T('Digite o código do aplicativo autenticador.', 'Type the code from your authenticator app.') : A.T('Mandamos um código para ', 'We sent a code to ') + (d.email || A.T('o seu e-mail', 'your e-mail')) + A.T('. Digite-o para confirmar este aparelho.', '. Type it to confirm this device.')), { precisa: d.precisa, email: d.email });
     API.definirToken(d.token); API.guardarCodigoAcesso(codigo);
     return d;
@@ -477,5 +485,10 @@
     } finally { aplicandoPrefs = false; }
   };
   A.evt.on('hub:prefs-mudou', (m) => { if (!m || m.t > (+A.store.ler(chavePrefs(), '0') || 0)) API.puxarPrefs(); });
-  A.evt.on('hub:eu', () => { if (Date.now() - puxouEm > 5000) API.puxarPrefs(); }); // (1.0.2) acabou de baixar ao entrar: não baixa de novo
+  A.evt.on('hub:eu', (m) => {
+    if (Date.now() - puxouEm <= 5000) return;
+    // (1.0.2) a conexão já diz a hora das configurações da conta: se este aparelho já tem essa (ou uma mais nova), não precisa baixar
+    if (m && m.pt > 0 && API.eu && A.store.ler('aero-prefs-conta', '') === API.eu.codigo && m.pt <= (+A.store.ler(chavePrefs(), '0') || 0)) return;
+    API.puxarPrefs();
+  }); // (1.0.2) acabou de baixar ao entrar: não baixa de novo
 })();

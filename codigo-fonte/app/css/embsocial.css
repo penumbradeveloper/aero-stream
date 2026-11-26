@@ -1,6 +1,6 @@
 /* (1.0.3) cartões de TikTok e Instagram (e a base .emb-x dos cartões novos): legível nos dois temas, fotos sem zoom, nada sai da caixa */
 .cx-midia.emb-x { --ex-c1: #25f4ee; --ex-c2: #fe2c55; --ex-bg: rgba(255,255,255,.88); --ex-txt: #0f1722; --ex-suave: rgba(15,23,34,.6); --ex-linha: rgba(15,23,34,.1);
-  display: flex; flex-direction: column; gap: 9px; width: 420px; max-width: calc(100% - 8px); box-sizing: border-box; padding: 12px; border-radius: 18px; color: var(--ex-txt); overflow: hidden;
+  display: flex; flex-direction: column; gap: 9px; width: 420px; max-width: calc(100% - 8px); box-sizing: border-box; padding: 12px; border-radius: 26px; color: var(--ex-txt); overflow: clip; overflow-clip-margin: 30px;
   background: radial-gradient(110% 70% at 0% 0%, color-mix(in srgb, var(--ex-c1) 12%, transparent), transparent 55%), radial-gradient(110% 70% at 100% 100%, color-mix(in srgb, var(--ex-c2) 10%, transparent), transparent 55%), var(--ex-bg);
   box-shadow: inset 0 0 0 1px var(--ex-linha), 0 8px 24px rgba(0,0,0,.16); }
 [data-tema=escuro] .cx-midia.emb-x { --ex-bg: rgba(16,20,28,.92); --ex-txt: #eef3f8; --ex-suave: rgba(238,243,248,.62); --ex-linha: rgba(255,255,255,.1); box-shadow: inset 0 0 0 1px var(--ex-linha), 0 8px 24px rgba(0,0,0,.4); }
@@ -50,6 +50,8 @@
 .ex-rod { display: inline-flex; align-items: center; gap: 6px; width: fit-content; font-size: 11.5px; color: var(--ex-suave); text-decoration: none; cursor: pointer; } .ex-rod:hover { text-decoration: underline; }
 /* perfil */
 .emb-x.perfil { padding-top: 0; gap: 8px; }
+/* (1.0.4) as faixas de cima encostam na borda do cartão: arredondadas como ele (o cartão não corta mais rente, a película ondula por fora) */
+.cx-midia.emb-x > :is(.ex-banner, .rb-banner, .rb-vitrine) { border-radius: 26px 26px 0 0; }
 .ex-banner { position: relative; height: 74px; margin: 0 -12px; overflow: hidden; background: linear-gradient(120deg, #25f4ee, #000 55%, #fe2c55); }
 .ex-banner-marca { position: absolute; right: -10px; top: -22px; opacity: .22; rotate: -12deg; }
 .ex-perfil-cab { display: flex; align-items: flex-end; justify-content: space-between; margin-top: -40px; }
@@ -74,3 +76,21 @@
   .ex-palco.em-pe { height: min(460px, calc((100vw - 110px) / var(--ar, .5625))); }
   .ex-ests { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+/* (1.0.4) a bolha de vidro em volta do cartão, como nas fotos e GIFs: o cartão fica dentro (com o fundo dele) e a película é o aro que ondula
+   por fora. Só com a película ligada; na otimizada o cartão continua como antes */
+:root .cx-midia.emb-x.com-pelicula, :root .cx-midia.emb-lj.com-pelicula { border: 9px solid transparent; background-clip: padding-box; } /* (o :root vence o fundo escuro da Steam, que também trocaria o recorte) */
+.cx-midia.emb-x.com-pelicula { box-shadow: inset 0 0 0 1px var(--ex-linha); }
+.cx-midia.emb-lj.com-pelicula { box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 0 0 1px color-mix(in srgb, var(--lj) 30%, var(--lj-linha)); }
+.cx-midia.emb-x.com-pelicula > :is(.ex-banner, .rb-banner, .rb-vitrine), .cx-midia.emb-x.com-pelicula > .jg-fundo { border-radius: 17px 17px 0 0; }
+.cx-midia.emb-x.com-pelicula > .jg-fundo { border-radius: 17px; }
+.cx-midia.emb-x.com-pelicula::before, .cx-midia.emb-lj.com-pelicula::before { inset: -9px; }
+.cx-midia.com-pelicula:is(.emb-x, .emb-lj) > .pelicula { left: -20px !important; top: -20px !important; width: calc(100% + 40px) !important; height: calc(100% + 40px) !important; } /* FOLGA (11) + a borda (9) */
+:root[data-moldura="0"] .cx-midia.com-pelicula:is(.emb-x, .emb-lj) { border-width: 0; } /* moldura das embeds desligada: sem o aro vazio */
+/* (1.0.4) X e Reddit: o mesmo formato (o cartão dentro, legível, e o aro de vidro em volta). A faixa colorida da esquerda vira uma linha por
+   dentro: como borda, ela empurrava a bolha para o lado */
+.cx-midia.cx-tw.com-pelicula { --tw-cor: color-mix(in srgb, var(--texto) 55%, transparent); --tw-bg: rgba(255,255,255,.86); border: 9px solid transparent !important; background: var(--tw-bg) padding-box;
+  box-shadow: inset 3px 0 0 var(--tw-cor), inset 0 0 0 1px rgba(15,23,34,.1); }
+.cx-midia.cx-tw.cx-rd.com-pelicula { --tw-cor: #ff4500; }
+[data-tema=escuro] .cx-midia.cx-tw.com-pelicula { --tw-bg: rgba(16,20,28,.9); box-shadow: inset 3px 0 0 var(--tw-cor), inset 0 0 0 1px rgba(255,255,255,.1); }
+.cx-midia.cx-tw.com-pelicula > .pelicula { left: -20px !important; top: -20px !important; width: calc(100% + 40px) !important; height: calc(100% + 40px) !important; }
+:root[data-moldura="0"] .cx-midia.cx-tw.com-pelicula { border-width: 0 !important; }

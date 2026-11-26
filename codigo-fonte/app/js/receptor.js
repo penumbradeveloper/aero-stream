@@ -15,6 +15,7 @@
     const miniBuf = () => { const c = new ArrayBuffer(MINI.length); new Uint8Array(c).set(MINI); return c; };
     let modo = 'passa', placa = false, acel = 'no-preference', dec = null, esperando = true, ultPedido = 0, tr = null, log2 = 0, numAnt = -1, fila = [], filaT = 0;
     let st = { q: 0, ms: 0, desc: 0, w: 0, h: 0, err: 0 };
+    const tot = { ent: 0, sai: 0 }; // (1.0.4) para a página conferir se o decodificador próprio está soltando imagem
     const inicio = new Map();
     // onde começa cada unidade (NAL) do quadro: [início com o código, tipo]
     const unidades = (d) => { const o = []; for (let i = 0; i + 3 < d.length; i++) if (d[i] === 0 && d[i + 1] === 0 && d[i + 2] === 1) { o.push([i > 0 && d[i - 1] === 0 ? i - 1 : i, d[i + 3] & 31, i + 3]); i += 2; } return o; };
@@ -45,7 +46,7 @@
       inicio.clear(); // (os quadros do decodificador antigo não saem mais: não podem contar como "esperando")
       try {
         dec = new VideoDecoder({
-          output: (v) => { const t0 = inicio.get(v.timestamp); inicio.delete(v.timestamp); if (t0) st.ms += performance.now() - t0; st.q++; st.w = v.displayWidth; st.h = v.displayHeight; postMessage({ t: 'quadro', v }, [v]); },
+          output: (v) => { tot.sai++; const t0 = inicio.get(v.timestamp); inicio.delete(v.timestamp); if (t0) st.ms += performance.now() - t0; st.q++; st.w = v.displayWidth; st.h = v.displayHeight; postMessage({ t: 'quadro', v }, [v]); },
           error: (e) => { st.err++; inicio.clear(); postMessage({ t: 'erro', msg: e && e.message }); dec = null; esperando = true; pedir(); },
         });
         dec.configure({ codec, optimizeForLatency: true, hardwareAcceleration: placa ? acel : 'prefer-software' });
@@ -68,6 +69,7 @@
       if (fila.length) filaT = setTimeout(() => { fila = []; esperando = true; st.desc++; pedir(); }, 35);
     }
     function proprio(f, d0) {
+      tot.ent++;
       const key = f.type === 'key', d = key ? ordenar(d0) || d0 : d0;
       if (esperando && !key) { st.desc++; pedir(); return; }
       if (key) {
@@ -101,6 +103,9 @@
         if (placa) VideoDecoder.isConfigSupported({ codec: 'avc1.42e01f', hardwareAcceleration: 'prefer-hardware' }).then((r) => { acel = r && r.supported ? 'prefer-hardware' : 'no-preference'; }).catch(() => {});
         pedir();
       }
+      // (1.0.4) volta para o decodificador do navegador (o próprio não soltou imagem neste aparelho)
+      else if (m.t === 'passa') { modo = 'passa'; esperando = true; fila = []; clearTimeout(filaT); inicio.clear(); if (dec) { try { dec.close(); } catch (er) { /* ok */ } dec = null; } ultPedido = 0; pedir(); }
+      else if (m.t === 'saude') postMessage({ t: 'saude', ...tot });
       else if (m.t === 'est') { postMessage({ t: 'est', ...st }); st = { ...st, q: 0, ms: 0 }; }
       else if (m.t === 'inteiro') { ultPedido = 0; pedir(); }
     };
@@ -147,25 +152,50 @@
       const ctl = { w, receiver, proprio: false, atras: 0, est: { fps: 0, ms: 0, desc: 0, w: 0, h: 0 }, gerador: null, escritor: null };
       w.onmessage = (e) => {
         const m = e.data || {};
-        if (m.t === 'quadro') { const es = ctl.escritor; if (!es || es.desiredSize <= 0) { m.v.close(); return; } es.write(m.v).catch(() => {}); }
+        if (m.t === 'quadro') { const es = ctl.escritor; if (!es || es.desiredSize <= 0) { m.v.close(); return; } ctl.escritos++; es.write(m.v).catch(() => {}); }
+        else if (m.t === 'saude') vigiar(m);
         else if (m.t === 'atras') ctl.atras++;
         else if (m.t === 'erro') A.log.aviso('decodificador próprio:', m.msg);
         else if (m.t === 'est') ctl.est = { fps: m.q, ms: m.q ? Math.round((m.ms / m.q) * 10) / 10 : 0, desc: m.desc, w: m.w, h: m.h };
       };
+      // (1.0.4) VIGIA DO DECODIFICADOR PRÓPRIO: chegam quadros e nenhuma imagem sai dele (o decodificador deste aparelho não aceitou o vídeo,
+      // ou a imagem não chega na tela) por 2,5 s: volta para o do navegador, que estava mostrando a imagem. Antes a tela ficava parada no
+      // primeiro quadro até sair da sala. Nessa conexão ele não liga de novo
+      ctl.escritos = 0;
+      let saude = null, saudeT = 0;
+      const vigiar = (m) => {
+        if (!ctl.proprio) return;
+        const agora = performance.now();
+        if (!saude || ctl.escritos > saude.esc) { saude = { ent: m.ent, esc: ctl.escritos, t: agora }; return; }
+        if (m.ent - saude.ent >= 20 && agora - saude.t > 2500) voltar('nenhuma imagem saiu dele em ' + Math.round((agora - saude.t) / 100) / 10 + ' s');
+      };
+      const voltar = (motivo) => {
+        if (!ctl.proprio) return;
+        clearInterval(saudeT); saudeT = 0; ctl.proprio = false; ctl.falhou = true; saude = null;
+        const st = ctl.stream, g = ctl.gerador;
+        try { if (st && g) { st.removeTrack(g); if (ctl.velha && ctl.velha.readyState === 'live' && !st.getVideoTracks().includes(ctl.velha)) st.addTrack(ctl.velha); } } catch (e) { /* ok */ }
+        try { if (ctl.escritor) ctl.escritor.releaseLock(); } catch (e) { /* ok */ }
+        try { if (g) g.stop(); } catch (e) { /* ok */ }
+        ctl.gerador = null; ctl.escritor = null;
+        w.postMessage({ t: 'passa' });
+        A.log.aviso('receptor de vídeo: decodificador próprio desligado (' + motivo + '), volta o do navegador');
+      };
+      ctl.voltar = voltar;
       ctl.medir = () => { if (ctl.proprio) w.postMessage({ t: 'est' }); return ctl.est; };
       // passa para o decodificador próprio. A trilha nova entra no MESMO pacote de vídeo (stream), então quem já mostra esse pacote não muda nada.
       // placa: true deixa o navegador escolher (a placa, se tiver); false vai direto para o processador (a placa deste PC já mostrou imagem verde)
       ctl.usarProprio = (stream, { placa = false } = {}) => {
         // (1.0.0) já está no próprio pela placa e a imagem ficou verde: passa para o processador (antes ficava preso no verde)
         if (ctl.proprio && ctl.placa && !placa) { ctl.placa = false; w.postMessage({ t: 'proprio', placa: false }); A.log.aviso('receptor de vídeo: decodificador próprio passa para o processador'); return true; }
-        if (ctl.proprio || !R.podeProprio() || !stream) return false;
+        if (ctl.proprio || ctl.falhou || !R.podeProprio() || !stream) return false;
         const velha = stream.getVideoTracks()[0]; if (!velha) return false;
         // (1.0.3) a escrita fica aqui na página: mandar a trilha para o worker funcionou no Linux, mas no Windows (decodificador da placa) a
         // imagem não chegava na tela (preta, ou parada no primeiro quadro)
         try { ctl.gerador = new MediaStreamTrackGenerator({ kind: 'video' }); ctl.escritor = ctl.gerador.writable.getWriter(); } catch (e) { A.log.aviso('decodificador próprio:', e); return false; }
-        ctl.proprio = true; ctl.placa = placa;
+        ctl.proprio = true; ctl.placa = placa; ctl.stream = stream; ctl.velha = velha; ctl.escritos = 0; saude = null;
+        clearInterval(saudeT); saudeT = setInterval(() => { if (!ctl.proprio) { clearInterval(saudeT); return; } try { w.postMessage({ t: 'saude' }); } catch (e) { clearInterval(saudeT); } }, 1000);
         stream.removeTrack(velha); stream.addTrack(ctl.gerador);
-        velha.addEventListener('ended', () => { try { ctl.gerador.stop(); } catch (e) { /* ok */ } }, { once: true });
+        velha.addEventListener('ended', () => { clearInterval(saudeT); try { if (ctl.gerador) ctl.gerador.stop(); } catch (e) { /* ok */ } }, { once: true });
         w.postMessage({ t: 'proprio', placa });
         A.log.aviso('receptor de vídeo: decodificador próprio ligado (' + (placa ? 'automático' : 'processador') + ')');
         return true;

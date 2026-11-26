@@ -1330,7 +1330,10 @@
               const ms = ((td - dA.t) / (fd - dA.f)) * 1000, desc = (fdr - dA.d) / Math.max(1, fd - dA.f + fdr - dA.d), fila = je > dA.je ? ((jd - dA.jd) / (je - dA.je)) * 1000 : 0;
               const impl = r.decoderImplementation || '', naPlaca = /External|D3D|Vaapi|VideoToolbox|MediaCodec/i.test(impl), quadroMs = 1000 / Math.max(10, r.framesPerSecond || 60);
               const recebidos = fr - (dA.r || 0), atras = recebidos > 0 && (recebidos - (fd - dA.f) - (fdr - dA.d)) / recebidos > 0.1;
-              peer.decLento = e.h > 360 && ((!naPlaca && ms > quadroMs * 0.85) || atras || fila > 120 || (e.perda < 1 && desc > 0.08)) ? (peer.decLento || 0) + 1 : 0;
+              // (1.0.4) no processador, fila e quadros para trás só contam com o decodificador realmente ocupado (40% do tempo de um quadro): com 1,5 ms
+              // por quadro o que segura a fila é a internet ou o quadro inteiro que não veio, não este PC (era o aviso falso que baixava a tela para 360p)
+              const ocupado = naPlaca || ms > quadroMs * 0.4;
+              peer.decLento = e.h > 360 && ((!naPlaca && ms > quadroMs * 0.85) || (ocupado && (atras || fila > 120 || (e.perda < 1 && desc > 0.08)))) ? (peer.decLento || 0) + 1 : 0;
               e.decMs = Math.round(ms * 10) / 10;
               // (1.0.0) o navegador decodifica pelo PROCESSADOR, mas a placa deste aparelho decodifica H.264: passa já para ela (como um vídeo do
               // YouTube, quem assiste só gasta internet). Sem esperar ficar lento. Uma vez por conexão

@@ -286,6 +286,13 @@
     if (!p.grad || p.gradK !== CW + 'x' + CH + p.temaV) { const gr = ctx.createLinearGradient(FOLGA, FOLGA, FOLGA + p.W, FOLGA + p.H); gr.addColorStop(0, p.cor.a); gr.addColorStop(0.55, p.cor.b); gr.addColorStop(1, p.cor.c); p.grad = gr; p.gradK = CW + 'x' + CH + p.temaV; }
     ctx.fillStyle = p.grad; ctx.fill();
     if (p.cor.traco && p.cor.traco !== 'none') { ctx.strokeStyle = p.cor.traco; ctx.lineWidth = p.cor.larg; ctx.lineJoin = 'round'; ctx.stroke(); }
+    // (1.0.4) cartão com borda transparente (os cartões de link): a película é só o aro em volta, vazada no meio, onde fica o fundo do cartão
+    if (p.aro > 0 && p.W > 2 * p.aro && p.H > 2 * p.aro) {
+      const a = p.aro, rr = Math.max(0, Math.min(RAIO, p.W / 2, p.H / 2) - a);
+      ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(FOLGA + a, FOLGA + a, p.W - 2 * a, p.H - 2 * a, rr); else ctx.rect(FOLGA + a, FOLGA + a, p.W - 2 * a, p.H - 2 * a);
+      ctx.fill(); ctx.globalCompositeOperation = 'source-over';
+    }
     p.sujo = false; p.vazia = false;
     if (!p.pronta) { p.pronta = true; p.el.classList.add('pel-ok'); } // até o 1º desenho, a bolha parada (sem animar) continua por baixo
   }
@@ -337,7 +344,7 @@
   // cada uma a cada quadro da rolagem pesava)
   const pelDe = new WeakMap();
   const pelRO = window.ResizeObserver ? new ResizeObserver((es) => {
-    for (const e of es) { const p = pelDe.get(e.target); if (!p) continue; const el = p.el; p.W = el.offsetWidth; p.H = el.offsetHeight; p.sujo = true;
+    for (const e of es) { const p = pelDe.get(e.target); if (!p) continue; const el = p.el; p.W = el.offsetWidth; p.H = el.offsetHeight; p.sujo = true; p.aro = parseFloat(getComputedStyle(el).borderTopWidth) || 0;
       // o primeiro desenho sai na hora (antes da tela ser pintada): a bolha não espera o próximo quadro do laço para aparecer
       if (p.W && p.H && performance.now() >= rolandoAte && pertoDaTela(el)) desenharPelicula(p, ultimoTPel || performance.now() / 1000); }
     animar(); }) : null;
@@ -491,7 +498,7 @@
   // (0.9.5) "galeria": { itens: [{ url, video, nome, link }], i } — várias fotos/vídeos de uma mensagem, com setas (e ← →) e miniaturas embaixo
   U.verImagem = (url, { nome, favoritar, link, gif, galeria } = {}) => {
     const itens = galeria && Array.isArray(galeria.itens) ? galeria.itens.filter((x) => x && x.url) : null;
-    let pos = itens ? Math.max(0, itens.findIndex((x) => x.url === url)) : 0, video = !!(itens && itens[pos].video);
+    let pos = itens ? (itens[galeria.i] && itens[galeria.i].url === url ? galeria.i : Math.max(0, itens.findIndex((x) => x.url === url))) : 0, video = !!(itens && itens[pos].video);
     const linkDe = (u, l) => l || (/^https?:/.test(u) ? u : null); // (0.8.3) copiar o link (da imagem ou do GIF)
     link = linkDe(url, link);
     const txtLink = () => (gif ? A.T('Copiar link do GIF', 'Copy GIF link') : video ? A.T('Copiar link do vídeo', 'Copy video link') : A.T('Copiar link da imagem', 'Copy image link'));
@@ -506,7 +513,7 @@
       const ox = cx - r.width / 2, oy = cy - r.height / 2; x = ox - ((ox - x) * nz) / z; y = oy - ((oy - y) * nz) / z; z = nz; if (z === 1) { x = 0; y = 0; } pintar();
     };
     palco.addEventListener('wheel', (e) => { if (video) return; e.preventDefault(); zoom(z * (e.deltaY < 0 ? 1.2 : 1 / 1.2), e.clientX, e.clientY); }, { passive: false });
-    palco.addEventListener('dblclick', (e) => zoom(z > 1 ? 1 : 2.5, e.clientX, e.clientY));
+    palco.addEventListener('dblclick', (e) => { if (e.target.closest('.vi-seta, .vi-cont')) return; zoom(z > 1 ? 1 : 2.5, e.clientX, e.clientY); }); // (1.0.4) clicar rápido nas setas troca de foto, sem dar zoom
     const toques = new Map(); let ini = null;
     palco.addEventListener('pointerdown', (e) => { if (video || e.target.closest('.vi-seta')) return; palco.setPointerCapture(e.pointerId); toques.set(e.pointerId, e); ini = { x, y, px: e.clientX, py: e.clientY, z, d: toques.size === 2 ? Math.hypot(...(() => { const [a1, b1] = [...toques.values()]; return [a1.clientX - b1.clientX, a1.clientY - b1.clientY]; })()) : 0 }; });
     palco.addEventListener('pointermove', (e) => {
@@ -526,7 +533,7 @@
     const zoomBts = [bt('zoomMenos', A.T('Diminuir', 'Zoom out'), () => zoom(z / 1.4)), nivel, bt('zoomMais', A.T('Aumentar', 'Zoom in'), () => zoom(z * 1.4)), h('i', { class: 'vi-sep' })];
     const btCopiar = bt('copiar', A.T('Copiar imagem', 'Copy image'), () => U.copiarImagem(url));
     // (1.0.2) pausar o vídeo e maximizar/minimizar (também no controle: Y pausa, X maximiza, B fecha e o direcional troca de foto)
-    const alternarPausa = () => { if (mid === img) return; if (mid.paused) mid.play().catch(() => {}); else mid.pause(); };
+    const alternarPausa = () => { if (mid === img || mid.tagName !== 'VIDEO') return; if (mid.paused) mid.play().catch(() => {}); else mid.pause(); };
     const btPausa = bt('pausa', A.T('Pausar / continuar', 'Pause / play'), alternarPausa); btPausa.hidden = !video;
     let caixaModal = null;
     const alternarMax = () => {
@@ -547,15 +554,16 @@
       const sEsq = seta('esq'), sDir = seta('dir');
       palco.append(sEsq, sDir, cont);
       const tiras = itens.map((it, k) => h('button', { type: 'button', class: 'vi-mini' + (it.video ? ' video' : ''), title: it.nome || '', onclick: () => mostrar(k) },
-        it.video ? h('video', { src: it.url, muted: '', preload: 'metadata', playsinline: '' }) : h('img', { src: it.url, alt: '', loading: 'lazy', draggable: 'false' })));
+        it.video && !(it.capa || it.poster) ? h('video', { src: it.url, muted: '', preload: 'metadata', playsinline: '' }) : h('img', { src: it.capa || it.poster || it.url, alt: '', loading: 'lazy', draggable: 'false' })));
       const faixa = h('div', { class: 'vi-faixa' }, ...tiras);
       partes.push(faixa);
       const mostrar = (k) => {
         pos = (k + n) % n; const it = itens[pos];
         url = it.url; nome = it.nome || nome; video = !!it.video; link = linkDe(url, it.link);
         z = 1; x = 0; y = 0; pintar(); toques.clear(); ini = null;
-        if (mid !== img) { try { mid.pause(); } catch (e) { /* ok */ } mid.remove(); }
-        if (video) { mid = h('video', { src: url, class: 'vi-img vi-video', controls: '', autoplay: '', playsinline: '' }); img.hidden = true; palco.prepend(mid); }
+        if (mid !== img) { try { if (mid.pause) mid.pause(); } catch (e) { /* ok */ } mid.remove(); }
+        // (1.0.4) vídeo do YouTube (os vídeos de um jogo do Roblox) toca ali mesmo, na mesma galeria das fotos
+        if (video) { mid = it.yt ? h('iframe', { src: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(it.yt)}?autoplay=1&rel=0&playsinline=1`, class: 'vi-img vi-video vi-yt', allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen', allowfullscreen: '', title: 'YouTube', referrerpolicy: 'strict-origin-when-cross-origin' }) : h('video', { src: url, class: 'vi-img vi-video', controls: '', autoplay: '', playsinline: '', poster: it.capa || it.poster || null }); img.hidden = true; palco.prepend(mid); }
         else { mid = img; img.hidden = false; img.src = url; }
         palco.classList.toggle('video', video);
         zoomBts.forEach((b) => (b.hidden = video)); btCopiar.hidden = video; btPausa.hidden = !video;

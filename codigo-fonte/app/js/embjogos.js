@@ -41,13 +41,16 @@
     const n = itens.length; if (!n) return null;
     let i = 0;
     const palco = naoAbrir(h('div', { class: 'jg-palco' }));
-    const galeria = itens.filter((x) => x.tipo === 'foto').map((x, k) => ({ url: img(x.url), video: false, nome: 'foto-' + (k + 1) + '.jpg', link }));
+    // (1.0.4) a galeria leva tudo, na mesma ordem das miniaturas: fotos, trailers (Steam) e vídeos do YouTube (Roblox)
+    const galeria = itens.map((x, k) => x.tipo === 'foto' ? { url: img(x.url), video: false, nome: 'foto-' + (k + 1) + '.jpg', link }
+      : x.tipo === 'yt' ? { url: img(x.capa), capa: img(x.capa), yt: x.id, video: true, nome: x.titulo || 'video', link: 'https://www.youtube.com/watch?v=' + x.id }
+      : { url: x.url, capa: x.capa ? img(x.capa) : '', video: true, nome: (x.titulo || 'video') + '.mp4', link });
     const mostrar = (k, tocar) => {
       i = (k + n) % n; const x = itens[i];
       palco.classList.remove('tocando');
       if (x.tipo === 'foto') {
         const b = h('button', { type: 'button', class: 'jg-palco-foto', title: T('Ampliar', 'Enlarge') }, h('img', { src: img(x.url), alt: '', decoding: 'async', draggable: 'false' }));
-        b.addEventListener('click', () => { const g = galeria.findIndex((y) => y.url === img(x.url)); A.ui.verImagem(img(x.url), { nome: 'foto.jpg', link, galeria: { itens: galeria, i: Math.max(0, g) } }); });
+        b.addEventListener('click', () => { const g = galeria[i]; A.ui.verImagem(g.url, { nome: g.nome, link, galeria: { itens: galeria, i } }); });
         palco.replaceChildren(b);
       } else if (!tocar) {
         const b = h('button', { type: 'button', class: 'jg-palco-foto', title: T('Assistir aqui', 'Watch here') }, x.capa ? h('img', { src: img(x.capa), alt: '', decoding: 'async', draggable: 'false' }) : null, h('span', { class: 'ex-play' }, A.icone('play', 28)));
@@ -71,7 +74,7 @@
       const resto = k === VISIVEIS - 1 && n > VISIVEIS ? n - VISIVEIS + 1 : 0;
       const capa = x.tipo === 'foto' ? x.url : x.capa;
       minis.append(h('button', { type: 'button', class: 'jg-mini' + (x.tipo !== 'foto' ? ' video' : ''), title: x.titulo || null, onclick: () => {
-        if (resto) { if (galeria.length) A.ui.verImagem(galeria[0].url, { nome: 'foto.jpg', link, galeria: { itens: galeria, i: Math.min(galeria.length - 1, Math.max(0, k)) } }); return; }
+        if (resto) { const g = galeria[k]; A.ui.verImagem(g.url, { nome: g.nome, link, galeria: { itens: galeria, i: k } }); return; }
         mostrar(k);
       } }, capa ? h('img', { src: img(capa), alt: '', loading: 'lazy', decoding: 'async', draggable: 'false' }) : null,
       x.tipo !== 'foto' ? h('span', { class: 'jg-mini-play' }, A.icone('play', 14)) : null, resto ? h('span', { class: 'jg-mini-mais' }, '+' + resto) : null));

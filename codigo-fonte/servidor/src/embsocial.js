@@ -34,7 +34,12 @@ const autorTT = (a) => ({ nick: txt(a.uniqueId || '', 40), nome: txt(a.nickname 
 
 export async function tiktok(url) {
   if (!RE_TIKTOK.test(url)) return null;
-  const p = await paginaTT(url); if (!p) return null;
+  // (1.0.4) post de fotos (link /photo/, ou o link curto vt./vm. que leva até ele): essa página vem sem os dados; a mesma em /video/ traz tudo
+  const foto = (x) => /tiktok\.com\/@[\w.-]{1,40}\/photo\/(\d{8,25})/i.exec(x || '');
+  let p = foto(url) ? null : await paginaTT(url);
+  const fm = foto(url) || (p && !p.j['webapp.video-detail'] && foto(p.final));
+  if (fm) p = (await paginaTT('https://www.' + fm[0].replace(/\/photo\//i, '/video/'))) || p;
+  if (!p) return null;
   const it = p.j['webapp.video-detail'] && p.j['webapp.video-detail'].itemInfo && p.j['webapp.video-detail'].itemInfo.itemStruct;
   if (it && it.id) {
     const st = it.statsV2 || it.stats || {}, v = it.video || {}, mu = it.music || {}, a = autorTT(it.author || {});

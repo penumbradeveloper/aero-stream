@@ -575,7 +575,9 @@
     const glob = window.aero && window.aero.cursoresGlobais;
     if (glob && ehDono()) {
       // no computador de quem transmite: o cursor de TODO MUNDO, por cima de tudo (até com o Aero minimizado)
-      const l = todos.filter(([id, , , , real]) => !(real && relDe.has(id) && !E.hostAtivo)).map(([id, x, y, ping]) => { const q = S.participante(id); return q ? { id, x, y, ping, cor: E.corDe(q), nome: q.nome } : null; }).filter(Boolean);
+      // (1.0.4) quem está com o mouse de verdade É o cursor do sistema: o colorido dele só aparece quando o dono mexe no próprio mouse (antes
+      // ficava sempre por cima do cursor de verdade, e parecia que o cursor de quem controla mandava mais que o do dono)
+      const l = todos.filter(([id, , , , real]) => !(real && !E.hostAtivo && (!quemManda || quemManda.id === id))).map(([id, x, y, ping]) => { const q = S.participante(id); return q ? { id, x, y, ping, cor: E.corDe(q), nome: q.nome } : null; }).filter(Boolean);
       const k = JSON.stringify(l); if (k !== E._globAnt) { E._globAnt = k; glob(l).catch(() => {}); }
     }
     S.participantes.forEach((q) => { if (q.id !== S.id) S.enviarDC(q.id, msg, { rapido: true }); });

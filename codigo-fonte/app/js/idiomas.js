@@ -4,6 +4,8 @@
   const A = window.Aero, { h, T } = A, U = A.ui;
   const LINGUAS = [['pt', 'Português'], ['en', 'English'], ['es', 'Español'], ['fr', 'Français'], ['de', 'Deutsch'], ['it', 'Italiano'], ['ja', '日本語'], ['ko', '한국어'], ['zh-CN', '中文'], ['ru', 'Русский'], ['ar', 'العربية'], ['hi', 'हिन्दी'], ['tr', 'Türkçe'], ['pl', 'Polski'], ['nl', 'Nederlands'], ['sv', 'Svenska'], ['uk', 'Українська'], ['id', 'Bahasa Indonesia']];
   const nomeLingua = (c) => (LINGUAS.find((x) => x[0] === c || x[0].slice(0, 2) === String(c || '').slice(0, 2)) || [c, String(c || '').toUpperCase()])[1];
+  // (1.0.3) "Traduzido do inglês" (o nome da língua na língua do app, não "English")
+  const nomeNaMinha = (c) => { try { const n = new Intl.DisplayNames([A.idioma() === 'en' ? 'en' : 'pt-BR'], { type: 'language' }).of(String(c || '').slice(0, 2)); if (n) return n; } catch (e) { /* ok */ } return nomeLingua(c); };
   const cfg = () => { const c = A.cfg.v.chat = A.cfg.v.chat || {}; return c; };
   const minha = () => cfg().traduzirPara || (A.idioma() === 'en' ? 'en' : 'pt');
   const cache = new Map(); // id da mensagem -> { texto, de } (sobrevive quando o chat redesenha a mensagem)
@@ -22,7 +24,7 @@
     let original = false;
     const corpo = h('div', { class: 'cx-trad-txt' }, r.texto);
     const alt = h('button', { class: 'cx-trad-alt', type: 'button', onclick: (e) => { e.stopPropagation(); original = !original; corpo.textContent = original ? m.texto : r.texto; alt.textContent = original ? T('Ver tradução', 'See translation') : T('Ver original', 'See original'); } }, T('Ver original', 'See original'));
-    lugar.replaceChildren(h('div', { class: 'cx-trad-topo' }, A.icone('traduzir', 12), h('span', {}, T('Traduzido de ', 'Translated from ') + nomeLingua(r.de)), alt), corpo);
+    lugar.replaceChildren(h('div', { class: 'cx-trad-topo' }, A.icone('traduzir', 12), h('span', {}, T('Traduzido do ', 'Translated from ') + nomeNaMinha(r.de)), alt), corpo);
     lugar.hidden = false;
   }
   function bloco(m, meu) {
@@ -41,7 +43,10 @@
   // links, menções e figurinhas não passam pelo tradutor (ele estragaria)
   const traduzivel = (t) => !!t && /\p{L}{2}/u.test(t.replace(/\bhttps?:\/\/\S+/g, '').replace(/<[^>]+>/g, '').replace(/:[a-z0-9_]+:/gi, ''));
   async function traduzirMsg(m, el) {
-    const lugar = el && el.querySelector('.cx-trad'); if (!lugar) return;
+    // (1.0.3) a mensagem já estava na tela antes de ligar a tradução: não tinha o lugar dela e o "Traduzir" do menu não fazia nada
+    let lugar = el && el.querySelector('.cx-trad');
+    if (!lugar && el) { const txt = el.querySelector('.cx-txt'); if (!txt) return; lugar = h('div', { class: 'cx-trad', hidden: true }); txt.after(lugar); }
+    if (!lugar) return;
     lugar.hidden = false; lugar.replaceChildren(h('div', { class: 'cx-trad-topo suave' }, T('Traduzindo…', 'Translating…')));
     try {
       const r = await traduzir(m.texto, minha());

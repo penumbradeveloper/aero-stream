@@ -292,12 +292,36 @@ app.on('open-file', (e, c) => { if (!/\.aer$/i.test(String(c))) return; e.preven
 handle('copiar', (t) => { clipboard.writeText(String(t || '').slice(0, 2000000)); return true; });
 handle('mostrar', () => { mostrarJanela(); return true; });
 let teclasDoJogo = false;
-ipcMain.on('teclas-do-jogo', (e, on) => { if (confiavel(e)) { teclasDoJogo = !!on; escDoJogo(); } });
+let imersivoPedido = false; // (1.0.3) o modo imersivo está ligado (Super, Alt+Tab... vão para o PC do amigo)
+ipcMain.on('teclas-do-jogo', (e, on, imersivo) => { if (confiavel(e)) { teclasDoJogo = !!on; imersivoPedido = !!imersivo; escDoJogo(); } });
+// (1.0.3) KDE Plasma: o KWin pega Alt+Tab, Super+tecla e os outros atalhos do sistema antes do app, e no modo imersivo eles agiam no seu PC
+// em vez de ir para o do amigo. Enquanto o jogo do amigo é dono do teclado (modo imersivo, janela em foco), os atalhos globais do KDE ficam
+// suspensos (o mesmo que o KWin faz com a regra "Ignorar atalhos globais"); perdeu o foco, pausou, saiu ou fechou: voltam na hora.
+// Só no Linux com KDE; Windows e os outros sistemas continuam como estão
+const kdeAtalhos = linux && /KDE/i.test(String(process.env.XDG_CURRENT_DESKTOP || ''));
+let atalhosSuspensos = false;
+const argsBloquear = (v) => [['gdbus', ['call', '--session', '--dest', 'org.kde.kglobalaccel', '--object-path', '/kglobalaccel', '--method', 'org.kde.KGlobalAccel.blockGlobalShortcuts', v ? 'true' : 'false']],
+  ['busctl', ['--user', 'call', 'org.kde.kglobalaccel', '/kglobalaccel', 'org.kde.KGlobalAccel', 'blockGlobalShortcuts', 'b', v ? 'true' : 'false']]];
+function bloquearAtalhosKde(v, sincrono) {
+  const cp = require('child_process');
+  if (sincrono) { for (const [c, a] of argsBloquear(v)) { try { cp.execFileSync(c, a, { timeout: 1500, stdio: 'ignore' }); return; } catch (e) { /* tenta o próximo */ } } return; }
+  const tentar = (i) => { const x = argsBloquear(v)[i]; if (!x) return; cp.execFile(x[0], x[1], { timeout: 3000 }, (e) => { if (e) { if (i === 0) tentar(1); else log('atalhos do KDE: ' + String(e.message).slice(0, 160)); } }); };
+  tentar(0);
+}
+function atalhosDoSistema() {
+  if (!kdeAtalhos) return;
+  const quer = teclasDoJogo && imersivoPedido && !!janela && !janela.isDestroyed() && janela.isFocused() && janela.isVisible();
+  if (quer === atalhosSuspensos) return;
+  atalhosSuspensos = quer; bloquearAtalhosKde(quer);
+}
+const soltarAtalhosKde = () => { if (atalhosSuspensos) { atalhosSuspensos = false; bloquearAtalhosKde(false, true); } };
+process.on('exit', soltarAtalhosKde);
 // (0.8.5) com o mouse preso no jogo do amigo, o Chromium pega o Esc ANTES da página (e do before-input-event) e solta o mouse: o controle
 // parecia pausado. Enquanto o jogo é dono do teclado e a janela está em foco, o Esc é pego no sistema (Windows e X11) e vai direto
 // para o jogo; ao perder o foco ele é devolvido na hora. Onde o sistema não deixa (Wayland), a página recupera o mouse sozinha.
 let escPreso = false;
 function escDoJogo() {
+  atalhosDoSistema();
   const quer = teclasDoJogo && !!janela && !janela.isDestroyed() && janela.isFocused();
   if (quer === escPreso) return;
   if (!quer) { try { globalShortcut.unregister('Escape'); } catch (e) { /* ok */ } escPreso = false; return; }
@@ -692,6 +716,12 @@ handle('ouvindo-agora', () => ouvindo.agora());
 handle('ouvindo-tocar', (c) => ouvindo.tocar(c && typeof c === 'object' ? { f: c.f, id: c.id, k: c.k, p: c.p, tocando: c.tocando, t: c.t } : null)); // (1.0.0) ouvir junto
 handle('ouvindo-token', (novo) => ({ token: ouvindoTok(!!novo), porta: ouvindo.porta() }));
 // (1.0.0) instalar a extensão: abre a página de instalar no navegador padrão; a extensão pega o código sozinha
+// (1.0.3) Jogar no cartão do Roblox: só o link roblox:// de um jogo (número), que o Roblox ou o Sober instalado abre
+// abre no app (Steam, Roblox/Sober) só quando ele está instalado; sem app, a página volta false e o cartão abre no navegador
+function temApp(proto) { try { return !!app.getApplicationNameForProtocol(proto + '://'); } catch (_) { return false; } }
+async function abrirApp(proto, url) { if (!temApp(proto)) return false; try { await shell.openExternal(url); return true; } catch (_) { return false; } }
+handle('abrir-steam', (id) => /^\d{1,10}$/.test(String(id)) ? abrirApp('steam', 'steam://store/' + id) : false);
+handle('jogar-roblox', (id) => /^\d{1,20}$/.test(String(id)) ? abrirApp('roblox', 'roblox://experiences/start?placeId=' + id) : false);
 handle('ouvindo-instalar', async () => { ouvindoTok(false); await shell.openExternal(ouvindo.convite()); return true; });
 handle('ouvindo-extensao', () => ouvindo.extensao());
 // (1.0.0) Assistindo agora (Twitch, Kick, YouTube e os sites da pessoa, pela extensão do navegador): a lista de sites e o vídeo de agora
@@ -963,12 +993,26 @@ handle('vigem-instalar', async () => {
   // 3010/1641 = instalado, pede reiniciar; 1638 = já havia uma versão instalada no sistema (também conta: não pede de novo)
   return { ok: !e || [3010, 1641, 1638].includes(e.code), codigo: e ? e.code : 0 };
 });
+// (1.0.3) Linux: libera o /dev/uinput para quem está sentado no computador (regra do udev com "uaccess", o mesmo que o Steam faz) e deixa
+// o módulo uinput ligando sozinho. Roda pelo pedido de senha do próprio sistema (pkexec); o script vai inteiro no comando (nada em arquivo).
+// Sem isso, quem transmitia no Linux não recebia o mouse nem o teclado dos amigos (o amigo só via o próprio cursor parado na tela)
+const UINPUT_SCRIPT = 'set -e; printf %s\\n \'KERNEL=="uinput", SUBSYSTEM=="misc", MODE="0660", TAG+="uaccess", OPTIONS+="static_node=uinput"\' > /etc/udev/rules.d/60-aero-uinput.rules; '
+  + 'chmod 0644 /etc/udev/rules.d/60-aero-uinput.rules; printf %s\\n uinput > /etc/modules-load.d/aero-uinput.conf; chmod 0644 /etc/modules-load.d/aero-uinput.conf; '
+  + 'modprobe uinput 2>/dev/null || true; udevadm control --reload-rules 2>/dev/null || true; udevadm trigger --name-match=uinput 2>/dev/null || udevadm trigger --subsystem-match=misc 2>/dev/null || true';
+handle('uinput-liberar', async () => {
+  if (process.platform !== 'linux') return { ok: false, motivo: 'sistema' };
+  const r = await new Promise((resolve) => require('child_process').execFile('pkexec', ['/bin/sh', '-c', UINPUT_SCRIPT], { timeout: 180000 }, (e, _o, err) => resolve(e ? { ok: false, erro: String(err || e.message).slice(0, 300), codigo: e.code } : { ok: true })));
+  if (!r.ok) { log('uinput: liberar ' + (r.erro || '')); return { ok: false, motivo: r.codigo === 126 || r.codigo === 127 || /dismissed|Not authorized/i.test(r.erro || '') ? 'cancelado' : 'falhou' }; }
+  try { entrada.parar(); } catch (_) { /* ok */ }
+  await new Promise((res) => setTimeout(res, 700)); // o udev aplica a permissão
+  return { ok: true };
+});
 const COMANDOS_ENTRADA = new Set(['mouseRel', 'mouseAbs', 'botao', 'roda', 'tecla', 'pad', 'padSair', 'soltarTudo', 'preparar']);
 ipcMain.on('entrada-cmd', (e, nome, ...args) => { if (!confiavel(e) || !COMANDOS_ENTRADA.has(nome)) return; try { entrada[nome](...args); } catch (err) { log('entrada', err.message); } });
 
 // ao fechar: devolve o som dos aplicativos, solta teclas e tira a atividade do Discord
 let limpou = false;
-const limparTudo = () => { if (limpou) return; limpou = true; try { cursorHost(false); } catch (e) { /* ok */ } gravarSent(null); try { audio.limparAoSair(); } catch (e) { /* ok */ } try { entrada.soltarTudo(); entrada.parar(); } catch (e) { /* ok */ } try { discord.parar(); } catch (e) { /* ok */ } try { kms.parar(); } catch (e) { /* ok */ } };
+const limparTudo = () => { if (limpou) return; limpou = true; soltarAtalhosKde(); try { cursorHost(false); } catch (e) { /* ok */ } gravarSent(null); try { audio.limparAoSair(); } catch (e) { /* ok */ } try { entrada.soltarTudo(); entrada.parar(); } catch (e) { /* ok */ } try { discord.parar(); } catch (e) { /* ok */ } try { kms.parar(); } catch (e) { /* ok */ } };
 app.on('before-quit', limparTudo);
 for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(sig, () => { saindo = true; limparTudo(); app.exit(0); });
 app.on('will-quit', limparTudo);
@@ -1025,7 +1069,7 @@ function criarJanela() {
     if (!bandeja || !escondidoNaBandeja || saindoDeVez) app.quit();
   });
   // fechar a janela: bandeja (continua recebendo chamadas e mensagens) ou fechar de vez, como a pessoa escolheu (ou pergunta)
-  janela.on('focus', escDoJogo); janela.on('blur', escDoJogo); janela.on('hide', escDoJogo); // o Esc só fica preso com o Aero em foco
+  janela.on('focus', escDoJogo); janela.on('blur', escDoJogo); janela.on('hide', escDoJogo); janela.on('minimize', escDoJogo); janela.webContents.on('render-process-gone', () => { teclasDoJogo = false; imersivoPedido = false; escDoJogo(); }); // (1.0.3) a página caiu: os atalhos do KDE voltam // o Esc só fica preso com o Aero em foco
   janela.on('close', (e) => {
     guardarJanela(true);
     if (saindoDeVez || saindo) return;

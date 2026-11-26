@@ -141,7 +141,7 @@
     if (ds.some((d) => d.estado === 'ocupado')) return 'ocupado';
     return 'ausente';
   };
-  U.naoPerturbe = () => { const eu = A.api.eu || {}; return eu.status === 'ocupado' || !!(eu.stc && eu.stc.c && eu.stc.sn); }; // (0.8.6) ou o status personalizado com "sem notificações" // (0.5.9-7) não perturbe: nenhum aviso de mensagem, amigo online ou toque
+  U.naoPerturbe = (cod) => { const eu = A.api.eu || {}; if (cod && (A.cfg.v.npExclusivos || []).includes(cod)) return false; return eu.status === 'ocupado' || !!(eu.stc && eu.stc.c && eu.stc.sn); }; // (1.0.3) quem você escolheu em "quem pode passar" passa também pelo não perturbe e pelo status sem notificações // (0.8.6) ou o status personalizado com "sem notificações" // (0.5.9-7) não perturbe: nenhum aviso de mensagem, amigo online ou toque
   // (0.8.6) "visto por último há 5 min / há 2 h / ontem às 21:40 / em 3 de mar."
   U.vistoHa = (t) => {
     const T = A.T, s = Math.max(0, (Date.now() - t) / 1000), d = new Date(t), hm = d.toLocaleTimeString(T('pt-BR', 'en-US'), { hour: '2-digit', minute: '2-digit' });
@@ -264,6 +264,8 @@
     p.temaV = temaPel;
   }
   function desenharPelicula(p, t) {
+    // (1.0.3) o cartão de link troca o conteúdo ao carregar (replaceChildren) e levava junto o desenho da película: volta para o lugar
+    if (p.cores && !p.cores.isConnected && p.el.isConnected) { p.el.prepend(p.tela, p.cores); p.cor = null; }
     if (p.geoK !== p.W + 'x' + p.H) geoPelicula(p);
     if (p.temaV !== temaPel || !p.cor) coresPelicula(p);
     const g = p.geo, N = p.N, amp = AMP * (0.85 + 0.15 * Math.sin(t * 0.9)), xs = p.xs && p.xs.length === N + 1 ? p.xs : (p.xs = new Float32Array(N + 1)), ys = p.ys && p.ys.length === N + 1 ? p.ys : (p.ys = new Float32Array(N + 1));
@@ -615,13 +617,14 @@
   // redimensionar por um divisor: "eixo" x (largura) ou y (altura); "sinal" -1 quando o divisor fica do lado esquerdo/de cima
   U.redimensionar = (el, divisor, { eixo = 'y', min = 80, max = 800, chave = '', sinal = 1, prop } = {}) => {
     const propriedade = prop || (eixo === 'x' ? 'width' : 'height');
-    const salvo = chave && +A.store.ler('aero-tam:' + chave, '0'); if (salvo) el.style[propriedade] = A.limitar(salvo, min, max) + 'px';
+    // (1.0.3) a classe tem-tam diz ao CSS que o tamanho foi mudado à mão (antes era [style*=...], que fazia o navegador recalcular tudo a cada mudança de estilo)
+    const salvo = chave && +A.store.ler('aero-tam:' + chave, '0'); if (salvo) { el.style[propriedade] = A.limitar(salvo, min, max) + 'px'; el.classList.add('tem-tam'); }
     let ini = null;
     divisor.addEventListener('pointerdown', (e) => { e.preventDefault(); divisor.setPointerCapture(e.pointerId); ini = { p: eixo === 'x' ? e.clientX : e.clientY, t: eixo === 'x' ? el.offsetWidth : el.offsetHeight }; document.documentElement.classList.add('redimensionando'); });
-    divisor.addEventListener('pointermove', (e) => { if (!ini) return; const d = ((eixo === 'x' ? e.clientX : e.clientY) - ini.p) * sinal; el.style[propriedade] = A.limitar(ini.t + d, min, max) + 'px'; });
+    divisor.addEventListener('pointermove', (e) => { if (!ini) return; const d = ((eixo === 'x' ? e.clientX : e.clientY) - ini.p) * sinal; el.style[propriedade] = A.limitar(ini.t + d, min, max) + 'px'; el.classList.add('tem-tam'); });
     const solta = () => { if (!ini) return; ini = null; document.documentElement.classList.remove('redimensionando'); if (chave) A.store.gravar('aero-tam:' + chave, String(eixo === 'x' ? el.offsetWidth : el.offsetHeight)); };
     divisor.addEventListener('pointerup', solta); divisor.addEventListener('pointercancel', solta);
-    divisor.addEventListener('dblclick', () => { el.style.removeProperty(propriedade); if (chave) A.store.gravar('aero-tam:' + chave, '0'); });
+    divisor.addEventListener('dblclick', () => { el.style.removeProperty(propriedade); el.classList.remove('tem-tam'); if (chave) A.store.gravar('aero-tam:' + chave, '0'); });
   };
 
   // ---------- chat durante a transmissão (0.6.0): grudado à direita, à esquerda ou solto numa janela flutuante ----------
@@ -744,7 +747,7 @@
   // som: [abrir, fechar] — cada tipo de janela tem o seu par (o perfil, por exemplo); sem isso, o par das janelas comuns
   // (0.5.9-9) "tem janela aberta" fica marcado na raiz (data-modal): o fundo e as películas de trás param. Antes era um ":has()" no CSS e
   // uma busca no documento a cada quadro
-  const marcarModais = () => { const r = document.documentElement, m = document.querySelector('#modais .fundo-modal, .fundo-modal.prioridade') ? '1' : ''; if ((r.dataset.modal || '') !== m) { if (m) r.dataset.modal = m; else delete r.dataset.modal; } };
+  const marcarModais = () => { const r = document.documentElement, m = document.querySelector('#modais .fundo-modal, .fundo-modal.prioridade') ? '1' : ''; if ((r.dataset.modal || '') !== m) { if (m) r.dataset.modal = m; else delete r.dataset.modal; A.evt.emit('modal', !!m); } };
   U.modal = (titulo, conteudo, { largura, acoes = [], aoFechar, som = ['janela-abrir', 'janela-fechar'], classe = '', prioridade = false } = {}) => {
     const raiz = prioridade ? document.body : document.getElementById('modais'); // (0.6.0) prioridade: por cima de tudo (chamada, sala, menus)
     const fundo = h('div', { class: 'fundo-modal' + (prioridade ? ' prioridade' : '') });
@@ -1031,9 +1034,31 @@
     // ou fundo repintam a cada quadro e ficam no relógio de 30 por segundo)
     const LEVES = new Set(['transform', 'opacity', 'translate', 'scale', 'rotate', 'offset', 'easing', 'composite', 'computedOffset', 'filter']);
     const soMove = (a) => { try { return a.effect.getKeyframes().every((k) => Object.keys(k).every((p) => LEVES.has(p))); } catch (e) { return false; } };
+    // (1.0.3) as que ninguém vê ficam paradas: fora da tela (rolou para longe, numa lista comprida) ou atrás de uma janela aberta (o editor do
+    // perfil, um aviso). Com o editor aberto, as gotas, bolhas e prévias das Configurações de trás andavam a cada quadro, e o app gastava um
+    // terço da CPU parado. Voltam do mesmo ponto quando aparecem de novo
+    const vistaDe = new WeakMap(); let reverQ = 0;
+    const rever = () => { if (!reverQ) reverQ = setTimeout(() => { reverQ = 0; varrerEligar(); }, 60); };
+    const io = window.IntersectionObserver ? new IntersectionObserver((es) => { let mudou = false; for (const e of es) { if (vistaDe.get(e.target) !== e.isIntersecting) { vistaDe.set(e.target, e.isIntersecting); mudou = true; } } if (mudou) rever(); }, { rootMargin: '120px' }) : null;
+    const palco = () => document.getElementById('palco');
+    const escondida = (t, modal, pc) => {
+      if (!t || !t.isConnected) return true;
+      if (modal && pc && pc.contains(t)) return true; // atrás da janela aberta
+      if (!io) return false;
+      // as bolhas do fundo (e do céu da chamada) atravessam a tela e saem dela de propósito: se ficassem paradas ao sair, nunca mais voltavam
+      // (sumiam aos poucos, a cada troca de aba). A pausa delas é a do fundo: janela sem foco, parado, janela aberta por cima
+      if (t.closest('.bolhas-bg, .cham-ceu')) return false;
+      // (1.0.3) o que entra de fora de uma caixa recortada (a doca da prévia começa escondida embaixo da tela de mentira): conta a caixa,
+      // senão a peça nunca era "vista", ficava parada fora e a doca não subia nunca
+      t = t.closest('.mq-tela') || t;
+      if (!vistaDe.has(t)) { vistaDe.set(t, true); io.observe(t); return false; } // até o observador responder, conta como vista
+      return !vistaDe.get(t);
+    };
+    A.evt.on('modal', () => rever());
     const varrer = () => {
       if (document.hidden) return;
       const agora = performance.now(), lite = document.documentElement.dataset.visual === 'lite' || document.documentElement.dataset.assistindo === '1';
+      const modal = !!document.documentElement.dataset.modal, pc = palco();
       lista = document.getAnimations().filter(infinita);
       for (const a of lista) {
         // (1.0.2) todas no mesmo relógio (o tempo da página): antes cada uma seguia do ponto em que foi pega, e as bolhas do chat ficavam
@@ -1041,7 +1066,7 @@
         if (!a._rel) { a._rel = { leve: soMove(a) }; a.pause(); try { a.currentTime = agora; } catch (e) { /* ok */ } }
         const r = a._rel, lp = lite && !UTIL.test(a.animationName || '');
         if (lp && !r.lp) { try { a.currentTime = 0; } catch (e) { /* ok */ } } // (1.0.2) paradas no primeiro quadro de verdade: todas iguais
-        r.lp = lp; r.parada = lp ? true : pausadaNoCss(a);
+        r.lp = lp; r.parada = lp ? true : escondida(a.effect.target, modal, pc) || pausadaNoCss(a);
       }
     };
     // (0.8.3) o relógio de 30 quadros só fica ligado quando tem alguma animação andando (antes acordava 30 vezes por segundo à toa) e para
@@ -1053,9 +1078,16 @@
     let tPasso = 0;
     const rapido = () => document.documentElement.dataset.visual !== 'lite' && document.documentElement.dataset.assistindo !== '1' && A.naFrente() && !ocioso && !document.hidden;
     const pararPasso = () => { clearInterval(tPasso); tPasso = 0; };
+    // (1.0.3) a animação que o CSS já cancelou (a pessoa parou de falar e as barrinhas do anel sumiram, um elemento saiu da tela) NUNCA pode
+    // ser tocada de novo: mexer no tempo dela (ou dar play/pause) a ressuscita como uma animação órfã, que fica para sempre na página. Com o
+    // app minimizado o relógio roda o tempo todo, e cada fala deixava mais 32 órfãs (o Equalizador): depois de uma série inteira eram milhares,
+    // empurradas 30 vezes por segundo, e a interface travava ao voltar. Quem foi cancelada sai da lista na hora
+    const morta = (a) => { try { return a.playState === 'idle'; } catch (e) { return true; } };
+    const tirarMortas = () => { if (lista.some(morta)) lista = lista.filter((a) => !morta(a)); };
     // entrega ao navegador as que podem andar sozinhas e pega de volta as que precisam parar (ou todas, fora do modo rápido)
     const sincronizar = () => {
       const agora = performance.now(), nat = rapido();
+      tirarMortas();
       for (const a of lista) {
         const r = a._rel; if (!r) continue;
         if (nat && !r.parada && r.leve) { if (!r.nativo) { try { a.startTime = 0; if (a.playState !== 'running') a.play(); r.nativo = true; } catch (e) { /* segue no relógio */ } } }
@@ -1065,6 +1097,7 @@
     const passo = () => {
       const agora = performance.now(), parado = document.hidden || ocioso;
       let anda = false;
+      tirarMortas();
       for (const a of lista) {
         const r = a._rel;
         if (r.nativo) continue;
@@ -1187,11 +1220,12 @@
     // (0.9.5) as bolhas de arte (estúdio, bolhaarte.js): se a arte não vale ou quem vê desligou, fica a bolha padrão
     if (A.bolhaArte) A.bolhaArte.limpar(el);
     if (bc && bc.m === 'arte') { if (A.bolhaArte && A.bolhaArte.aplicar(el, bc)) return el; bc = null; }
+    el.classList.remove('tem-bc');
     if (!bc || !bc.m) { delete el.dataset.bc; el.style.removeProperty('--bc'); el.style.removeProperty('--bcf'); el.style.removeProperty('--bcg'); return el; }
     const g = Array.isArray(bc.g) ? bc.g.filter((c) => /^#[0-9a-f]{6}$/i.test(c)) : [];
     if (g.length >= 2) el.style.setProperty('--bcg', g.join(', ') + ', ' + g[0]); else el.style.removeProperty('--bcg');
     el.dataset.bc = bc.m;
-    if (/^#[0-9a-f]{6}$/i.test(bc.c || '')) el.style.setProperty('--bc', bc.c); else el.style.removeProperty('--bc');
+    if (/^#[0-9a-f]{6}$/i.test(bc.c || '')) { el.style.setProperty('--bc', bc.c); el.classList.add('tem-bc'); } else el.style.removeProperty('--bc');
     if (/^#[0-9a-f]{6}$/i.test(bc.f || '')) el.style.setProperty('--bcf', bc.f); else el.style.removeProperty('--bcf');
     return el;
   };
@@ -1423,11 +1457,12 @@
       if (nn === n && raiz.childElementCount) return;
       n = nn; raiz.textContent = '';
       const largCol = (w - 14 * (n - 1)) / n;
-      const medida = h('div', { class: 'mosaico-col', estilo: { position: 'absolute', visibility: 'hidden', width: largCol + 'px', left: '-99999px', top: '0' } });
+      const medida = h('div', { class: 'mosaico-col medindo', estilo: { position: 'absolute', visibility: 'hidden', width: largCol + 'px', left: '-99999px', top: '0' } });
       raiz.append(medida);
       lista.forEach((it) => medida.append(it)); // (1.0.0) as largas também: medidas na largura de uma coluna, para saber se cabem num buraco
       const altura = new Map(lista.map((it) => [it, it.offsetHeight])); // um layout só
       medida.remove();
+      for (const it of lista) if (!it.classList.contains('larga')) it.style.containIntrinsicSize = 'auto ' + altura.get(it) + 'px'; // (1.0.3) fora da tela, a caixa guarda o tamanho dela
       let cols = null, alts = null;
       for (const it of lista) {
         if (it.classList.contains('larga')) {

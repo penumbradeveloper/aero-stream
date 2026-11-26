@@ -702,8 +702,25 @@
     const eu = A.api && A.api.eu;
     if (eu && cod === eu.codigo) { const n = X.nivel(), o = {}; if (eu.an && nivelEm(X.ANEIS, eu.an.t) <= n) o.an = eu.an; if (eu.mc && nivelEm(X.MOLDURAS_CAMERA, eu.mc.t) <= n) o.mc = eu.mc; if (eu.se && nivelEm(X.SONS_ENTRAR, eu.se) <= n) o.se = eu.se; return o; }
     const p = A.talk && A.talk.pessoaDe ? A.talk.pessoaDe(cod) : null;
-    return (p && p.extra) || {};
+    const base = (p && p.extra) || {};
+    if (!aoVivo.has(cod)) return base;
+    const v = aoVivo.get(cod), o = { ...base }; delete o.an; delete o.mc; if (v.an) o.an = v.an; if (v.mc) o.mc = v.mc; return o;
   };
+  // (1.0.3) o anel e a moldura que a pessoa acabou de trocar chegam pela própria chamada (bem pequeno, só quando muda): valem na hora,
+  // sem sair e entrar de novo. Vêm de outra pessoa, então só passa o que o app conhece (cores em #hex e artes reconferidas)
+  const aoVivo = new Map();
+  const coresOk = (l, n) => (Array.isArray(l) ? l : []).filter((c) => typeof c === 'string' && /^#[0-9a-f]{3,8}$/i.test(c)).slice(0, n);
+  X.limparExtra = (ex) => {
+    if (!ex || typeof ex !== 'object') return {};
+    const o = {}, an = ex.an, mc = ex.mc;
+    if (an && typeof an === 'object') {
+      if (an.t === 'arte') { const a = A.bolhaArte && A.bolhaArte.validarFoto ? A.bolhaArte.validarFoto(an.a, true) : null; if (a) o.an = { t: 'arte', a, ig: String(an.ig || '').slice(0, 40), id: String(an.id || '').slice(0, 40), v: +an.v || 0 }; }
+      else if (X.ANEIS.some((x) => x[0] === an.t)) o.an = { t: an.t, c: coresOk(an.c, 8) };
+    }
+    if (mc && typeof mc === 'object' && X.MOLDURAS_CAMERA.some((x) => x[0] === mc.t)) o.mc = { t: mc.t, c: coresOk(mc.c, 6) };
+    return o;
+  };
+  X.extraVivo = (cod, ex) => { if (!cod) return; if (ex === null) aoVivo.delete(cod); else aoVivo.set(cod, X.limparExtra(ex)); };
   // marca o elemento (a janelinha da pessoa ou a bolinha na faixa da chamada) com o anel e a moldura dela
   X.marcarChamada = (el, cod) => {
     if (!el) return el;
@@ -1004,26 +1021,33 @@
     coracoes(c, o, R, s, dt, k) { particulas(c, o, R, s, dt, k, false, (cx, p, col) => vidro(cx, CORACAO, col)); },
     notas(c, o, R, s, dt, k) { particulas(c, o, R, s, dt, k, true, (cx, p, col) => vidro(cx, NOTAS[p.tipo], col)); },
   };
-  function passo(av, agora, s, dt) {
+  // (1.0.3) a prévia parada simula os primeiros passos num "pincel" de mentira (nada é desenhado) e só pinta o último
+  const GRAD = { addColorStop() {} }, NADA = () => {}, SECO = new Proxy({}, { get: (t, k) => (k in t ? t[k] : /^create/.test(k) ? () => GRAD : k === 'measureText' ? () => ({ width: 0 }) : NADA) });
+  function passo(av, agora, s, dt, seco) {
     const fx = av.querySelector(':scope > .px-fx'); if (!fx) return;
     let alvo = 0;
     if (s.fixo != null) alvo = s.fixo;
     else if (av.classList.contains('an-on')) { const e = av._cod && VOZ.get(av._cod); alvo = e && agora - e.em < 700 ? e.v : vozFalsa(s.t, s.s); }
     s.v += (alvo - s.v) * (1 - Math.pow(alvo > s.v ? 0.002 : 0.1, dt)); s.t += dt; // sobe rápido, desce devagar
-    if (Math.abs(s.v - (s.vCss ?? -1)) > 0.01) { fx.style.setProperty('--v', s.v.toFixed(3)); s.vCss = s.v; }
-    if (++s.quadro % 6 === 0) { // as animações em CSS aceleram com a voz (sem pular: a velocidade muda onde a animação está)
+    if (Math.abs(s.v - (s.vCss ?? -1)) > 0.01) { escritas.push(fx, s.v.toFixed(3)); s.vCss = s.v; } // (1.0.3) gravado no fim do quadro: ler e escrever alternado fazia o navegador recalcular o estilo a cada anel
+    if (++s.quadro % 6 === 0 && s.fixo == null) { // as animações em CSS aceleram com a voz (sem pular: a velocidade muda onde a animação está)
       const r = +(0.55 + 1.3 * s.v).toFixed(2);
       if (Math.abs(r - s.rate) > 0.04) { s.rate = r; for (const a of fx.getAnimations({ subtree: true })) if (a.effect && a.effect.target !== fx) a.updatePlaybackRate(r); }
     }
     const cv = fx.querySelector(':scope > canvas'), desenho = DESENHO[av.dataset.an]; if (!cv || !desenho) return;
-    if (!s.cores || s.quadro % 30 === 1) lerCores(av, s);
-    if (!s.w || s.quadro % 30 === 1) { const w = cv.clientWidth; if (!w) return; const px = Math.min(leve() ? 320 : 640, Math.round(w * Math.min(1.5, devicePixelRatio || 1))); /* (a foto grande do palco pede mais pontos) */ if (cv.width !== px) cv.width = cv.height = px; s.w = w; s.k = px / w; }
+    const ler = s.fixo == null && s.quadro % 30 === 1; // (a prévia parada já leu tudo antes, junto com as outras)
+    if (!s.cores || ler) lerCores(av, s);
+    if (!s.w || ler) { const w = cv.clientWidth; if (!w) return; s.w = w; }
+    const px = Math.min(leve() ? 320 : 640, Math.round(s.w * Math.min(1.5, devicePixelRatio || 1))); /* (a foto grande do palco pede mais pontos) */ if (cv.width !== px) cv.width = cv.height = px; s.k = px / s.w;
+    if (seco) { desenho(SECO, s.w / 2, s.w / 4, s, dt, s.cores, !leve()); return; }
     const c = cv.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; c.filter = 'none'; c.shadowBlur = 0;
     c.clearRect(0, 0, cv.width, cv.height); c.setTransform(s.k, 0, 0, s.k, 0, 0);
     // nada é pintado dentro da foto (sem foto, a inicial e o fundo do avatar ficam à vista; o que nasce no anel sai de trás dela)
     c.save(); c.beginPath(); c.rect(0, 0, s.w, s.w); c.arc(s.w / 2, s.w / 2, s.w / 4 * 0.985, 0, Math.PI * 2, true); c.clip('evenodd');
     desenho(c, s.w / 2, s.w / 4, s, dt, s.cores, !leve()); c.restore();
   }
+  const escritas = [];
+  const gravar = () => { for (let i = 0; i < escritas.length; i += 2) escritas[i].style.setProperty('--v', escritas[i + 1]); escritas.length = 0; };
   function rodar(agora) {
     laco = 0;
     for (const av of vivos) {
@@ -1036,15 +1060,28 @@
       const dt = s.ult ? Math.min(0.1, (agora - s.ult) / 1000) : 1 / 60; s.ult = agora;
       passo(av, agora, s, dt);
     }
+    gravar();
     if (vivos.size) laco = requestAnimationFrame(rodar);
   }
   function ligar(av) { if (!av || !av.dataset.an) return; if (calmo()) { parado(av); return; } vivos.add(av); if (!laco) laco = requestAnimationFrame(rodar); }
   // um quadro parado e bonito (a prévia em repouso e quem pediu para reduzir movimento): simula um pouco de fala e desenha
-  function parado(av, tentativa = 0) {
-    const s = estado(av); if (!av.isConnected) { if (tentativa < 40) requestAnimationFrame(() => parado(av, tentativa + 1)); return; }
-    s.p = []; s.fixo = 0.65; s.v = 0.65; s.t = 3.3; s.carga = 0;
-    for (let i = 0; i < 24; i++) passo(av, performance.now(), s, 1 / 16);
-    s.fixo = null;
+  // (1.0.3) todas as prévias do quadro juntas: primeiro lê as cores e o tamanho de todas, depois simula e pinta, e grava o estilo no fim
+  // (uma de cada vez, ler depois de gravar fazia o navegador recalcular a página inteira a cada amostra: ~1 s para abrir o editor)
+  const paradas = new Map(); let lacoParado = 0;
+  // (roda logo DEPOIS de o quadro ser pintado: o estilo da janela nova já está pronto e ler as cores não obriga a calcular tudo antes da hora)
+  const depoisDoQuadro = () => requestAnimationFrame(() => setTimeout(rodarParados, 0));
+  function parado(av) { if (!paradas.has(av)) paradas.set(av, 0); if (!lacoParado) lacoParado = depoisDoQuadro(); }
+  function rodarParados() {
+    lacoParado = 0; const prontos = [];
+    for (const [av, n] of paradas) { if (av.isConnected) { prontos.push(av); paradas.delete(av); } else if (n >= 40) paradas.delete(av); else paradas.set(av, n + 1); }
+    for (const av of prontos) { const s = estado(av), cv = av.querySelector(':scope > .px-fx > canvas'); lerCores(av, s); s.w = cv ? cv.clientWidth : 0; }
+    for (const av of prontos) {
+      const s = estado(av); s.p = []; s.fixo = 0.65; s.v = 0.65; s.t = 3.3; s.carga = 0;
+      for (let i = 0; i < 24; i++) passo(av, performance.now(), s, 1 / 16, i < 23);
+      s.fixo = null;
+    }
+    gravar();
+    if (paradas.size) lacoParado = depoisDoQuadro();
   }
   // a amostra na grade do editor: a sua foto pequena num círculo de chamada, com o anel parado; com o mouse ou o teclado em cima ele "fala"
   X.amostraAnel = (id, cores, an) => {

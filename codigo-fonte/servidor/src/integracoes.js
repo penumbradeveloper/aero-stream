@@ -99,9 +99,12 @@ export function dimensoesImagem(b, mime) {
 // confere tudo de novo antes de instalar (as mesmas travas das integrações feitas em casa).
 const CATS = new Set(['barra', 'tema', 'custom', 'misc']);
 const MAX_PUB = 2000, MAX_PAC = 120000, DENUNCIAS_OCULTA = 5;
+const PRECO_MIN = 2, PRECO_MAX = 200; // (1.0.3) as mesmas da loja de skins
 const CSS_RUIM = /(url\s*\(|image-set\s*\(|src\s*\(|expression\s*\(|javascript:|vbscript:|@import|@font-face|@namespace|@property|attr\s*\(|behavior\s*:|-moz-binding|\\|<\s*\/?\s*(script|style|iframe|object|embed|svg|link|meta)\b|paint\s*\(|element\s*\()/i;
 const limpa = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
 const imagemOk = (u) => (typeof u === 'string' && u.length < 420000 && /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+=*$/.test(u) ? u : '');
+// (1.0.3) o ícone que quem fez escolheu (a bolha redonda do cartão, separada do banner): menor que o banner
+const iconeOk = (u) => (u && u.length < 160000 ? imagemOk(u) : '');
 // confere o pacote: devolve { pac, imagem } ou lança o motivo
 export function validarPacote(b) {
   const p = b && typeof b === 'object' && !Array.isArray(b) ? b : null;
@@ -123,7 +126,7 @@ export function validarPacote(b) {
   if (!pac.nome) throw new Error('Dê um nome para a integração.');
   if (!css.trim() && !pac.opcoes.length && !pac.sons && !pac.presets.length && !pac.bolhas.some((x) => x.arte) && !pac.molduras.length && !pac.aneis.length) throw new Error('A integração está vazia.');
   if (JSON.stringify(pac).length > MAX_PAC) throw new Error('A integração é grande demais.');
-  return { pac, imagem: imagemOk(p.imagem) };
+  return { pac, imagem: imagemOk(p.imagem), icone: iconeOk(p.icone) };
 }
 
 export class Integracoes {
@@ -139,7 +142,15 @@ export class Integracoes {
   async existe(id) { return ID.test(id || '') && (OFICIAIS.has(id) || (/^c-[a-f0-9]{10}$/.test(id) && !!(await this.hub.get('igc:' + id)))); }
   async indice() { return (await this.hub.get('igc-ind')) || []; }
   // o cartão de cada uma na lista (sem o CSS nem a imagem: esses vêm quando abre)
-  cartao(x) { return { id: x.id, cat: x.cat, nome: x.pac.nome, resumo: x.pac.desc.slice(0, 160), versao: x.pac.versao, autor: x.autor, codigo: x.codigo, av: x.avV || 0, em: x.em, atual: x.atual, img: !!x.imagem, oculta: !!x.oculta }; }
+  cartao(x) { return { id: x.id, cat: x.cat, nome: x.pac.nome, resumo: x.pac.desc.slice(0, 160), versao: x.pac.versao, autor: x.autor, codigo: x.codigo, av: x.avV || 0, em: x.em, atual: x.atual, img: !!x.imagem, ic: !!x.icone, oculta: !!x.oculta, preco: x.preco || 0 }; }
+  // (1.0.3) as pagas: quem publicou, a moderação, o dev e quem comprou têm o pacote; os outros só veem a vitrine
+  async tem(conta, x, mod) {
+    if (!x.preco || x.dono === conta.id || mod) return true;
+    if (await this.hub.loja.ehDev(conta)) return true;
+    return !!(await this.hub.get('lic:' + conta.id + ':' + x.id));
+  }
+  // o que ela traz, só em números (para quem ainda não comprou ver antes)
+  itens(pac) { const n = (k) => (Array.isArray(pac[k]) ? pac[k].length : 0); return { css: !!pac.css, opcoes: n('opcoes'), sons: !!pac.sons, barras: n('barras'), bolhas: n('bolhas'), presets: n('presets'), molduras: n('molduras'), aneis: n('aneis') }; }
   async reindexar(x, tirar) {
     let ind = (await this.indice()).filter((y) => y.id !== x.id);
     if (!tirar) ind.unshift({ ...this.cartao(x), ...this.resumo(await this.doc(x.id)) });
@@ -164,13 +175,18 @@ export class Integracoes {
       for (const bo of [...v.pac.bolhas, ...v.pac.molduras, ...v.pac.aneis]) for (const h of imagensDaArte(bo.arte)) { const im = await this.hub.get('igam:' + h); if (!im || im.bloq) return erro('Uma imagem de "' + bo.nome + '" não está no servidor. Abra o estúdio e salve de novo.'); }
       let x = b.id ? await this.hub.get('igc:' + String(b.id)) : null;
       if (b.id && (!x || x.dono !== conta.id)) return erro('Só quem publicou pode atualizar.', 403);
+      // (1.0.3) o preço (em reais; 0 = grátis). Para vender, a conta do Mercado Pago de quem publica precisa estar conectada
+      let preco = b.preco == null ? (x && x.preco) || 0 : Math.round(Number(b.preco) * 100) / 100;
+      if (!(preco >= 0)) preco = 0;
+      if (preco && (preco < PRECO_MIN || preco > PRECO_MAX)) return erro('O preço vai de R$ ' + PRECO_MIN + ' a R$ ' + PRECO_MAX + ' (ou grátis).');
+      if (preco && !(await this.hub.get('vend:' + conta.id))) return erro('Para vender, conecte a sua conta do Mercado Pago (o dinheiro vai direto para ela).');
       if (!x) {
         const minhas = (await this.indice()).filter((y) => y.codigo === conta.codigo).length;
         if (minhas >= 20) return erro('Você já tem 20 integrações publicadas. Apague alguma para publicar outra.');
         const id = 'c-' + [...crypto.getRandomValues(new Uint8Array(5))].map((n) => n.toString(16).padStart(2, '0')).join('');
         x = { id, dono: conta.id, em: Date.now() };
       }
-      Object.assign(x, { cat, pac: v.pac, imagem: v.imagem || (b.manterImagem ? x.imagem || '' : ''), autor: conta.nome, codigo: conta.codigo, avV: conta.avatarV || 0, atual: Date.now() });
+      Object.assign(x, { cat, preco: preco || undefined, pac: v.pac, imagem: v.imagem || (b.manterImagem ? x.imagem || '' : ''), icone: v.icone || ((b.manterIcone === undefined ? b.manterImagem : b.manterIcone) ? x.icone || '' : ''), autor: conta.nome, codigo: conta.codigo, avV: conta.avatarV || 0, atual: Date.now() });
       await this.hub.put({ ['igc:' + x.id]: x });
       await this.reindexar(x);
       return resposta({ ok: true, id: x.id });
@@ -181,9 +197,11 @@ export class Integracoes {
     // o pacote inteiro (para instalar ou ver a página)
     if (seg[2] === 'pacote' && metodo === 'GET') {
       if (x.oculta && !mod && x.dono !== conta.id) return erro('Esta integração está em revisão.', 403);
-      return resposta({ ...this.cartao(x), pac: x.pac, imagem: x.imagem || '', meu: x.dono === conta.id, mod });
+      const tenho = await this.tem(conta, x, mod);
+      if (!tenho) return resposta({ ...this.cartao(x), pac: null, itens: this.itens(x.pac), tenho: false, imagem: x.imagem || '', icone: x.icone || '', meu: false, mod });
+      return resposta({ ...this.cartao(x), pac: x.pac, tenho: true, imagem: x.imagem || '', icone: x.icone || '', meu: x.dono === conta.id, mod });
     }
-    if (seg[2] === 'imagem' && metodo === 'GET') return resposta({ imagem: x.oculta ? '' : x.imagem || '' });
+    if (seg[2] === 'imagem' && metodo === 'GET') return resposta({ imagem: x.oculta ? '' : x.imagem || '', icone: x.oculta ? '' : x.icone || '' });
     // apagar: quem publicou ou a moderação
     if (seg.length === 2 && metodo === 'DELETE') {
       if (x.dono !== conta.id && !mod) return erro('Só quem publicou pode apagar.', 403);
@@ -235,7 +253,7 @@ export class Integracoes {
   // (0.9.5) a bolha de arte que alguém escolheu: vem do pacote publicado (nunca do que o app mandou) e fica guardada como estava
   async bolhaArte(conta, ig, bid) {
     const pk = /^c-[a-f0-9]{10}$/.test(String(ig || '')) ? await this.hub.get('igc:' + ig) : null;
-    if (!pk || (pk.oculta && pk.dono !== conta.id)) return null;
+    if (!pk || (pk.oculta && pk.dono !== conta.id) || !(await this.tem(conta, pk))) return null;
     const bo = ((pk.pac && pk.pac.bolhas) || []).find((z) => z && z.id === bid && z.arte);
     const a = bo && validarArte(bo.arte); if (!a) return null;
     for (const h of imagensDaArte(a)) { const im = await this.hub.get('igam:' + h); if (!im || im.bloq) return null; }
@@ -245,7 +263,7 @@ export class Integracoes {
   // (1.0.2) a moldura da foto ou o anel de quem fala de um pacote da Comunidade: fica guardado no perfil como estava (igual às bolhas)
   async fotoArte(conta, ig, id, anel) {
     const pk = /^c-[a-f0-9]{10}$/.test(String(ig || '')) ? await this.hub.get('igc:' + ig) : null;
-    if (!pk || (pk.oculta && pk.dono !== conta.id)) return null;
+    if (!pk || (pk.oculta && pk.dono !== conta.id) || !(await this.tem(conta, pk))) return null;
     const it = ((pk.pac && pk.pac[anel ? 'aneis' : 'molduras']) || []).find((z) => z && z.id === id);
     const a = it && validarArteFoto(it.arte, anel); if (!a) return null;
     for (const h of imagensDaArte(a)) { const im = await this.hub.get('igam:' + h); if (!im || im.bloq) return null; }
@@ -262,7 +280,7 @@ export class Integracoes {
       for (const id of OFICIAIS) { const d = await this.doc(id); out[id] = this.resumo(d); const m = d.av && d.av[conta.id]; if (m) minhas[id] = m.e; }
       const mod = !!(await this.hub.admin.cargo(conta));
       const comunidade = (await this.indice()).filter((y) => !y.oculta || mod || y.codigo === conta.codigo);
-      return resposta({ oficiais: out, comunidade, minhas, podePublicar: !!limitesDe(conta).integracoes });
+      return resposta({ oficiais: out, comunidade, minhas, podePublicar: !!limitesDe(conta).integracoes, loja: await this.hub.loja.infoVenda(conta) });
     }
     if (seg[1] === 'publicar' || (seg[1] && seg[1].startsWith('c-') && (seg[2] === 'pacote' || seg[2] === 'imagem' || seg[2] === 'denunciar' || (seg.length === 2 && metodo === 'DELETE')))) {
       const r = await this.comunidade(conta, seg, metodo, b || {}); if (r) return r;
@@ -294,6 +312,7 @@ export class Integracoes {
     // instalou / tirou: conta uma vez por conta (a lista fica na própria conta)
     if (seg[2] === 'instalar' && metodo === 'POST') {
       const tinha = Array.isArray(conta.igs) ? conta.igs : [], sim = !!b.sim, ja = tinha.includes(id);
+      if (sim && id.startsWith('c-')) { const x = await this.hub.get('igc:' + id); if (x && !(await this.tem(conta, x))) return erro('Compre a integração para instalar.', 402); }
       if (sim === ja) return resposta({ ok: true });
       conta.igs = sim ? [...tinha, id].slice(-60) : tinha.filter((x) => x !== id);
       const d = await this.doc(id); d.inst = Math.max(0, (d.inst || 0) + (sim ? 1 : -1));

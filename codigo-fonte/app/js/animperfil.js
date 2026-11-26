@@ -99,6 +99,6 @@
     }
   }
 
-  A.animPerfil = { aplicar, parados };
+  A.animPerfil = { aplicar, parados, quadro }; // (1.0.3) quadro: o primeiro quadro (a chamada usa para a foto animada só ao falar)
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', aplicar); else aplicar();
 })();

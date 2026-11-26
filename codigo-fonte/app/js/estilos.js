@@ -8,6 +8,9 @@
   const ES = (A.estilos = {});
   const CHAVES = ['tema', 'arranjo', 'chat', 'iconeApp', 'skin', 'bolhaArte'];
   const N = 3;
+  // (1.0.3) trocar de estilo (arrastar, atalho e o Usar) é do Aero Bubble Donator; guardar e ver ficam para todo mundo (como prévia)
+  const NIVEL = 3;
+  ES.pode = () => !A.extras || A.extras.tem(NIVEL);
   const copia = (x) => (x === undefined ? undefined : JSON.parse(JSON.stringify(x)));
 
   // ---------- guardados no IndexedDB (cabem imagens de fundo) ----------
@@ -35,7 +38,7 @@
   // troca o app inteiro para o estilo i (dir: -1/1, o lado da animação)
   let trocando = false;
   ES.usar = async (i, dir = 1, semAnim = false) => {
-    const l = await ES.lista(), alvo = l[i]; if (!alvo || trocando) return false;
+    const l = await ES.lista(), alvo = l[i]; if (!alvo || trocando || !ES.pode()) return false;
     const ant = ES.atual(); if (ant === i) return true;
     trocando = true;
     try {
@@ -59,6 +62,7 @@
   };
   // o próximo (ou anterior) estilo salvo
   ES.passar = async (d) => {
+    if (!ES.pode()) return false;
     const l = await ES.lista(), salvos = l.map((x, i) => (x ? i : -1)).filter((i) => i >= 0); if (salvos.length < 2) return false;
     const at = ES.atual(), pos = salvos.indexOf(at), prox = salvos[((pos < 0 ? (d > 0 ? -1 : 0) : pos) + d + salvos.length) % salvos.length];
     return ES.usar(prox, d);
@@ -113,7 +117,7 @@
     cortina.replaceChildren(h('div', { class: 'estv-cortina-in' }, h('span', { class: 'estv-chip-pts' }, ...Array.from({ length: N }, (_, j) => h('i', { class: j === i ? 'on' : '' }))), h('b', {}, cache[i].nome)));
   }
   const largura = (px) => { if (cortina) cortina.style.setProperty('--w', Math.max(0, Math.min(innerWidth, px)) + 'px'); };
-  function comecar(x, y, id) { if (trocando || ar) return; ar = { x, y, id, ok: false, d: 0, i: -1, t: performance.now(), ux: x, ut: performance.now(), v: 0 }; }
+  function comecar(x, y, id) { if (trocando || ar || !ES.pode()) return; ar = { x, y, id, ok: false, d: 0, i: -1, t: performance.now(), ux: x, ut: performance.now(), v: 0 }; }
   function mover(x, y) {
     if (!ar) return false;
     const dx = x - ar.x, dy = y - ar.y;
@@ -177,7 +181,7 @@
       carrossel.classList.toggle('todas', todas); carrossel.classList.toggle('estreito', carrossel.clientWidth < 420); posicionar(false);
     };
     const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(() => { if (!caixa.isConnected) return; medir(); }) : null; if (ro) { ro.observe(janela); ro.observe(carrossel); }
-    const caixa = h('div', { class: 'est-caixa' }, h('p', { class: 'peq suave', estilo: { margin: '0 0 10px' } }, T('Guarde até 3 jeitos do app inteiro (cores, fundo, barra, chats, ícone, skin) e troque arrastando de lado em qualquer espaço vazio do app (ou este cartão), com Ctrl+Alt+← / →, ou com dois dedos de lado no celular. Só o estilo em uso fica rodando.', 'Keep up to 3 looks for the whole app (colors, background, bar, chats, icon, skin) and switch by dragging sideways on any empty spot of the app (or this card), with Ctrl+Alt+← / →, or two fingers sideways on the phone. Only the style in use runs.')), carrossel, pontos);
+    const caixa = h('div', { class: 'est-caixa' }, h('p', { class: 'peq suave', estilo: { margin: '0 0 10px' } }, T('Guarde até 3 jeitos do app inteiro (cores, fundo, barra, chats, ícone, skin) e troque arrastando de lado em qualquer espaço vazio do app (ou este cartão), com Ctrl+Alt+← / →, ou com dois dedos de lado no celular. Só o estilo em uso fica rodando.', 'Keep up to 3 looks for the whole app (colors, background, bar, chats, icon, skin) and switch by dragging sideways on any empty spot of the app (or this card), with Ctrl+Alt+← / →, or two fingers sideways on the phone. Only the style in use runs.')), A.extras && A.extras.faixaPrevia(NIVEL), carrossel, pontos);
     let pintou = false;
     const pintar = async () => {
       const l = await ES.lista(), at = ES.atual();
@@ -185,7 +189,8 @@
         const c = corDe(x && x.v), on = at === i;
         const prev = h('div', { class: 'estv-prev' + (c.escuro ? ' escuro' : ''), estilo: { '--c': c.c, '--f1': c.f1, '--f2': c.f2 } }, h('i', { class: 'estv-p-barra' }), h('i', { class: 'estv-p-bl a' }), h('i', { class: 'estv-p-bl b' }), h('i', { class: 'estv-p-bl c' }));
         const acoes = x
-          ? [A.ui.btn(on ? T('Em uso', 'In use') : T('Usar', 'Use'), { peq: true, tipo: on ? 'sec' : '', onclick: (e) => { e.stopPropagation(); if (!on) ES.usar(i, i > at ? 1 : -1); } }),
+          ? [!on && !ES.pode() ? ((b) => { if (A.extras) b.append(A.extras.selo(NIVEL)); b.classList.add('preso'); return b; })(A.ui.btn(T('Usar', 'Use'), { peq: true, tipo: 'sec', titulo: T('Trocar de estilo é do Aero Bubble Donator', 'Switching styles is on Aero Bubble Donator'), onclick: (e) => { e.stopPropagation(); if (A.extras) A.extras.verPlanos(); } }))
+            : A.ui.btn(on ? T('Em uso', 'In use') : T('Usar', 'Use'), { peq: true, tipo: on ? 'sec' : '', onclick: (e) => { e.stopPropagation(); if (!on) ES.usar(i, i > at ? 1 : -1); } }),
             A.ui.btn('', { icone: 'download', tipo: 'sec', redondo: true, peq: true, titulo: T('Guardar o app de agora aqui', 'Save the current look here'), onclick: async (e) => { e.stopPropagation(); if (await A.ui.confirmar(T('Trocar este estilo pelo jeito que o app está agora?', 'Replace this style with the app as it is now?'))) { await ES.salvar(i); A.som.tocar('sucesso'); } } }),
             A.ui.btn('', { icone: 'lapis', tipo: 'sec', redondo: true, peq: true, titulo: T('Renomear', 'Rename'), onclick: async (e) => { e.stopPropagation(); const campo = h('input', { class: 'campo', value: x.nome, maxlength: 24 }); if (await A.ui.confirmar(campo, { titulo: T('Nome do estilo', 'Style name'), sim: T('Salvar', 'Save') })) ES.renomear(i, campo.value.trim()); } }),
             A.ui.btn('', { icone: 'lixo', tipo: 'sec', redondo: true, peq: true, titulo: T('Apagar', 'Delete'), onclick: async (e) => { e.stopPropagation(); if (await A.ui.confirmar(T('Apagar este estilo? O app continua como está.', 'Delete this style? The app stays as it is.'), { perigo: true })) ES.apagar(i); } })]

@@ -36,7 +36,7 @@
   const PLANOS = [
     { id: 'standard', nome: 'Standard Patreon', preco: 10, cor: ['#7fd3ff', '#2d9ee0'], itens: () => [T('Anexos de até 100 MB no Aero Talk', 'Attachments up to 100 MB in Aero Talk'), T('Seus grupos com até 15 pessoas', 'Your groups with up to 15 people'), T('Insígnia Standard no seu nome', 'Standard badge next to your name'), T('O efeito de nome Cromado, 2 molduras da foto, 2 toques de ligação e 2 ícones do app', 'The Chrome name effect, 2 photo frames, 2 ringtones and 2 app icons'), T('Um ícone nas suas pastas de conversa', 'An icon on your chat folders')] },
     { id: 'plus', nome: 'Plus Patreon', preco: 15, cor: ['#9fe8b0', '#2fb36b'], itens: () => [T('Tudo do Standard, e mais:', 'Everything in Standard, plus:'), T('Anexos de até 250 MB e seus grupos com até 25 pessoas', 'Attachments up to 250 MB and your groups with up to 25 people'), T('Insígnia Plus no seu nome', 'Plus badge next to your name'), T('10 emojis seus para usar no meio do texto', '10 emojis of your own to use in your messages'), T('Uma imagem de fundo em cada conversa (só você vê)', 'An image background in each chat (only you see it)'), T('Mais efeitos de nome, molduras, toques e ícones, cor própria no anel de fala e o pacote de sons Cristal', 'More name effects, frames, ringtones and icons, your own color on the speaking ring and the Crystal sound pack')] },
-    { id: 'donator', nome: 'Donator', preco: 25, cor: ['#e9a6ff', '#9b4dff'], itens: () => [T('Tudo do Plus, e mais:', 'Everything in Plus, plus:'), T('Anexos de até 500 MB e seus grupos com até 30 pessoas', 'Attachments up to 500 MB and your groups with up to 30 people'), T('Transmitir em até 1440p 60 fps, e 120 fps até 1080p', 'Stream up to 1440p 60 fps, and 120 fps up to 1080p'), T('Estúdio de skins: monte a sua e venda na loja da Comunidade, com 5% de desconto nas suas compras', 'Skin Studio: build your own and sell it in the Community store, with 5% off your purchases'), T('30 emojis seus (também animados), a super reação e GIF ou vídeo de fundo nas conversas', '30 emojis of your own (animated too), the super reaction and GIF or video backgrounds in chats'), T('No perfil: até 3 acessórios no cartão e a abertura animada', 'On your profile: up to 3 card accessories and an animated opening'), T('Nas chamadas: anéis de fala animados, moldura da câmera, som de entrar e um toque para cada amigo', 'In calls: animated speaking rings, camera frames, a join sound and a ringtone for each friend'), T('Bolhas de mensagem, molduras, efeitos de nome e ícones a mais', 'Extra message bubbles, frames, name effects and icons'), T('Exclusivo: o efeito de nome Diamante, a insígnia de coroa e a borda animada no perfil', 'Exclusive: the Diamond name effect, the crown badge and the animated profile border')] },
+    { id: 'donator', nome: 'Donator', preco: 25, cor: ['#e9a6ff', '#9b4dff'], itens: () => [T('Tudo do Plus, e mais:', 'Everything in Plus, plus:'), T('Anexos de até 500 MB e seus grupos com até 30 pessoas', 'Attachments up to 500 MB and your groups with up to 30 people'), T('Transmitir em até 1440p 60 fps, e 120 fps até 1080p', 'Stream up to 1440p 60 fps, and 120 fps up to 1080p'), T('Estúdio de skins: monte a sua e venda na loja da Comunidade, com 5% de desconto nas suas compras', 'Skin Studio: build your own and sell it in the Community store, with 5% off your purchases'), T('30 emojis seus (também animados), a super reação e GIF ou vídeo de fundo nas conversas', '30 emojis of your own (animated too), the super reaction and GIF or video backgrounds in chats'), T('No perfil: até 3 acessórios no cartão e a abertura animada', 'On your profile: up to 3 card accessories and an animated opening'), T('Nas chamadas: anéis de fala animados, moldura da câmera, som de entrar e um toque para cada amigo', 'In calls: animated speaking rings, camera frames, a join sound and a ringtone for each friend'), T('Bolhas de mensagem, molduras, efeitos de nome e ícones a mais', 'Extra message bubbles, frames, name effects and icons'), T('Estilos do app desbloqueados: monte até 3 do seu jeito (o app inteiro) e troque com um arrasto de lado', 'App looks unlocked: build up to 3 of your own (the whole app) and switch with a sideways drag'), T('Exclusivo: o efeito de nome Diamante, a insígnia de coroa e a borda animada no perfil', 'Exclusive: the Diamond name effect, the crown badge and the animated profile border')] },
     { id: 'supporter', nome: 'Supporter', preco: 50, cor: ['#ffb3c4', '#f43f5e'], coracao: true, itens: () => [T('Tudo do Donator, e mais:', 'Everything in Donator, plus:'), T('Anexos de até 1 GB e seus grupos com até 40 pessoas', 'Attachments up to 1 GB and your groups with up to 40 people'), T('Até 10 chats e 5 chamadas de voz em cada grupo', 'Up to 10 chats and 5 voice calls in each group'), T('Transmitir sem limite: até 4K e 240 fps', 'Stream with no limit: up to 4K and 240 fps'), T('5 perfis salvos para trocar num clique', '5 saved profiles to switch in one click'), T('Versões de teste antes de todo mundo (Configurações > Atualizações)', 'Test versions before everyone else (Settings > Updates)'), T('Publicar integrações na Comunidade (baixar e usar é para todo mundo)', 'Publish integrations to the Community (anyone can download and use them)'), T('100 emojis seus, até 8 acessórios no cartão e o seu próprio toque de ligação', '100 emojis of your own, up to 8 card accessories and your own ringtone'), T('Os itens mais raros: molduras, anéis, aberturas e efeitos de nome só do Supporter', 'The rarest items: Supporter-only frames, rings, openings and name effects'), T('10% de desconto na loja e, a cada 3 meses seguidos, 1 mês de Standard para dar a um amigo', '10% off in the store and, every 3 months in a row, 1 month of Standard to gift a friend'), T('Exclusivo: a insígnia de coração e a borda animada de coração no perfil', 'Exclusive: the heart badge and the heart animated border on your profile')] },
   ];
   const KOFI_TIERS = KOFI + '/tiers';
@@ -182,16 +182,83 @@
     btn.disabled = true;
     try { const r = await A.api.req('bolha/cancelar', {}); if (A.api.eu) A.api.eu.bolha = r.bolha; A.evt.emit('bolha', r.bolha); U.toast(T('Renovação cancelada.', 'Renewal canceled.'), { ms: 2500 }); } catch (e) { btn.disabled = false; U.toast(e.message, { tipo: 'erro' }); }
   }
+
+  // (1.0.3) os exemplos de cada plano: clicar no cartão abre uma janela com o que ele dá, desenhado com as prévias de verdade do app
+  // (os mesmos efeitos de nome, molduras, anéis, bolhas e aberturas do editor do perfil). Mostra só o que o plano traz de novo.
+  const LIMITES = { gratis: [10, 10, '1080p 60'], standard: [100, 15, '1080p 60'], plus: [250, 25, '1080p 60'], donator: [500, 30, '1440p 60 · 1080p 120'], supporter: [1024, 40, '4K 240'] };
+  const RECOMENDADO = 'donator';
+  const mb = (n) => (n >= 1024 ? n / 1024 + ' GB' : n + ' MB');
+  function exemplos(p0, botao) {
+    const U = A.ui, X = A.extras; if (!U || !U.modal) return;
+    let p = p0;
+    const corpo = h('div', { class: 'col bx-corpo' }), topo = h('div', { class: 'bx-topo' }), acao = h('div', { class: 'bx-acao' });
+    const nivel = () => PLANOS.indexOf(p) + 1;
+    const eu = A.api && A.api.eu;
+    const nomeMeu = (eu && (eu.apelido || eu.nome)) || 'Aero';
+    const galeria = (tit, itens) => (itens.length ? h('section', { class: 'bx-sec' }, h('h4', {}, tit), h('div', { class: 'bx-grade' }, ...itens)) : null);
+    const peca = (desenho, rot, extra) => h('div', { class: 'bx-peca' }, h('div', { class: 'bx-am' }, desenho), h('small', {}, rot), extra || null);
+    const doNivel = (l, i = 3) => (l || []).filter((x) => x[i] === nivel());
+    const barra = (rot, de, ate, txt) => h('div', { class: 'bx-lim' }, h('span', { class: 'bx-lim-rot' }, rot),
+      h('div', { class: 'bx-lim-trilha' }, h('i', { class: 'bx-lim-de', estilo: { width: Math.max(3, de) + '%' } }), h('i', { class: 'bx-lim-ate', estilo: { width: Math.max(4, ate) + '%' } })), h('b', {}, txt));
+    const pintar = () => {
+      const n = nivel(), L = LIMITES[p.id], G = LIMITES.gratis;
+      corpo.style.setProperty('--b1', p.cor[0]); corpo.style.setProperty('--b2', p.cor[1]);
+      topo.replaceChildren(h('span', { class: 'bolha-esfera bx-esfera', 'aria-hidden': 'true' }), h('div', { class: 'col bx-tit' },
+        h('b', { class: 'bolha-nome' }, p.nome, U.selos ? U.selos([p.id]) : null, p.id === RECOMENDADO ? h('span', { class: 'bx-reco' }, T('Recomendado', 'Recommended')) : null),
+        h('div', { class: 'bolha-preco' }, h('span', {}, 'R$ ' + p.preco), h('small', {}, T('/mês', '/month'))),
+        n > 1 ? h('small', { class: 'suave' }, T('Tudo do ' + PLANOS[n - 2].nome + ', e mais o que está aqui embaixo.', 'Everything in ' + PLANOS[n - 2].nome + ', plus what is below.')) : null));
+      const secs = [];
+      secs.push(h('section', { class: 'bx-sec' }, h('h4', {}, T('Limites (sem plano → com o ' + p.nome + ')', 'Limits (no plan → with ' + p.nome + ')')),
+        barra(T('Anexos', 'Attachments'), (G[0] / 1024) * 100, (L[0] / 1024) * 100, mb(G[0]) + ' → ' + mb(L[0])),
+        barra(T('Pessoas no grupo', 'People per group'), (G[1] / 40) * 100, (L[1] / 40) * 100, G[1] + ' → ' + L[1]),
+        barra(T('Transmissão', 'Streaming'), 25, [25, 25, 25, 55, 100][n], G[2] + ' → ' + L[2])));
+      if (X) {
+        const efs = doNivel(X.EFEITOS_NOME); const nm = (id) => U.aplicarNome(h('b', { class: 'bx-nome' }, nomeMeu), { e: id, c: (X.CORES_NOME || {})[id] || [] });
+        secs.push(galeria(T('Efeitos de nome', 'Name effects'), efs.map(([id, pt, en]) => peca(nm(id), T(pt, en)))));
+        const av = (t) => { const a = U.avatar && eu ? U.avatar(eu, t) : h('span', { class: 'avatar', estilo: { '--t': t + 'px' } }); return a; };
+        secs.push(galeria(T('Molduras da foto', 'Photo frames'), doNivel(X.MOLDURAS).map(([id, pt, en]) => { const a = av(46); X.moldura(a, { t: id, c: [] }, p.cor[0], p.cor[1]); return peca(a, T(pt, en)); })));
+        secs.push(galeria(T('Anéis quando você fala', 'Rings when you speak'), doNivel(X.ANEIS).map(([id, pt, en]) => peca(X.amostraAnel(id, null), T(pt, en)))));
+        secs.push(galeria(T('Bolhas de conversa', 'Chat bubbles'), doNivel(X.BOLHAS).map(([id, pt, en]) => { const k = (U.CORES_BOLHA || {})[id] || []; const tx = h('div', { class: 'cx-txt' }, h('span', {}, T('Olá!', 'Hello!'))); return peca(U.aplicarBolha(h('div', { class: 'cx-msg eu' }, tx), { m: id, c: k[0], f: k[1] }), T(pt, en)); })));
+        secs.push(galeria(T('Animação ao abrirem seu perfil', 'Animation when your profile opens'), doNivel(X.ABERTURAS).map(([id, pt, en]) => { const am = X.amostraAbertura(id, p.cor[0], p.cor[1]); const pc = peca(am, T(pt, en)); pc.addEventListener('pointerenter', () => am._tocar && am._tocar()); return pc; })));
+        const som = (lista, toca) => doNivel(lista).map(([id, pt, en]) => peca(h('button', { type: 'button', class: 'bx-som', 'aria-label': T('Ouvir ', 'Listen to ') + T(pt, en), onclick: () => toca(id) }, A.icone('volume', 20)), T(pt, en)));
+        secs.push(galeria(T('Toques de ligação', 'Ringtones'), som(X.TOQUES, (id) => A.som && A.som.tocar('toque-x-' + id))));
+        secs.push(galeria(T('Som quando você entra na chamada', 'Sound when you join a call'), som(X.SONS_ENTRAR, (id) => A.som && A.som.tocar('entrar-' + id))));
+        secs.push(galeria(T('Ícones do app', 'App icons'), doNivel(X.ICONES).map(([id, pt, en]) => { const im = h('img', { class: 'bx-ic', alt: '' }); if (X.desenharIcone) X.desenharIcone(id, 64).then((u) => { im.src = u; }).catch(() => {}); return peca(im, T(pt, en)); })));
+      }
+      if (p.id === 'donator') {
+        // os 3 estilos do app: três janelinhas com cores diferentes e a seta do arrasto
+        const mini = (c1, c2, nm) => peca(h('span', { class: 'bx-est', estilo: { '--e1': c1, '--e2': c2 } }, h('i'), h('i'), h('i')), nm);
+        // (1.0.3) não são modelos prontos: o plano libera montar os seus (as cores aqui são só exemplo)
+        const ge = galeria(T('Estilos do app: você monta até 3', 'App looks: build up to 3 of your own'), [mini('#7fd4ff', '#2a7bd8', T('Seu estilo 1', 'Your look 1')), mini('#ffb37f', '#d8452a', T('Seu estilo 2', 'Your look 2')), mini('#b6ff9a', '#2f9b4d', T('Seu estilo 3', 'Your look 3'))]);
+        ge.querySelector('h4').after(h('p', { class: 'peq suave bx-nota' }, T('Não são modelos prontos: o plano libera os estilos para você criar do seu jeito (cores, fundo, vidro, bolhas, barra das abas, ícone e skin) e guardar até 3. Depois é só arrastar de lado para trocar entre eles.', 'These are not ready-made templates: the plan unlocks looks you design yourself (colors, background, glass, bubbles, tab bar, icon and skin) and keep up to 3. Then just drag sideways to switch between them.')));
+        secs.push(ge);
+      }
+      // o resto do plano (o que não dá para desenhar), em cartõezinhos
+      const resto = p.itens().filter((x) => !/:$/.test(x));
+      secs.push(h('section', { class: 'bx-sec' }, h('h4', {}, T('Tudo o que vem nele', 'Everything it includes')), h('div', { class: 'bx-itens' }, ...resto.map((x) => h('div', { class: 'bx-item' }, A.icone('ok', 14), h('span', {}, x))))));
+      corpo.replaceChildren(topo, seg, ...secs.filter(Boolean), acao);
+      acao.replaceChildren(botao(p));
+      corpo.scrollTop = 0;
+    };
+    const seg = U.seg(PLANOS.map((x) => [x.id, x.nome.replace(' Patreon', '')]), p.id, (v) => { p = PLANOS.find((x) => x.id === v) || p; pintar(); }); // o clique já toca o som de botão (antes tocava dois de uma vez)
+    seg.classList.add('bx-seg');
+    pintar();
+    U.modal(T('Exemplos dos planos', 'Plan examples'), corpo, { largura: 640, classe: 'bx-modal' });
+  }
   function bolha() {
     const caixa = h('div', { class: 'bolha-sec' });
     const pintar = () => {
       const U = A.ui, eu = A.api && A.api.eu, b = eu && eu.bolha, meu = b && b.plano, mp = !!(b && b.mp);
       const botao = (p) => mp ? h('button', { type: 'button', class: 'apoio-acao bolha-assinar', onclick: () => pagar(p) }, meu === p.id ? T('Renovar', 'Renew') : T('Assinar', 'Subscribe')) : link(KOFI_TIERS, h('span', { class: 'apoio-acao' }, T('Assinar', 'Subscribe')));
-      const cartoes = PLANOS.map((p) => h('div', { class: 'bolha-plano' + (meu === p.id ? ' meu' : ''), estilo: { '--b1': p.cor[0], '--b2': p.cor[1] } },
+      // (1.0.3) o cartão inteiro abre os exemplos (menos os botões de assinar e cancelar); o Donator vem em destaque
+      const abrirEx = (p) => (e) => { if (e.target.closest('button, a') && !e.target.closest('.bolha-ver')) return; A.som && A.som.tocar('click'); exemplos(p, botao); };
+      const cartoes = PLANOS.map((p) => h('div', { class: 'bolha-plano' + (meu === p.id ? ' meu' : '') + (p.id === RECOMENDADO ? ' recomendado' : ''), estilo: { '--b1': p.cor[0], '--b2': p.cor[1] }, onclick: abrirEx(p) },
+        p.id === RECOMENDADO ? h('div', { class: 'bolha-reco' }, A.icone('estrela', 13), T('Recomendado', 'Recommended')) : null,
         h('div', { class: 'bolha-esfera', 'aria-hidden': 'true' }),
         h('b', { class: 'bolha-nome' }, p.coracao ? h('span', { class: 'bolha-coracao', 'aria-hidden': 'true' }, A.icone('coracao', 16)) : null, p.nome, U.selos ? U.selos([p.id]) : null),
         h('div', { class: 'bolha-preco' }, h('span', {}, 'R$ ' + p.preco), h('small', {}, T('/mês', '/month'))),
         h('ul', {}, ...p.itens().map((x) => h('li', {}, A.icone('ok', 14), h('span', {}, /:$/.test(x) ? h('b', {}, x) : x)))), // "Tudo do Plus, e mais:" em negrito
+        h('button', { type: 'button', class: 'bolha-ver' }, A.icone('olho', 15), T('Ver exemplos', 'See examples')),
         meu === p.id ? h('div', { class: 'bolha-ativo' }, T('Seu plano', 'Your plan') + (b.ate ? ' · ' + T('até ', 'until ') + dataDe(b.ate) : '') + (b.cartao ? ' · ' + T('renova sozinho', 'auto-renews') : '')) : null,
         meu === p.id && b.cartao ? h('button', { type: 'button', class: 'bolha-cancelar peq', onclick: (e) => cancelarCartao(e.currentTarget) }, T('Cancelar renovação', 'Cancel renewal'))
           : meu === p.id && !b.ate ? null : botao(p)));

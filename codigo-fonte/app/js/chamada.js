@@ -30,13 +30,30 @@
   // ch = { cid, id, titulo, grupo, ice, mic (trilha), cam (trilha), tela (stream), mudo, pares: Map, saindo, inicio, ui, timers, modo }
   let ch = null;
   // (0.6.1) todo sinal leva a "sessão" (uma por vez que você entra na chamada): quem saiu e voltou é reconhecido na hora
-  const sinal = (para, paraDev, dados) => ch && H.enviar({ tipo: 'cham-sinal', cid: ch.cid, id: ch.id, para, paraDev: paraDev || undefined, dados: { ...dados, s: ch.sessao } });
+  // (1.0.3) com a conexão do servidor caída (ela se refaz de tempos em tempos, e numa chamada longa isso sempre acontece) o sinal era jogado
+  // fora calado: se era a oferta de mostrar a tela, a chamada ficava esperando uma resposta que nunca vinha (tela preta, e tudo o que mudava
+  // depois esperava junto). Agora espera a conexão voltar e sai na ordem
+  const sinal = (para, paraDev, dados) => {
+    if (!ch) return;
+    const m = { tipo: 'cham-sinal', cid: ch.cid, id: ch.id, para, paraDev: paraDev || undefined, dados: { ...dados, s: ch.sessao } };
+    if (H.ws && H.ws.readyState === 1 && !(ch.filaSinal && ch.filaSinal.length)) { H.enviar(m); return; }
+    (ch.filaSinal = ch.filaSinal || []).push({ m, em: Date.now() });
+    if (ch.filaSinal.length > 300) ch.filaSinal.splice(0, ch.filaSinal.length - 300);
+  };
+  const soltarFilaSinal = () => {
+    if (!ch || !ch.filaSinal || !ch.filaSinal.length || !H.ws || H.ws.readyState !== 1) return;
+    const agora = Date.now();
+    for (const { m, em } of ch.filaSinal.splice(0)) if (agora - em < 60000 && m.id === ch.id) H.enviar(m);
+  };
+  A.evt.on('hub:conectou', () => setTimeout(soltarFilaSinal, 300)); // (depois do "estado" que a conexão nova manda)
   const viva = (t) => (t && t.readyState === 'live' ? t : null);
   const minhas = () => ({ voz: viva(ch.mic), cam: viva(ch.cam), tela: ch.tela && !S().local.kms ? viva(ch.tela.getVideoTracks()[0]) : null, somTela: ch.tela ? viva(ch.tela.getAudioTracks()[0]) : null });
   // (1.0.0) o ajuste da câmera (espelhar, de cabeça para baixo, girar): quem mostra escolhe e todo mundo vê a imagem já corrigida
   const ajOk = (a) => ({ h: !!(a && a.h), v: !!(a && a.v), r: a && [90, 180, 270].includes(a.r) ? a.r : 0 });
   const ajCam = () => ajOk(A.cfg.v.camAjuste);
-  const meuEstado = () => ({ aj: ajCam(), mudo: ch.mudo, cam: !!viva(ch.cam), tela: !!ch.tela, cel: !!A.plat.celular, modo: ch.modoTela, cor: corOk((A.cfg.v.entrada || {}).cor), ms: ch.meuMs || undefined, msDc: 1 }); // (1.0.0) msDc: o ms vai direto entre as pessoas (canal da chamada), sem passar pelo servidor
+  // (1.0.3) o seu anel de fala e a moldura da câmera vão junto (poucos bytes, e só quando o estado é mandado): trocar no perfil muda na hora
+  const meuEx = () => { const eu = A.api && A.api.eu; if (!A.extras || !eu) return undefined; const e = A.extras.extrasDe(eu.codigo); return e.an || e.mc ? { an: e.an, mc: e.mc } : 0; };
+  const meuEstado = () => ({ ex: meuEx(), aj: ajCam(), mudo: ch.mudo, surdo: S().volume <= 0 ? 1 : undefined, cam: !!viva(ch.cam), tela: !!ch.tela, cel: !!A.plat.celular, modo: ch.modoTela, cor: corOk((A.cfg.v.entrada || {}).cor), ms: ch.meuMs || undefined, msDc: 1 }); // (1.0.0) msDc: o ms vai direto entre as pessoas (canal da chamada), sem passar pelo servidor
   const corOk = (c) => (/^#[0-9a-f]{6}$/i.test(c || '') ? c : '');
   const avisarEstado = () => { sinal('*', '', { t: 'estado', ...meuEstado() }); };
 
@@ -155,7 +172,7 @@
     const U = A.ui, nome = nomeDe(e.de.codigo) || e.de.nome;
     const tocarAntigo = () => { if (A.cfg.v.toque === 'novo') tocar('chamada-entrada', 3000); else if (A.cfg.v.toque === 'marimba') tocar('chamada-entrada-marimba', 3400); else if (A.cfg.v.toque === 'brisa') tocar('chamada-entrada-brisa', 4000); else tocar('chamada-entrada-classico', 3000); }; // padrão: Vidro // o toque novo (ou o antigo, nas Configurações)
     // (1.0.0) os toques do Aero Bubble (o do amigo, o escolhido, o próprio); sem nenhum, o de antes
-    if (A.ui.naoPerturbe()) { /* não perturbe: o cartão aparece, mas sem tocar */ } else { const idx = A.extras ? A.extras.toqueDe(e.de.codigo) : ''; if (!idx) tocarAntigo(); else A.extras.tocarToque(idx, tocar).then((ok) => { if (!tocando || tocando.id !== e.id) { A.extras.pararToque(); pararToque(); } else if (!ok) tocarAntigo(); }); }
+    if (A.ui.naoPerturbe(e.de && e.de.codigo)) { /* não perturbe: o cartão aparece, mas sem tocar */ } else { const idx = A.extras ? A.extras.toqueDe(e.de.codigo) : ''; if (!idx) tocarAntigo(); else A.extras.tocarToque(idx, tocar).then((ok) => { if (!tocando || tocando.id !== e.id) { A.extras.pararToque(); pararToque(); } else if (!ok) tocarAntigo(); }); }
     const atenderCom = (video) => () => atender(e, video).catch((x) => U.toast(x.message || String(x), { tipo: 'erro' }));
     const el = h('div', { class: 'cham-toque vidro', role: 'alertdialog', 'aria-label': T('Chamada de ', 'Call from ') + nome },
       h('div', { class: 'cham-toque-av' }, h('div', { class: 'tocando-ondas' }, h('i'), h('i'), h('i')), U.avatar(e.de, 64)),
@@ -267,6 +284,7 @@
     } else if (d.t === 'resposta' && par) {
       if (par.pc.signalingState !== 'have-local-offer') return; // (1.0.2) resposta de uma oferta que já foi desfeita (as duas cruzaram)
       await par.pc.setRemoteDescription({ type: 'answer', sdp: somDaTela(d.sdp) });
+      clearTimeout(par.ofertaT); par.ofertaSemResposta = 0;
       await soltarIce(par);
       if (par.refazerOferta) { par.refazerOferta = false; renegociar(par); }
     } else if (d.t === 'ice' && par) {
@@ -292,11 +310,12 @@
   const nivelMs = (v) => (!v ? '' : v < 90 ? 'bom' : v < 200 ? 'medio' : 'ruim');
   const pintarMsPar = (par) => { const e = par.tile && par.tile.querySelector('.cham-tile-ms'); if (!e) return; const t = par.ms ? par.ms + ' ms' : ''; if (e.textContent !== t) e.textContent = t; e.dataset.nivel = nivelMs(par.ms); e.title = par.ms ? T('Conexão de ', 'Connection of ') + nomeDe(par.codigo) + ': ' + par.ms + ' ms' : ''; };
   const lerEstado = (par, d) => {
+    if (d.ex !== undefined && A.extras && A.extras.extraVivo) { const k = JSON.stringify(d.ex); if (k !== par.exK) { par.exK = k; A.extras.extraVivo(par.codigo, d.ex || {}); remarcar(par.codigo); } } // quem ainda não manda (1.0.2) fica com o do perfil
     if (d.ms !== undefined) msDoPar(par, d.ms);
     if (d.msDc) par.msDc = true;
     if (d.cel !== undefined) par.cel = !!d.cel;
     par.aj = ajOk(d.aj);
-    par.mudo = !!d.mudo; par.cam = !!d.cam; par.tela = !!d.tela; if (par.tela && !par.telaDesde) par.telaDesde = Date.now(); if (!par.tela) par.telaDesde = 0; A.evt.emit('chamada:tela', par.tela);
+    par.mudo = !!d.mudo; par.surdo = !!d.surdo; par.cam = !!d.cam; par.tela = !!d.tela; if (par.tela && !par.telaDesde) par.telaDesde = Date.now(); if (!par.tela) par.telaDesde = 0; A.evt.emit('chamada:tela', par.tela);
     const eraJogo = par.modo === 'jogo';
     par.modo = d.modo === 'jogo' ? 'jogo' : 'tela'; par.cor = corOk(d.cor); sujarCtl();
     if (eraJogo !== (par.modo === 'jogo')) atrasoTela(par);
@@ -338,7 +357,14 @@
     if (!par.pj) return;
     desligarTelaJogo(par); S().peersChamada.delete(par.pj.id); par.pj = null;
   }
-  function renegociar(par) { if (par.pc.signalingState === 'stable') ofertar(par).catch((e) => A.log.aviso('chamada: renegociar', e)); else par.refazerOferta = true; }
+  // (1.0.3) pela mesma fila dos sinais: mostrar a tela no instante em que chegava uma oferta do outro lado fazia as duas se atropelarem (uma
+  // falhava calada e a tela não ia)
+  function renegociar(par) {
+    cadeia = cadeia.then(async () => {
+      if (!ch || ch.pares.get(par.chave) !== par) return;
+      if (par.pc.signalingState === 'stable') await ofertar(par); else par.refazerOferta = true;
+    }).catch((e) => A.log.aviso('chamada: renegociar', e));
+  }
   // a minha tela no modo jogo entra nessa conexão como entra numa sala (na ordem: formato, transformação da placa, qualidade)
   function ligarTelaJogo(par) {
     const tr = par.tr && par.tr.tela; if (!tr || !minhaTela()) return false;
@@ -368,6 +394,27 @@
     const meu = ch; ch.sozinhoT = setTimeout(() => { if (ch === meu && !ch.pares.size) { A.ui.toast(T('Você ficou sozinho na chamada por 3 minutos: saí dela.', 'You were alone in the call for 3 minutes: left it.')); CH.desligar(); } }, 3 * 60000);
   }
   CH._vigiarSozinho = vigiarSozinho;
+  // (1.0.3) para o relatório de diagnóstico: a tela que eu mando e a que eu recebo de cada pessoa (codificador, quadros, se está preta/parada)
+  CH.diag = async () => {
+    if (!ch) return null;
+    const trilha = (t) => { if (!t) return null; let st = {}; try { st = t.getSettings(); } catch (_) { /* ok */ } return { estado: t.readyState, mudo: t.muted, l: st.width, a: st.height, fps: st.frameRate && Math.round(st.frameRate), sup: st.displaySurface }; };
+    const vt = ch.tela && ch.tela.getVideoTracks ? ch.tela.getVideoTracks()[0] : null;
+    const r = { modo: ch.modoTela, minhaTela: trilha(vt), superficie: ch.superficie || '', direta: A.kms && A.kms.ativa() ? { ...(A.kms.info() || {}), transformacao: A.kms._est || null } : null, placa: A.gpu && A.gpu.codecAtual ? A.gpu.codecAtual() : '', pares: [] };
+    let n = 0;
+    for (const par of ch.pares.values()) {
+      const o = { quem: 'pessoa ' + (++n), con: par.pc.connectionState + '/' + par.pc.iceConnectionState + '/' + par.pc.signalingState, tela: par.tela, modo: par.modo, sai: [], chega: [] };
+      try {
+        const st = await par.pc.getStats();
+        st.forEach((x) => {
+          if (x.kind !== 'video') return;
+          if (x.type === 'outbound-rtp') o.sai.push({ enc: x.encoderImplementation, q: x.framesEncoded, env: x.framesSent, l: x.frameWidth, a: x.frameHeight, fps: x.framesPerSecond, lim: x.qualityLimitationReason, pli: x.pliCount, kbps: x.targetBitrate && Math.round(x.targetBitrate / 1000) });
+          if (x.type === 'inbound-rtp') o.chega.push({ dec: x.decoderImplementation, rec: x.framesReceived, dec2: x.framesDecoded, perd: x.framesDropped, l: x.frameWidth, a: x.frameHeight, fps: x.framesPerSecond, congel: x.freezeCount, pli: x.pliCount, pacPerd: x.packetsLost });
+        });
+      } catch (_) { /* ok */ }
+      r.pares.push(o);
+    }
+    return r;
+  };
   CH._pares = () => (ch ? [...ch.pares.values()].map((p) => ({ chave: p.chave, sessao: p.sessao, estado: p.pc.connectionState, som: Object.keys(p.som || {}).length })) : []); // para os testes
   // (0.9.6) o som da tela (o 2º áudio da conexão) vai em estéreo e com qualidade de música, como era na sala; o microfone continua igual
   const somDaTela = (sdp) => {
@@ -394,6 +441,7 @@
       // (0.7.6) a tela da captura direta chega num envio à parte (veja ligarTelaJogo); quando ela acaba, volta a valer o de sempre
       // (0.7.8) a volta é sempre para a trilha de sempre: guardar "a anterior" podia devolver uma já encerrada (trocar de modo com a tela ligada
       // emenda um envio no outro), e a trilha de sempre não pode cobrir a da captura direta (nos dois casos, tela preta)
+      if (papel === 'voz') par.rxVoz = ev.receiver; // (1.0.3) o nível que chega no próprio áudio (bolinha verde de quem fala)
       if (papel === 'tela' && par.tr.tela && ev.transceiver === par.tr.tela) par.telaBase = st;
       if (papel === 'tela' && par.tr.tela && ev.transceiver !== par.tr.tela) {
         par.rxJogo = ev.transceiver;
@@ -492,6 +540,24 @@
     }
     await par.pc.setLocalDescription(await par.pc.createOffer(reiniciar ? { iceRestart: true } : undefined));
     sinal(par.codigo, par.dev, { t: 'oferta', sdp: par.pc.localDescription.sdp, ...meuEstado() });
+    vigiarOferta(par);
+  }
+  // (1.0.3) a resposta não veio (a oferta ou a resposta se perdeu no caminho): desfaz a oferta e manda de novo. Antes a conexão ficava parada
+  // esperando para sempre e a tela que alguém começava a mostrar ficava preta até reiniciar a chamada
+  function vigiarOferta(par) {
+    clearTimeout(par.ofertaT);
+    const sdp = par.pc.localDescription && par.pc.localDescription.sdp;
+    par.ofertaT = setTimeout(() => {
+      if (!ch || ch.pares.get(par.chave) !== par || par.pc.signalingState !== 'have-local-offer' || !par.pc.localDescription || par.pc.localDescription.sdp !== sdp) return;
+      par.ofertaSemResposta = (par.ofertaSemResposta || 0) + 1;
+      A.log.aviso('chamada: a oferta para', par.codigo, 'ficou sem resposta (' + par.ofertaSemResposta + '): mandando de novo');
+      if (par.ofertaSemResposta > 4) { par.ofertaSemResposta = 0; refazerPar(par); return; }
+      cadeia = cadeia.then(async () => {
+        if (!ch || ch.pares.get(par.chave) !== par || par.pc.signalingState !== 'have-local-offer') return;
+        if (par.pc.currentRemoteDescription) { await par.pc.setLocalDescription({ type: 'rollback' }); await ofertar(par, par.pc.connectionState !== 'connected'); }
+        else { sinal(par.codigo, par.dev, { t: 'oferta', sdp: par.pc.localDescription.sdp, ...meuEstado() }); vigiarOferta(par); } // a primeira: a mesma de novo
+      }).catch((e) => A.log.aviso('chamada: oferta de novo', e));
+    }, 9000);
   }
   function ligarTrilhas(par) { // quem recebe a oferta: põe as próprias trilhas nos transceptores que vieram nela, pela mesma ordem
     const m = minhas();
@@ -575,7 +641,9 @@
     const n = par.pretoN = (par.pretoN || 0) + 1;
     if (n % 2 === 0) pedirQuadro(par, 'tela', trT);
     if (n === 4) { const st = v.srcObject; v.srcObject = null; v.srcObject = st; v.play().catch(() => {}); }
-    if (n === 6) sinal(par.codigo, par.dev, { t: 'telaPreta' });
+    // (1.0.3) pede de novo a cada ~10 voltas: quem manda com uma versão antiga, preso numa oferta que se perdeu, só se recupera quando o
+    // pedido chega depois de ela ter voltado (o pedido vale a cada 20 s do lado de lá)
+    if (n === 6 || (n > 6 && (n - 6) % 10 === 0 && n <= 66)) sinal(par.codigo, par.dev, { t: 'telaPreta' });
     if (n === 8 || n === 10 || n === 14) {
       const tr = par.rxJogo || (par.tr && par.tr.tela); let bytes = 0, quadros = 0;
       try { (await tr.receiver.getStats()).forEach((x) => { if (x.type === 'inbound-rtp' && x.kind === 'video') { bytes = x.bytesReceived || 0; quadros = x.framesDecoded || 0; } }); } catch (_) { return; }
@@ -600,7 +668,7 @@
   const trocar = (papel, trilha) => { for (const par of ch.pares.values()) if (par.tr[papel]) par.tr[papel].sender.replaceTrack(trilha).catch(() => {}); };
   async function soltarIce(par) { const l = par.ice.splice(0); for (const c of l) await par.pc.addIceCandidate(c).catch(() => {}); }
   function removerPar(par, { semSom = false } = {}) {
-    clearTimeout(par.caiuT); clearTimeout(par.conectarT);
+    clearTimeout(par.caiuT); clearTimeout(par.conectarT); clearTimeout(par.ofertaT);
     soltarJogo(par);
     const tocouEntrar = par.anunciado || !!(ch && ch.anunciados && ch.anunciados.has(par.codigo));
     if (!semSom && ch && ch.anunciados) ch.anunciados.delete(par.codigo); // saiu de verdade: se voltar, o som de entrar toca de novo
@@ -921,7 +989,21 @@
     if (c.ui) { c.ui.limpar(); const el = c.ui.el; el.classList.add('saindo'); setTimeout(() => el.remove(), 320); document.documentElement.removeAttribute('data-cham-max'); document.documentElement.removeAttribute('data-cham-jogo'); }
     if (som) A.som.tocar('cham-sai'); // (0.7.0) o som de sair
     A.evt.emit('chamada:fim');
+    vivaAplicar(false, true); // (1.0.3) o som do celular volta ao normal
   }
+  // (1.0.3) viva-voz no celular: ligado por padrão (a escolha fica guardada). O Android às vezes devolve o som ao alto-falante de ouvido
+  // quando o microfone reabre, então aplica de novo logo depois de entrar
+  function vivaPlugin() { const N = A.plat.apk && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AeroNotif; return N && N.vivaVoz ? N : null; }
+  function vivaLigado() { return A.cfg.v.vivaVoz !== false; }
+  function vivaAplicar(on, fim) { const N = vivaPlugin(); if (!N) return; try { Promise.resolve(N.vivaVoz({ on: !!on, fim: !!fim })).catch(() => {}); } catch (e) { /* ok */ } }
+  CH.vivaVoz = (on) => {
+    A.cfg.v.vivaVoz = !!on; A.cfg.salvar();
+    if (ch) vivaAplicar(on);
+    const b = ch && ch.ui && ch.ui.el && ch.ui.el.querySelector('.cham-viva');
+    if (b) { b.classList.toggle('ativo', !!on); b.setAttribute('aria-pressed', String(!!on)); b.title = on ? T('Viva-voz ligado', 'Speakerphone on') : T('Viva-voz', 'Speakerphone'); }
+    A.som.tocar('clique');
+  };
+  A.evt.on('chamada:entrou', () => { if (!vivaPlugin()) return; [0, 900, 2500, 6000].forEach((t) => setTimeout(() => { if (ch) vivaAplicar(vivaLigado()); }, t)); });
   // (0.6.9) o servidor tirou um aparelho da chamada (o app dele fechou, a internet caiu): ele sai da tela na hora, com a tela compartilhada
   // dele (antes ficava a imagem parada por até 20 s, até a conexão direta desistir)
   A.evt.on('hub:chamada-estado', (e) => {
@@ -952,15 +1034,32 @@
   // (o anel de fala não parava mais). Agora cada um tem um piso que acompanha o ruído (desce na hora, sobe devagar) e só conta som acima dele
   const pisoFala = (chave, v, folga) => {
     const p = ch.pisos || (ch.pisos = {});
-    const atual = p[chave] == null ? v : v < p[chave] ? v : p[chave] + (v - p[chave]) * 0.01;
+    // (1.0.3) enquanto a pessoa fala (som bem acima do piso) o piso quase não sobe: antes ele subia junto com a voz e a bolinha apagava
+    // no meio de uma fala comprida
+    const ant = p[chave], atual = ant == null ? v : v < ant ? v : ant + (v - ant) * (v > ant * 3 + 0.01 ? 0.0008 : 0.02);
     p[chave] = atual;
     return v > atual * folga[0] + folga[1];
   };
+  // (1.0.3) "Foto animada só quando fala" (Aparência > Na chamada): a foto animada (GIF) de cada um fica parada no primeiro quadro e só anima
+  // enquanto a pessoa fala. Desligada, tudo como antes
+  const gifFala = () => A.cfg.v.chamGifFala === true;
+  function gifDaFala(el, on) {
+    if (!el || !A.animPerfil || !A.animPerfil.quadro) return;
+    el.querySelectorAll('.cham-av .avatar img, .avatar img').forEach((img) => {
+      const real = img.dataset.gifReal || img.getAttribute('src') || '';
+      if (!/\/api\/avatar\//.test(real)) return;
+      if (!gifFala() || on) { if (img.dataset.gifReal) { delete img.dataset.gifReal; img.dataset.animOn = '1'; img.src = real; } return; }
+      if (img.dataset.gifReal) return;
+      A.animPerfil.quadro(real).then((q) => { if (!q || !gifFala() || el.classList.contains('falando') || img.dataset.gifReal || !img.isConnected) return; img.dataset.gifReal = real; img.src = q; });
+    });
+  }
+  CH.gifFala = (v) => { A.cfg.v.chamGifFala = !!v; A.cfg.salvar(); if (ch && ch.ui) ch.ui.el.querySelectorAll('.cham-tile').forEach((t) => gifDaFala(t, t.classList.contains('falando'))); };
   const marcarFala = (el, on) => {
     if (!el) return;
     const antes = el.classList.contains('falando');
     if (A.extras && A.extras.fala) A.extras.fala(el, on); else el.classList.toggle('falando', on);
     if (on) el._ultFala = Date.now();
+    if (on !== antes || (gifFala() && !on && el.querySelector('.avatar img[src*="/api/avatar/"]:not([data-gif-real])'))) gifDaFala(el, on); // (a foto pode ter sido refeita)
     // (1.0.2) alguém que estava escondido na janelinha/mini começou a falar: troca quem aparece
     if (on && !antes && ch && ch.ui && ch.modo !== 'max' && (el.classList.contains('fora-pequena') || ch.ui.miniAvs.dataset.n > 3)) pintarPequenos();
   };
@@ -1004,14 +1103,24 @@
     }
     el.style.setProperty('--tw', Math.floor(melhor) + 'px');
   }
+  // (1.0.3) o nível de quem fala: o maior entre o som que toca aqui (num trecho mais longo) e o nível que vem marcado em cada pacote de
+  // áudio (o mesmo que o WebRTC usa; vale também sem Web Audio e não depende do volume que você escolheu para a pessoa)
+  const nivelPar = (par) => {
+    let v = nivelDe(par.som && par.som.voz && par.som.voz.medidor);
+    try {
+      const f = par.rxVoz && par.rxVoz.getSynchronizationSources && par.rxVoz.getSynchronizationSources()[0];
+      if (f && typeof f.audioLevel === 'number' && Math.abs(performance.timeOrigin + performance.now() - f.timestamp) < 400) v = Math.max(v, f.audioLevel);
+    } catch (_) { /* navegador sem isso */ }
+    return v;
+  };
   function medirFalas() {
     if (!ch || !ch.ui) return;
     for (const par of ch.pares.values()) {
-      const v = nivelDe(par.som && par.som.voz && par.som.voz.medidor);
-      const on = falouAgora(par.chave, !par.mudo && v > 0.025 && pisoFala(par.chave, v, [1.8, 0.008])) && !par.mudo;
+      const v = nivelPar(par);
+      const on = falouAgora(par.chave, !par.mudo && v > 0.02 && pisoFala(par.chave, v, [1.8, 0.006])) && !par.mudo;
       marcarFala(par.tile, on); par.falando = on;
       // (1.0.2) o volume acima do ruído (0 a 1) vai para o anel de fala, que brinca com ele
-      if (A.extras && A.extras.volume) A.extras.volume(par.codigo, on ? Math.sqrt(Math.max(0, Math.min(1, (v - ((ch.pisos && ch.pisos[par.chave]) || 0) * 1.8 - 0.008) / 0.13))) : 0);
+      if (A.extras && A.extras.volume) A.extras.volume(par.codigo, on ? Math.sqrt(Math.max(0, Math.min(1, (v - ((ch.pisos && ch.pisos[par.chave]) || 0) * 1.8 - 0.006) / 0.13))) : 0);
     }
     const v = A.mic.ativo ? A.mic.nivel() : 0;
     ch.euFalando = falouAgora('eu', !ch.mudo && A.mic.ativo && v > 0.45 && pisoFala('eu', v, [1, 0.1]) && A.mic.aberto) && !ch.mudo;
@@ -1052,8 +1161,18 @@
     if (Math.abs(c.meuMs - msAvisado) >= 3 || (c.meuMs !== msAvisado && Date.now() - msAvisadoEm > 2000)) /* (0.9.3) a outra pessoa vê o seu ms quase na hora */ { msAvisado = c.meuMs; msAvisadoEm = Date.now(); if (c.pares.size) { const txt = '{"t":"ms","v":' + c.meuMs + '}'; let faltou = false; for (const par of c.pares.values()) if (!(par.msDc && enviarCtl(par.chave, txt))) faltou = true; if (faltou) sinal('*', '', { t: 'ms', v: c.meuMs }); } } // (1.0.0) direto pelo canal da chamada; pelo servidor só para quem ainda não tem o canal aberto (ou uma versão antiga)
   }
   let sinalN = 0;
+  // (1.0.3) o ms até o servidor: a cada 1 s nos primeiros 10 s e por mais 5 s sempre que muda; parado, a cada 5 s (o número na tela continua
+  // o mesmo, só sem pedir ao servidor toda hora). O tempo entre as pessoas (getStats) continua a cada 1 s
+  let msRapido = 0, msUltimo = 0;
+  function talvezMedirMeuMs() {
+    if (!ch) return;
+    const v = ch.meuMs || 0;
+    if (v && msUltimo && Math.abs(v - msUltimo) > Math.max(8, msUltimo * 0.25)) msRapido = 5;
+    msUltimo = v;
+    if ((ch.msN = (ch.msN || 0) + 1) <= 10 || msRapido > 0 || sinalN % 5 === 0) { if (msRapido > 0) msRapido--; medirMeuMs(); }
+  }
   async function medirSinal() {
-    medirMeuMs();
+    talvezMedirMeuMs();
     if (!ch || !ch.ui) return;
     let melhor = 0; const pesado = (sinalN++ & 1) === 0;
     for (const par of ch.pares.values()) {
@@ -1078,8 +1197,15 @@
   const fmt = (ms) => { const s = Math.floor(ms / 1000); const hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60; return (hh ? hh + ':' + String(mm).padStart(2, '0') : mm) + ':' + String(ss).padStart(2, '0'); };
   // o tamanho do avatar da chamada vem do CSS (pequeno na sua prévia, no PiP e no celular): sem o --t fixo no próprio elemento
   const semTamanho = (av) => { av.style.removeProperty('--t'); return av; };
+  // (1.0.3) pinta de novo só o anel e a moldura de uma pessoa (as janelinhas dela e a foto grande), sem refazer a chamada
+  function remarcar(cod) {
+    if (!A.extras || !cod) return;
+    document.querySelectorAll('.cham-tile').forEach((t) => { if (t._pessoa && t._pessoa.codigo === cod) A.extras.marcarChamada(t, cod); });
+    const ui = ch && ch.ui; if (ui && ui.palcoAv && ui.palcoAv.dataset.de === cod && ui.palco && ui.palco.dataset.tipo === 'foto') A.extras.marcarChamada(ui.palcoAv, cod);
+  }
+  A.evt.on('perfil', () => { const eu = A.api && A.api.eu; if (!ch || !eu) return; remarcar(eu.codigo); avisarEstado(); }); // você trocou: a sua prévia e quem está com você
   function tile(pessoa, { eu: ehEu, videoEl } = {}) {
-    const quadro = h('div', { class: 'cham-quadro' }, videoEl || null, h('div', { class: 'cham-av' }, semTamanho(A.ui.avatar(pessoa, 96))), h('span', { class: 'cham-mudo', title: T('Microfone desligado', 'Microphone off') }, A.icone('micOff', 16)));
+    const quadro = h('div', { class: 'cham-quadro' }, videoEl || null, h('div', { class: 'cham-av' }, semTamanho(A.ui.avatar(pessoa, 96))), h('span', { class: 'cham-mudo', title: T('Microfone desligado', 'Microphone off') }, A.icone('micOff', 16)), h('span', { class: 'cham-surdo', title: T('Som desligado: não está ouvindo', 'Sound off: not listening') }, A.icone('fonesOff', 16))); // (1.0.3)
     const el = h('div', { class: 'cham-tile' + (ehEu ? ' eu' : '') }, quadro,
       h('div', { class: 'cham-nome' }, h('span', {}, ehEu ? T('Você', 'You') : nomeDe(pessoa.codigo) || pessoa.nome), h('span', { class: 'cham-pontos' }, h('i'), h('i'), h('i'))));
     el._pessoa = pessoa;
@@ -1294,6 +1420,7 @@
       if (comVideo && par.camEl.srcObject !== par.midia.cam) { par.camEl.srcObject = par.midia.cam; par.camEl.play().catch(() => {}); }
       par.tile.classList.toggle('com-video', !!comVideo);
       par.tile.classList.toggle('mudo', par.mudo);
+      par.tile.classList.toggle('surdo', !!par.surdo);
       par.tile.classList.toggle('conectando', par.pc.connectionState !== 'connected');
       par.tile.classList.toggle('na-tela', par.tela);
     }
@@ -1303,6 +1430,7 @@
     if (!cam) ui.euVideo.srcObject = null;
     ui.euTile.classList.toggle('com-video', !!cam);
     ui.euTile.classList.toggle('mudo', ch.mudo);
+    ui.euTile.classList.toggle('surdo', S().volume <= 0);
     ui.euTile.classList.toggle('na-tela', !!minhaTela()); // (1.0.2) o selo TELA também no seu quadro quando você mostra a tela
     // palco (tela compartilhada)
     // (1.0.2) a tela (ou câmera) que estava grande sumiu (a pessoa parou de mostrar ou saiu): volta para a chamada normal e sai da tela
@@ -1409,12 +1537,12 @@
     return {
       cid: ch.cid, id: ch.id, modo: ch.modo, inicio: ch.inicio, chamando: ch.saindo && !ch.pares.size,
       eu: { codigo: eu().codigo, nome: eu().nome, av: eu().av, mudo: ch.mudo, surdo: S().volume <= 0, cam: !!viva(ch.cam), tela: !!ch.tela, falando: !!ch.euFalando && !ch.mudo },
-      pares: [...ch.pares.values()].map((par) => ({ codigo: par.codigo, mudo: par.mudo, cam: par.cam, tela: par.tela, falando: !!par.falando && !par.mudo, conectado: par.pc.connectionState === 'connected' })),
+      pares: [...ch.pares.values()].map((par) => ({ codigo: par.codigo, mudo: par.mudo, surdo: !!par.surdo, cam: par.cam, tela: par.tela, falando: !!par.falando && !par.mudo, conectado: par.pc.connectionState === 'connected' })),
     };
   };
   // (1.0.0) o mudo geral (deixar de ouvir a chamada), o mesmo na barra grande e na faixa da conversa
   let volAntes = 1;
-  CH.mudoSom = () => { const s = S(); s.reativarAudio(); if (s.volume > 0) { volAntes = s.volume; s.definirVolume(0); A.som.tocar('som-off'); } else { s.definirVolume(volAntes || 1); A.som.tocar('som-on'); } if (ch && ch.ui) pintarTudo(); };
+  CH.mudoSom = () => { const s = S(); s.reativarAudio(); if (s.volume > 0) { volAntes = s.volume; s.definirVolume(0); A.som.tocar('som-off'); } else { s.definirVolume(volAntes || 1); A.som.tocar('som-on'); } if (ch && ch.ui) pintarTudo(); if (ch) avisarEstado(); A.evt.emit('talk:cham', { cid: ch && ch.cid }); }; // (1.0.3) os outros veem que você não está ouvindo
   CH.opcoesSom = (b) => A.mixer.audio(b);
   CH.opcoesTela = (b) => opcoesTela(b);
   CH.opcoesCamera = (b) => escolherCamera(b);
@@ -1561,6 +1689,9 @@
     const setaMic = seta(T('Opções do microfone', 'Microphone options'), (b) => A.mixer.mic(b, ctxMic));
     const bSom = rb('volume', T('Som (mudo geral)', 'Sound (mute all)'), () => CH.mudoSom());
     const setaSom = seta(T('Saída de som e volumes', 'Sound output and volumes'), (b) => A.mixer.audio(b));
+    // (1.0.3) celular: viva-voz (o som sai do alto-falante do aparelho em vez do de ouvido)
+    const bViva = vivaPlugin() ? rb('vivaVoz', T('Viva-voz', 'Speakerphone'), () => CH.vivaVoz(!vivaLigado())) : null;
+    if (bViva) { bViva.classList.add('cham-viva'); bViva.classList.toggle('ativo', vivaLigado()); bViva.setAttribute('aria-pressed', String(vivaLigado())); }
     const bFim = rb('desligarTel', T('Desligar', 'Hang up'), () => CH.desligar(), 'perigo'); bFim.classList.add('cham-fim');
     const msEl = h('span', { class: 'cham-ms', 'aria-live': 'off' });
     const bSinal = h('span', { class: 'cham-sinal', role: 'img' }, A.icone('sinal', 20), msEl);
@@ -1730,7 +1861,7 @@
     const barra = h('div', { class: 'cham-barra' },
       // (1.0.0) em blocos, do mais usado para o menos: a voz (microfone, som), o vídeo (câmera, tela, controle), o desligar no meio;
       // depois a conversa (chat, música) e, por fim, a janela (sinal, janelinha, esconder)
-      h('div', { class: 'cham-grupo' }, par(bMic, setaMic), par(bSom, setaSom), h('i', { class: 'cham-div', 'aria-hidden': 'true' }), bCam ? par(bCam, setaCam) : null, bTela ? par(bTela, setaTela) : null, parCtl),
+      h('div', { class: 'cham-grupo' }, par(bMic, setaMic), par(bSom, setaSom), bViva, h('i', { class: 'cham-div', 'aria-hidden': 'true' }), bCam ? par(bCam, setaCam) : null, bTela ? par(bTela, setaTela) : null, parCtl),
       bFim,
       h('div', { class: 'cham-grupo' }, bChat, A.integChamada ? A.integChamada(ch, rb) : null, h('i', { class: 'cham-div', 'aria-hidden': 'true' }), bSinal, bModo, bRecolher)); // (0.8.7) Música junto na chamada; (1.0.2) com mais de uma integração, o botão vira um + (integchamada.js)
     const barraArr = A.ui.arrastar(barra, barra, { fixar: true, quando: () => ch && ch.modo === 'max' && !matchMedia('(max-width: 680px)').matches }); // (0.6.0) a barra de botões dá para arrastar
@@ -1761,7 +1892,7 @@
     for (const par of ch.pares.values()) pessoas.append(tilePar(par));
     CH.modo('max');
     ch.timers.push(setInterval(() => { if (S().peersChamada.size && !S().ativa) S().medirJogo(); }, 1000)); // (na sala é ela que mede)
-    ch.timers.push(setInterval(pintarTudo, 1000), setInterval(medirFalas, 150), setInterval(medirSinal, 1000), setInterval(CH.ajustarJanela, 400));
+    ch.timers.push(setInterval(pintarTudo, 1000), setInterval(medirFalas, 100), setInterval(medirSinal, 1000), setInterval(CH.ajustarJanela, 400));
     A.evt.emit('chamada:inicio');
   }
   // a janelinha pode ser arrastada pelo topo (fica onde você deixar)

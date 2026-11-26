@@ -22,4 +22,6 @@ aur/*/*.pkg.tar.*
 *.keystore
 *.jks
 android.properties
+# (1.0.3) a configuração do Firebase do app do Android vem de um segredo do repositório na hora de compilar
+google-services.json
 desktop/extra/

@@ -8,7 +8,21 @@
   const PALETAS = ['#2d9ee0', '#1fb6a6', '#4caf50', '#a3c614', '#f0a020', '#e5533d', '#e0559c', '#8a63e0'];
   const t = () => A.cfg.v.tema;
 
+  // (1.0.3) arrastando um controle, o tema entra no máximo a cada 50 ms e é gravado 400 ms depois do último passo: cada passo refazia o
+  // estilo da página inteira e gravava todas as configurações (com a imagem de fundo junto), e o controle travava na mão
+  let tAplicar = 0, ultimoAplicar = 0, tGravar = 0;
+  const aplicarJa = () => { clearTimeout(tAplicar); tAplicar = 0; ultimoAplicar = performance.now(); A.tema.aplicar(); };
+  const gravarJa = () => { clearTimeout(tGravar); tGravar = 0; if (!A.cfg.salvar()) U.toast(T('Sem espaço para guardar essa configuração (a imagem pode estar pesada demais).', 'No room to store this setting (the image may be too heavy).'), { tipo: 'erro' }); };
+  addEventListener('pagehide', () => { if (tGravar) gravarJa(); });
+  function salvarSuave(mudou) {
+    Object.assign(A.cfg.v.tema, mudou);
+    const falta = 50 - (performance.now() - ultimoAplicar);
+    if (falta <= 0 && !tAplicar) aplicarJa(); else if (!tAplicar) tAplicar = setTimeout(aplicarJa, Math.max(0, falta));
+    clearTimeout(tGravar); tGravar = setTimeout(gravarJa, 400);
+  }
   function salvar(mudou) {
+    if (tAplicar) { clearTimeout(tAplicar); tAplicar = 0; }
+    if (tGravar) { clearTimeout(tGravar); tGravar = 0; }
     Object.assign(A.cfg.v.tema, mudou);
     A.tema.aplicar();
     if (!A.cfg.salvar()) U.toast(T('Sem espaço para guardar essa configuração (a imagem pode estar pesada demais).', 'No room to store this setting (the image may be too heavy).'), { tipo: 'erro' });
@@ -21,7 +35,7 @@
   function slid(rot, k, fmt, { dica, aoMudar } = {}) {
     const [mi, ma] = A.tema.LIM[k];
     const v = h('b', {}, fmt(t()[k]));
-    const s = U.slider({ min: mi, max: ma, valor: t()[k], oninput: (x) => { v.textContent = fmt(x); salvar({ [k]: x }); aoMudar && aoMudar(x); } });
+    const s = U.slider({ min: mi, max: ma, valor: t()[k], oninput: (x) => { v.textContent = fmt(x); salvarSuave({ [k]: x }); aoMudar && aoMudar(x); }, onchange: (x) => salvar({ [k]: x }) });
     const caixa = h('div', { class: 'slid' }, h('div', { class: 'linha entre' }, h('span', {}, rot), v), s, dica ? h('div', { class: 'peq suave' }, dica) : null);
     caixa.sync = () => { s.atualizar(t()[k]); v.textContent = fmt(t()[k]); };
     return caixa;

@@ -21,6 +21,7 @@ public class AeroPushAlarme extends BroadcastReceiver {
     static void agendar(Context ctx) {
         SharedPreferences sp = ctx.getSharedPreferences(AeroPushJob.PREFS, Context.MODE_PRIVATE);
         if (sp.getString("t", "").isEmpty()) return;
+        if (sp.getBoolean("fcm", false)) return; // (1.0.3) o push do Google avisa na hora: fica só a checagem de 15 min (economiza bateria)
         long fundo = sp.getLong("fundo", 0), agora = System.currentTimeMillis();
         long espera = fundo > 0 && agora - fundo < JANELA ? RAPIDO : CALMO;
         AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);

@@ -48,12 +48,13 @@
   async function olhar() {
     const p = ponte();
     if (!p || olhando || !A.api || !A.api.eu) return;
-    if (!O.ligado()) { if (ligouPonte !== false) { ligouPonte = false; p.ligar(false).catch(() => {}); } if (meu || enviado) { meu = null; enviado = null; mandar(null); O.pintar(); } return; }
+    const compartilha = O.ligado(); // (1.0.3) numa Jam o PC lê a música daqui mesmo sem mostrar a sua aos amigos (só não manda)
+    if (!compartilha && !junto) { if (ligouPonte !== false) { ligouPonte = false; p.ligar(false).catch(() => {}); } if (meu || enviado) { meu = null; enviado = null; mandar(null); O.pintar(); } return; }
     if (ligouPonte !== true) { ligouPonte = true; try { await p.ligar(true); } catch (e) { return; } }
     olhando = true;
     let x = null; try { x = await p.agora(); } catch (e) { x = null; } finally { olhando = false; }
     local = x ? { ...x } : null;
-    if (!O.ligado()) return;
+    if (!O.ligado()) { if (meu || enviado) { meu = null; enviado = null; mandar(null); O.pintar(); } return; }
     const agora = Date.now();
     // pausou: some quase na hora (confere de novo 0,4 s depois, para um clique duplo no play não piscar na tela dos amigos)
     if (x && !x.tocando) { if (!pausadoDesde) pausadoDesde = agora; if (agora - pausadoDesde < 350 && enviado && chave(enviado) === chave(x)) { setTimeout(olhar, 400); return; } x = null; } else pausadoDesde = 0;
@@ -96,14 +97,19 @@
   let junto = null; // { cod, desde, cmdEm, tentativas, casou, sumiu }
   const norm = (v) => String(v || '').toLowerCase().replace(/\s+/g, ' ').trim();
   const combina = (a, b) => !!(a && b && a.f === b.f && (a.id && b.id ? a.id === b.id : norm(a.t) === norm(b.t)));
-  O.podeJunto = (cod) => { const o = O.de(cod), p = ponte(); return !!(o && o.id && p && p.tocar && O.ligado() && cod !== ((A.api && A.api.eu) || {}).codigo); };
+  const euCod = () => ((A.api && A.api.eu) || {}).codigo;
+  O.podeJunto = (cod) => { const o = O.de(cod), p = ponte(); return !!(o && o.id && p && p.tocar && cod !== euCod()); };
+  // (1.0.3) a Jam é de quem já estava ouvindo: entrar pela pessoa que está ouvindo junto leva para o dono da Jam
+  const donoDe = (cod) => { const o = O.de(cod); return o && o.jn && o.jn !== euCod() && O.de(o.jn) ? o.jn : cod; };
+  O.dono = donoDe;
   O.junto = () => (junto ? junto.cod : null);
-  O.entrarJunto = (cod) => { if (!O.podeJunto(cod)) return; junto = { cod, desde: Date.now(), cmdEm: 0, tentativas: 0, casou: false, sumiu: 0, alvo: '' }; enviado = null; seguir(); O.pintar(); A.evt.emit('ouvir:junto', cod); };
+  O.entrarJunto = (cod) => { cod = donoDe(cod); if (!O.podeJunto(cod)) return; junto = { cod, desde: Date.now(), cmdEm: 0, tentativas: 0, casou: false, sumiu: 0, alvo: '' }; enviado = null; seguir(); O.pintar(); A.evt.emit('ouvir:junto', cod); };
   O.sairJunto = () => { if (!junto) return; junto = null; enviado = null; O.pintar(); A.evt.emit('ouvir:junto', null); setTimeout(olhar, 50); };
+  // (1.0.3) sem o app do PC (site, celular): abre a música no app do serviço (sem acertar o tempo)
+  const linkFora = (o) => !o || !o.id ? '' : o.f === 'spotify' ? 'https://open.spotify.com/' + (o.k === 'ep' ? 'episode/' : 'track/') + o.id : o.f === 'ytmusic' ? 'https://music.youtube.com/watch?v=' + o.id : o.f === 'deezer' ? 'https://www.deezer.com/' + (o.k === 'ep' ? 'episode/' : 'track/') + o.id : '';
   let seguindo = false;
   async function seguir() {
     const p = ponte(); if (!junto || seguindo || !p || !p.tocar) return;
-    if (!O.ligado()) return O.sairJunto();
     const L = O.de(junto.cod), agora = Date.now();
     seguindo = true;
     try {
@@ -164,7 +170,7 @@
   O.cartao = (cod, opc = {}) => { const el = h('div', { class: 'ouv-cartao' + (opc.mini ? ' mini' : ''), dados: { ouvCartao: cod || '' }, hidden: true }); preencherCartao(el); setTimeout(O.pintar, 0); setTimeout(O.pintar, 600); return el; }; // (a barra começa a andar quando ele entra na tela)
   function preencherCartao(el) {
     const cod = el.dataset.ouvCartao, o = O.de(cod), ouvintes = o ? quemOuveJunto(cod) : [];
-    const k = o ? [chave(o), o.img || '', o.id || '', O.podeJunto(cod) ? (junto && junto.cod === cod ? 'J' : 'P') : '', o.jn || '', ouvintes.map((x) => x.codigo).join(',')].join('\u0001') : '';
+    const k = o ? [chave(o), o.img || '', o.id || '', O.podeJunto(donoDe(cod)) ? (junto && junto.cod === donoDe(cod) ? 'J' : 'P') : '', o.jn || '', ouvintes.map((x) => x.codigo).join(',')].join('\u0001') : '';
     if (el.dataset.k !== k) {
       el.dataset.k = k; el.hidden = !o; el.textContent = '';
       if (!o) return;
@@ -201,8 +207,9 @@
     return [...vistos.values()].slice(0, 6);
   }
   function rodapeJunto(cod, o, ouvintes) {
-    const pode = O.podeJunto(cod), nele = junto && junto.cod === cod;
-    if (!pode && !ouvintes.length && !o.jn) return null;
+    const dono = donoDe(cod), pode = O.podeJunto(dono), nele = junto && junto.cod === dono;
+    const fora = !pode && cod !== euCod() && !ponte() ? linkFora(o) : '';
+    if (!pode && !fora && !ouvintes.length && !o.jn) return null;
     const lider = o.jn ? (A.hub && A.hub.dispositivosDe(o.jn)[0]) : null;
     const nomeDe = (x) => (x && (x.apelido || x.nome)) || '';
     return h('div', { class: 'ouv-junto' },
@@ -211,8 +218,10 @@
         h('span', {}, ouvintes.length === 1 ? T('1 ouvindo junto', '1 listening along') : ouvintes.length + T(' ouvindo junto', ' listening along'))) :
         o.jn && lider ? h('div', { class: 'ouv-ouvintes' }, A.icone('fones', 13), h('span', {}, T('Ouvindo junto com ', 'Listening along with ') + nomeDe(lider))) :
         nele ? h('div', { class: 'ouv-ouvintes' }, A.icone('fones', 13), h('span', {}, T('Você está ouvindo junto', 'You are listening along'))) : h('span'),
-      pode ? h('button', { type: 'button', class: 'ouv-junto-bt' + (nele ? ' nele' : ''), onclick: (e) => { e.stopPropagation(); if (nele) O.sairJunto(); else O.entrarJunto(cod); } },
-        A.icone(nele ? 'sair' : 'fones', 14), nele ? T('Sair', 'Leave') : T('Ouvir junto', 'Listen along')) : null);
+      pode ? h('button', { type: 'button', class: 'ouv-junto-bt' + (nele ? ' nele' : ''), title: nele ? T('Sair da Jam', 'Leave the Jam') : T('Entrar na Jam: a música toca aí no mesmo tempo, e quem estava ouvindo controla', 'Join the Jam: the song plays for you in sync, and whoever was listening controls it'), onclick: (e) => { e.stopPropagation(); if (nele) O.sairJunto(); else O.entrarJunto(dono); } },
+        A.icone(nele ? 'sair' : 'fones', 14), nele ? T('Sair da Jam', 'Leave Jam') : T('Ouvir junto', 'Listen along')) :
+      fora ? h('button', { type: 'button', class: 'ouv-junto-bt', title: T('Abre a música no ', 'Opens the song in ') + O.nome(o.f) + T(' (no app do PC ela toca no mesmo tempo)', ' (in the PC app it plays in sync)'), onclick: (e) => { e.stopPropagation(); A.ui.abrirFora(fora); } },
+        A.icone('fones', 14), T('Ouvir junto', 'Listen along')) : null);
   }
 
   // atualiza tudo o que está na tela (chegou presença, mudou a música) e anda a barra uma vez por segundo enquanto houver cartão aberto
@@ -226,5 +235,27 @@
       if (cs.length && !tick) tick = setInterval(() => { const l = document.querySelectorAll('.ouv-cartao[data-ouv-cartao]'); if (!l.length) { clearInterval(tick); tick = 0; return; } if (!document.hidden) l.forEach(preencherCartao); }, 1000);
     });
   };
+  // (1.0.3) o PiP da Jam: enquanto você ouve junto, um cartãozinho no canto com a música, de quem é a Jam e o botão de sair
+  let pipEl = null, pipK = '';
+  function pip() {
+    const L = junto ? O.de(junto.cod) : null;
+    if (!junto) { if (pipEl) { const e = pipEl; pipEl = null; pipK = ''; e.classList.add('sai'); setTimeout(() => e.remove(), 220); } return; }
+    const dono = A.hub && A.hub.dispositivosDe ? A.hub.dispositivosDe(junto.cod)[0] : null, nome = (dono && (dono.apelido || dono.nome)) || '';
+    const k = [junto.cod, nome, L ? chave(L) : '', L ? L.img || '' : ''].join('\u0001');
+    if (pipEl && pipK === k) return;
+    const capa = h('span', { class: 'ouv-pip-capa' }, A.icone('musica', 18));
+    if (L && L.img) { const im = h('img', { alt: '', draggable: 'false', referrerpolicy: 'no-referrer', src: L.img }); im.addEventListener('error', () => im.remove()); capa.append(im); }
+    const novo = h('div', { class: 'ouv-pip vidro', role: 'region', 'aria-label': T('Jam', 'Jam') },
+      capa,
+      h('div', { class: 'ouv-pip-tx' },
+        h('b', { title: L ? L.t : '' }, L ? L.t : T('Esperando a música', 'Waiting for the song')),
+        h('small', {}, logo(L ? L.f : '', 11), h('span', {}, nome ? T('Jam com ', 'Jam with ') + nome : T('Jam', 'Jam')))),
+      L ? h('div', { class: 'mu-pip-vis', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i')) : null,
+      A.ui.btn('', { icone: 'sair', tipo: 'sec', redondo: true, peq: true, titulo: T('Sair da Jam', 'Leave the Jam'), onclick: () => O.sairJunto() }));
+    if (pipEl) pipEl.replaceWith(novo); else document.body.append(novo);
+    pipEl = novo; pipK = k;
+  }
+  A.evt.on('ouvir:junto', pip);
+  ['hub:ouvindo', 'hub:presenca', 'idioma'].forEach((ev) => A.evt.on(ev, () => { if (junto || pipEl) pip(); }));
   ['hub:ouvindo', 'hub:presenca', 'hub:offline', 'hub:amigos', 'talk:lista', 'perfil', 'idioma'].forEach((ev) => A.evt.on(ev, O.pintar));
 })();

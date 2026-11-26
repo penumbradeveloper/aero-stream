@@ -363,10 +363,10 @@
   // ---------- configurações da conta em todos os aparelhos (0.5.9-7) ----------
   // Tema, sons, toque de chamada, tamanho do chat, idioma, atualizações e volume da música seguem a conta. O que é de cada aparelho
   // (microfone, saída de som, placa de vídeo, controle, transmissão) fica só nele. A mais nova vence (hora em que foi mudada).
-  const SINC = ['tema', 'visual', 'som', 'toque', 'chat', 'idioma', 'atualizar', 'volMusica', 'volMidia', 'pularSplash', 'integ', 'toqueExtra', 'toquesAmigo', 'pacoteSons', 'somEntrarOutros', 'iconeApp'];
+  const SINC = ['tema', 'visual', 'som', 'toque', 'chat', 'idioma', 'atualizar', 'volMusica', 'volMidia', 'pularSplash', 'integ', 'toqueExtra', 'toquesAmigo', 'pacoteSons', 'somEntrarOutros', 'iconeApp', 'npExclusivos'];
   let aplicandoPrefs = false, tPrefs = 0;
   // (0.9.5) dá para escolher o que segue a conta, por parte. A parte desligada fica só neste aparelho, e o que a conta tem dela continua guardado
-  const PARTES = { aparencia: ['tema', 'iconeApp'], desempenho: ['visual'], /* (1.0.2) a versão (otimizada/completa) pode ficar só no aparelho */ chats: ['chat'], sons: ['som', 'toque', 'volMusica', 'volMidia', 'toqueExtra', 'toquesAmigo', 'pacoteSons', 'somEntrarOutros'], geral: ['idioma', 'atualizar', 'pularSplash'], integracoes: ['integ'] };
+  const PARTES = { aparencia: ['tema', 'iconeApp'], desempenho: ['visual'], /* (1.0.2) a versão (otimizada/completa) pode ficar só no aparelho */ chats: ['chat'], sons: ['som', 'toque', 'volMusica', 'volMidia', 'toqueExtra', 'toquesAmigo', 'pacoteSons', 'somEntrarOutros'], geral: ['idioma', 'atualizar', 'pularSplash', 'npExclusivos'], integracoes: ['integ'] };
   const parteDe = (k) => Object.keys(PARTES).find((x) => PARTES[x].includes(k));
   const sincK = (k) => { const ps = A.cfg.v.sincPartes; if (!ps || typeof ps !== 'object') return true; const p = parteDe(k); if (p === 'desempenho' && ps.desempenho === undefined) return ps.aparencia !== false; return ps[p] !== false; };
   // (0.9.5) as integrações instaladas seguem a conta. As da Comunidade vão sem o pacote (cada aparelho baixa de novo do servidor, passando

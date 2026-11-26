@@ -274,6 +274,43 @@ export async function buscar(tipo, q) {
     return ((k && k.data) || []).filter((x) => x && x.attributes && /^\d+$/.test(String(x.id))).map((x) => { const a = x.attributes, ti = a.titles || {};
       return { t: corta(ti.en || a.canonicalTitle || ti.en_jp, 100), a: [String(a.startDate || '').slice(0, 4), String(a.subtype || '').toUpperCase()].filter(Boolean).join(' · '), c: capaOk(String((a.posterImage && (a.posterImage.medium || a.posterImage.small)) || '')), u: 'https://kitsu.app/anime/' + x.id }; });
   }
+  if (tipo === 'g') {
+    // (1.0.3) mangás: AniList (mangá, one-shot e novel), e o Kitsu se ele não responder
+    try {
+      const d = await pegar('https://graphql.anilist.co', { json: true, init: { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ query: 'query($q:String){Page(perPage:10){media(search:$q,type:MANGA,isAdult:false){title{romaji english} startDate{year} format staff(perPage:1){nodes{name{full}}} coverImage{large} siteUrl}}}', variables: { q } }) } });
+      const l = ((((d || {}).data || {}).Page || {}).media || []).map((x) => ({ t: corta(x.title.english || x.title.romaji, 100), a: [x.startDate && x.startDate.year, corta(((((x.staff || {}).nodes || [])[0] || {}).name || {}).full, 40)].filter(Boolean).join(' · '), c: capaOk(x.coverImage && x.coverImage.large), u: String(x.siteUrl || '').slice(0, 200) }));
+      if (l.length) return l;
+    } catch (_) { /* tenta o Kitsu */ }
+    const k = await pegar('https://kitsu.io/api/edge/manga?page%5Blimit%5D=10&filter%5Btext%5D=' + encodeURIComponent(q), { json: true, init: { headers: { Accept: 'application/vnd.api+json' } } });
+    return ((k && k.data) || []).filter((x) => x && x.attributes && /^\d+$/.test(String(x.id))).map((x) => { const a = x.attributes, ti = a.titles || {};
+      return { t: corta(ti.en || a.canonicalTitle || ti.en_jp, 100), a: [String(a.startDate || '').slice(0, 4), String(a.subtype || '').toUpperCase()].filter(Boolean).join(' · '), c: capaOk(String((a.posterImage && (a.posterImage.medium || a.posterImage.small)) || '')), u: 'https://kitsu.app/manga/' + x.id }; });
+  }
+  if (tipo === 'h') {
+    // (1.0.3) HQs: as séries e revistas da Wikipédia (artigos com a ficha de quadrinho, com capa) e os encadernados do Google Livros
+    const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\(.*?\)/g, '').replace(/[^a-z0-9]+/g, '');
+    const wiki = (busca, n) => pegar('https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&generator=search&gsrlimit=' + n + '&prop=pageimages|description&piprop=thumbnail&pithumbsize=500&pilicense=any&gsrsearch='
+      + encodeURIComponent(busca), { json: true, init: { headers: { 'User-Agent': 'AeroStream/1.0 (comics search)' } } });
+    const [wd, wk, gb] = await Promise.allSettled([
+      wiki(q + ' comic', 6), // a obra com o nome exato (Watchmen, Sandman): a ficha dela nem sempre é a de "série"
+      wiki(q + ' hastemplate:"Infobox comic book title"', 8),
+      pegar('https://www.googleapis.com/books/v1/volumes?maxResults=10&printType=books&q=' + encodeURIComponent(q + ' subject:comics'), { json: true }),
+    ]);
+    const lista = [], vistos = new Set();
+    const por = (x) => { const k = norm(x.t); if (!x.t || vistos.has(k)) return; vistos.add(k); lista.push(x); };
+    const paginas = (r) => ((r.status === 'fulfilled' && r.value && r.value.query && r.value.query.pages) || []).sort((a, b) => a.index - b.index);
+    const ehHq = (p) => /comic|graphic novel|manga|manhwa|bande dessin|fumetti|quadrinh|cartoon|strip|limited series/i.test(String(p.description || ''));
+    for (const p of [...paginas(wd).filter(ehHq), ...paginas(wk)]) {
+      const titulo = String(p.title || ''); if (!titulo) continue;
+      por({ t: corta(titulo.replace(/ \((comics?|comic book|magazine)\)$/i, ''), 100), a: corta(p.description, 60), c: capaOk(String((p.thumbnail && p.thumbnail.source) || '').replace(/\?.*$/, '')), u: 'https://en.wikipedia.org/wiki/' + encodeURIComponent(titulo.replace(/ /g, '_')) });
+    }
+    for (const x of (gb.status === 'fulfilled' && gb.value && gb.value.items) || []) {
+      const v = x.volumeInfo || {}; if (!/^[\w-]{6,20}$/.test(String(x.id))) continue;
+      const cp = String((v.imageLinks && (v.imageLinks.thumbnail || v.imageLinks.smallThumbnail)) || '').replace(/^http:/, 'https:').replace(/&edge=curl/, '');
+      por({ t: corta(v.title + (v.subtitle ? ': ' + v.subtitle : ''), 100), a: [String(v.publishedDate || '').slice(0, 4), corta((v.authors || []).slice(0, 2).join(', '), 60)].filter(Boolean).join(' · '), c: capaOk(cp), u: 'https://books.google.com/books?id=' + x.id });
+    }
+    return lista.sort((a, b) => (b.c ? 1 : 0) - (a.c ? 1 : 0)).slice(0, 12);
+  }
   if (tipo === 'b') {
     // (0.9.0) livros: a Open Library (até os mais nichados, de qualquer língua) e o Google Books juntos, sem repetir o mesmo livro
     const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '');

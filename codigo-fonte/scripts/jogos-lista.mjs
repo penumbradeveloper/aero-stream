@@ -13,3 +13,4 @@ const lista = compactar(await r.json());
 const destino = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'desktop', 'jogos-lista.json');
 fs.writeFileSync(destino, JSON.stringify({ em: Date.now(), apps: lista }));
 console.log(`${lista.length} jogos -> ${destino} (${Math.round(fs.statSync(destino).size / 1024)} KB)`);
+await import('./jogos-icones.mjs'); // (1.0.3) os ícones dos jogos do Mural saem da mesma lista

@@ -53,6 +53,14 @@
         <receiver
             android:name=".AeroPushAlarme"
             android:exported="false" />
+        <!-- (1.0.3) o aviso na hora pelo push do Google (só um toque vazio: o app busca as novidades) -->
+        <service
+            android:name=".AeroFcm"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -5,6 +5,8 @@
 //  /ws          -> sala (Room): participantes, chat e repasse das mensagens de conexão
 // O vídeo NÃO passa por aqui: ele vai direto entre os aparelhos (WebRTC).
 import * as midia from './midia.js';
+import { ttMidia } from './embsocial.js';
+import { steamVideo } from './embsteam.js';
 import { SEGURANCA, CORS } from './util.js';
 export { Hub } from './hub.js';
 export { Room } from './sala.js';
@@ -19,6 +21,7 @@ function iceDemais(ip, comConta) {
   return ++r.n > (comConta ? 60 : 12);
 }
 
+const imgGz = (r) => { const cab = new Headers(r.headers); cab.delete('X-Aero-Gz'); cab.set('Content-Encoding', 'gzip'); return new Response(r.body, { status: 200, headers: cab, encodeBody: 'manual' }); };
 const IMG_FIXA = /^\/api\/(avatar|banner|nameplate|fundo|ligacao|mural-fundo|grupo-foto|grupo-banner)\/[A-Za-z0-9_-]{1,40}$/;
 
 export default {
@@ -95,6 +98,8 @@ export default {
     // (0.8.7) as capas de filmes, animes e músicas passam por aqui (só de sites conhecidos): quem vê o perfil não fala com sites de fora
     if (url.pathname === '/api/capa' && request.method === 'GET') return midia.capa(url.searchParams.get('u') || '', env, request);
     if (url.pathname === '/api/img' && request.method === 'GET') return midia.imgProxy(url.searchParams.get('u') || '', env, request);
+    if (url.pathname === '/api/tt' && request.method === 'GET') return ttMidia(request, url, env); // (1.0.3) vídeo e música da TikTok
+    if (url.pathname === '/api/sv' && request.method === 'GET') return steamVideo(request, url, env); // (1.0.3) trailer da Steam e fundo animado do perfil
     if (url.pathname === '/api/twvideo' && request.method === 'GET') return midia.twVideo(request, url.searchParams.get('u') || '', env);
     if (url.pathname.startsWith('/api/musica') || ['/api/letterboxd', '/api/busca', '/api/link'].includes(url.pathname)) {
       if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
@@ -159,10 +164,16 @@ export default {
     // pede, e o servidor central só é acordado na primeira vez em cada lugar do mundo
     if (request.method === 'GET' && IMG_FIXA.test(url.pathname) && /^\d{1,15}$/.test(url.searchParams.get('v') || '') && typeof caches !== 'undefined' && caches.default) {
       const chave = new Request(url.origin + url.pathname + '?v=' + url.searchParams.get('v'));
-      const ja = await caches.default.match(chave).catch(() => null); if (ja) return ja;
+      const ja = await caches.default.match(chave).catch(() => null); if (ja) return ja.headers.get('X-Aero-Gz') ? imgGz(ja) : ja;
       const r = await hub().fetch(request);
-      if (r.status === 200 && !r.headers.get('Content-Encoding') && /immutable/.test(r.headers.get('Cache-Control') || '')) { const p = caches.default.put(chave, r.clone()).catch(() => {}); if (ctx && ctx.waitUntil) ctx.waitUntil(p); }
-      return r;
+      if (r.status !== 200 || !/immutable/.test(r.headers.get('Cache-Control') || '')) return r;
+      if (!r.headers.get('Content-Encoding')) { const p = caches.default.put(chave, r.clone()).catch(() => {}); if (ctx && ctx.waitUntil) ctx.waitUntil(p); return r; }
+      // (1.0.3) as comprimidas (gzip) também ficam no cache: guardadas com a marca X-Aero-Gz e sem o Content-Encoding (o cache não mexe
+      // nos bytes), e na saída voltam com o Content-Encoding. Se os bytes já chegaram abertos, guarda e entrega como imagem comum
+      const corpo = new Uint8Array(await r.arrayBuffer()), cab = new Headers(r.headers), gz = corpo[0] === 0x1f && corpo[1] === 0x8b;
+      cab.delete('Content-Encoding'); cab.delete('Content-Length'); if (gz) cab.set('X-Aero-Gz', '1');
+      const guardar = new Response(corpo, { headers: cab }), p = caches.default.put(chave, guardar.clone()).catch(() => {}); if (ctx && ctx.waitUntil) ctx.waitUntil(p);
+      return gz ? imgGz(guardar) : guardar;
     }
     // (1.0.2) os dados dos cartões de links (YouTube, Twitter, Reddit, lojas...) e o catálogo das integrações são iguais para todo mundo:
     // ficam no cache da Cloudflare perto de quem pede (1 h e 5 min, como já era guardado lá dentro), sem acordar o servidor central a cada vez

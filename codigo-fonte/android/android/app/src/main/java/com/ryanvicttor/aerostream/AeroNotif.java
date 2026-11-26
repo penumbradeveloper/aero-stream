@@ -17,6 +17,8 @@ import android.content.pm.ActivityInfo;
 import android.net.Uri;
 import android.content.ContentResolver;
 import android.content.ContentValues;
+import android.media.AudioDeviceInfo;
+import android.media.AudioManager;
 import android.media.MediaScannerConnection;
 import android.os.Environment;
 import android.provider.MediaStore;
@@ -104,12 +106,47 @@ public class AeroNotif extends Plugin {
     }
 
     // (0.9.1) push com o app fechado: guarda o token de push deste aparelho e agenda a checagem em segundo plano (AeroPushJob)
+    // (1.0.3) viva-voz na chamada: o WebView põe o som da chamada no alto-falante de ouvir (o do ouvido) e nada trocava. on=true manda
+    // para o alto-falante do celular; on=false devolve ao sistema (fone com fio ou Bluetooth, se houver; senão o do ouvido).
+    // Responde se há fone conectado, para o botão saber o que mostrar.
+    @PluginMethod
+    public void vivaVoz(PluginCall call) {
+        final boolean on = Boolean.TRUE.equals(call.getBoolean("on", false)), fim = Boolean.TRUE.equals(call.getBoolean("fim", false));
+        AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+        JSObject r = new JSObject();
+        if (am == null) { r.put("ok", false); call.resolve(r); return; }
+        boolean fone = false;
+        try {
+            for (AudioDeviceInfo d : am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
+                int t = d.getType();
+                if (t == AudioDeviceInfo.TYPE_WIRED_HEADSET || t == AudioDeviceInfo.TYPE_WIRED_HEADPHONES || t == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
+                    || t == AudioDeviceInfo.TYPE_USB_HEADSET || (Build.VERSION.SDK_INT >= 31 && t == AudioDeviceInfo.TYPE_BLE_HEADSET)) fone = true;
+            }
+        } catch (Exception e) { /* ok */ }
+        boolean ok = true;
+        try {
+            if (fim) {
+                if (Build.VERSION.SDK_INT >= 31) am.clearCommunicationDevice(); else am.setSpeakerphoneOn(false);
+            } else {
+                if (am.getMode() != AudioManager.MODE_IN_COMMUNICATION) am.setMode(AudioManager.MODE_IN_COMMUNICATION);
+                if (Build.VERSION.SDK_INT >= 31) {
+                    if (on) {
+                        ok = false;
+                        for (AudioDeviceInfo d : am.getAvailableCommunicationDevices()) if (d.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) { ok = am.setCommunicationDevice(d); break; }
+                    } else am.clearCommunicationDevice();
+                } else am.setSpeakerphoneOn(on);
+            }
+        } catch (Exception e) { ok = false; }
+        r.put("ok", ok); r.put("fone", fone); call.resolve(r);
+    }
+
     @PluginMethod
     public void guardarPush(PluginCall call) {
         String t = call.getString("t", ""), api = call.getString("api", "");
         if (t == null || !t.matches("[A-Za-z0-9]{40}") || api == null || !api.startsWith("https://")) { call.reject("inválido"); return; }
         getContext().getSharedPreferences(AeroPushJob.PREFS, Context.MODE_PRIVATE).edit().putString("t", t).putString("api", api).apply();
         AeroPushJob.agendar(getContext());
+        AeroFcm.registrar(getContext()); // (1.0.3) o aviso na hora pelo push do Google
         if (!naTela) AeroPushAlarme.agendar(getContext());
         call.resolve();
     }

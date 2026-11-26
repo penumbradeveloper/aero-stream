@@ -326,11 +326,45 @@
         chave(T('Mostrar ao abrir o app', 'Show when the app opens'), st.bv, 'on'), texto(T('Título', 'Title'), st.bv, 'titulo', 60), texto(T('Texto', 'Text'), st.bv, 'texto', 200, true),
         cor(T('Cor', 'Color'), st.bv, 'cor', '#ffffff'), imagem(T('Imagem', 'Image'), () => st.bv.img, (b) => { st.bv.img = b; }),
         linha('', A.ui.btn(T('Ver agora', 'Preview now'), { icone: 'olho', tipo: 'sec', peq: true, onclick: () => { if (ultimo) S().boasVindas(ultimo, document.body); } }))],
+      // (1.0.3) as artes da 1.0.2 também nascem aqui: molduras da foto, anéis de voz e bolhas de arte, num pacote que vai para a Comunidade
+      artes: () => {
+        const v = A.cfg.v; const d = (v.estudioArtes && typeof v.estudioArtes === 'object') ? v.estudioArtes : (v.estudioArtes = { nome: '', molduras: [], aneis: [], bolhas: [] });
+        for (const k of ['molduras', 'aneis', 'bolhas']) if (!Array.isArray(d[k])) d[k] = [];
+        const guardar = () => { try { A.cfg.salvar(); } catch (e) { /* ok */ } pintar(); };
+        const BA = A.bolhaArte;
+        const nome = h('input', { class: 'campo', maxlength: 40, placeholder: T('Ex.: Coleção Sakura', 'E.g. Sakura collection') }); nome.value = d.nome || '';
+        nome.addEventListener('input', () => { d.nome = nome.value.slice(0, 40); try { A.cfg.salvar(); } catch (e) { /* ok */ } });
+        nome.addEventListener('keydown', (e) => e.stopPropagation());
+        const fotos = (tipo) => BA && BA.estudioFotos(d.molduras, d.aneis, (mo, an) => { d.molduras = mo; d.aneis = an; guardar(); }, { tipo });
+        const bolhas = () => BA && BA.estudio(d.bolhas, (b) => { d.bolhas = (b || []).filter((x) => x && x.arte); guardar(); });
+        const qtd = (n, um, varios) => (n ? n + ' ' + (n === 1 ? um : varios) : T('Nenhuma ainda', 'None yet'));
+        const cartao = (ic, tit, desc, n, ab) => h('div', { class: 'est-arte vidro interno' }, h('span', { class: 'est-arte-ic' }, A.icone(ic, 22)),
+          h('div', { class: 'est-arte-txt' }, h('b', {}, tit), h('span', { class: 'peq suave' }, desc), h('small', { class: 'suave' }, n)),
+          A.ui.btn(T('Abrir', 'Open'), { icone: 'lapis', tipo: 'sec', peq: true, onclick: ab }));
+        const total = d.molduras.length + d.aneis.length + d.bolhas.length;
+        const publicar = async () => {
+          if (!total) { U.toast(T('Crie pelo menos uma moldura, anel ou bolha antes.', 'Make at least one frame, ring or bubble first.'), { tipo: 'erro' }); return; }
+          const I = A.integ; if (!I) return;
+          if (!I.publicarDoEstudio && A.abas && A.abas.integ) { try { A.abas.integ(h('div')); } catch (e) { /* ok */ } }
+          if (!I.publicarDoEstudio) return;
+          I.publicarDoEstudio({ nome: d.nome || ((d.molduras[0] || d.aneis[0] || d.bolhas[0]) || {}).nome || T('Minhas artes', 'My art'), molduras: d.molduras, aneis: d.aneis, bolhas: d.bolhas });
+        };
+        return [h('p', { class: 'peq suave est-dica' }, T('Desenhe molduras para a foto do perfil, anéis que aparecem em volta de quem fala na chamada e bolhas de conversa com a sua arte. Tudo fica guardado aqui até você publicar; publicado, qualquer pessoa usa de graça pelas Integrações.', 'Draw frames for profile photos, rings that show around whoever is talking in a call, and chat bubbles with your art. Everything stays saved here until you publish; once published, anyone can use them for free from Integrations.')),
+          linha(T('Nome do pacote', 'Package name'), nome),
+          h('div', { class: 'est-artes' },
+            cartao('imagem', T('Molduras da foto', 'Photo frames'), T('Em volta da foto, no perfil e nas listas.', 'Around the photo, on the profile and in lists.'), qtd(d.molduras.length, T('moldura', 'frame'), T('molduras', 'frames')), () => fotos('mo')),
+            cartao('mic', T('Anéis de voz', 'Voice rings'), T('Em volta da foto de quem fala na chamada.', 'Around the photo of whoever talks in a call.'), qtd(d.aneis.length, T('anel', 'ring'), T('anéis', 'rings')), () => fotos('an')),
+            cartao('bolhas', T('Bolhas de arte', 'Art bubbles'), T('A bolha da conversa com moldura, fundo e personagens.', 'The chat bubble with frame, background and characters.'), qtd(d.bolhas.length, T('bolha', 'bubble'), T('bolhas', 'bubbles')), bolhas)),
+          h('div', { class: 'linha est-artes-acoes' },
+            A.ui.btn(T('Publicar na Comunidade', 'Publish to Community'), { icone: 'subir', peq: true, onclick: publicar }),
+            total ? A.ui.btn(T('Começar de novo', 'Start over'), { icone: 'lixo', tipo: 'sec', peq: true, onclick: async () => { if (!(await U.confirmar(T('Apagar as artes guardadas aqui?', 'Delete the art saved here?')))) return; v.estudioArtes = { nome: '', molduras: [], aneis: [], bolhas: [] }; guardar(); } }) : null),
+          h('p', { class: 'peq suave est-dica' }, T('Publicar é do Supporter. As imagens vão para o servidor do Aero quando você salva no estúdio de cada uma.', 'Publishing is a Supporter perk. Images go to Aero\'s server when you save in each studio.'))];
+      },
       css: () => { const i = h('textarea', { class: 'campo est-css selecionavel', rows: 12, spellcheck: 'false', placeholder: '.tk-lado { border-radius: 30px; }' }); i.value = st.css; i.addEventListener('input', () => { st.css = i.value.slice(0, 50000); mudou(); });
         return [h('p', { class: 'peq suave est-dica' }, T('Para quem sabe CSS. As mesmas travas das integrações: sem url(), sem esconder as partes de segurança, nada dentro das Configurações. As imagens da skin entram como var(--aer-img-fundo).', 'For people who know CSS. Same locks as integrations: no url(), no hiding safety parts, nothing inside Settings. Skin images come in as var(--aer-img-fundo).')), i];
       },
     };
-    const NOMES = [['basico', T('Básico', 'Basics'), 'lapis'], ['cores', T('Cores', 'Colors'), 'oPaleta'], ['ligacao', T('Ligação', 'Call'), 'telefone'], ['sons', T('Sons', 'Sounds'), 'volume'], ['letras', T('Letras', 'Letters'), 'livro'], ['layout', T('Layout', 'Layout'), 'apps'], ['css', 'CSS', 'codigo']];
+    const NOMES = [['basico', T('Básico', 'Basics'), 'lapis'], ['cores', T('Cores', 'Colors'), 'oPaleta'], ['ligacao', T('Ligação', 'Call'), 'telefone'], ['sons', T('Sons', 'Sounds'), 'volume'], ['letras', T('Letras', 'Letters'), 'livro'], ['layout', T('Layout', 'Layout'), 'apps'], ['artes', T('Molduras e bolhas', 'Frames and bubbles'), 'imagem'], ['css', 'CSS', 'codigo']];
     function pintar() { corpo.replaceChildren(...ABAS[aba]()); }
 
     // ---------- guardar ----------

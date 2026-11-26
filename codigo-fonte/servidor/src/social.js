@@ -9,6 +9,8 @@ import * as midia from './midia.js';
 import { resposta, erro, txt, umEmoji } from './util.js';
 import { limitesDe, MAX_GRUPO_TETO } from './bolha.js';
 import { nivelDe, limparPerfil, nmPublico, bcPublico, EFEITOS_NOME as EFEITOS_PAGOS, NOME_LEGADO } from './extras.js';
+// (1.0.3) as abas do Mural: filmes, séries, animes, músicas, álbuns, livros, HQs, mangás e jogos
+const MURAL_CATS = ['f', 's', 'a', 'm', 'l', 'b', 'h', 'g', 'j'];
 const PERFIL_MODELO = ['bio', 'cor1', 'cor2', 'fundo1', 'fundo2', 'discord', 'spotify', 'nm', 'fd', 'np', 'pf', 'bc', 'ml', 'lb', 'gl', 'mf']; // o que um perfil salvo guarda
 const IMGS_MODELO = [['fd', 'fdV'], ['np', 'npV'], ['mf', 'mfV']]; // (1.0.2) as imagens que o perfil salvo leva junto
 const PERFIL_MODELO_X = ['mo', 'ab', 'ac', 'an', 'se', 'mc']; // (1.0.2) e os extras do Aero Bubble (moldura, abertura, acessórios, anel, som de entrada, moldura da câmera)
@@ -200,6 +202,13 @@ export class Social {
   }
   async perfilExtra(conta, b) {
     const p = conta.extra = conta.extra || {};
+    const r = await this.aplicarExtra(conta, b, p); if (r) return r;
+    await this.st.put('c:' + conta.id, conta);
+    await this.hub.mudou([conta.id, ...Object.keys(conta.amigos)]);
+    return resposta({ ok: true, extra: p });
+  }
+  // (1.0.3) as regras do perfil num lugar só: o perfil público e o perfil feito para um amigo passam pelas mesmas (o que entrar no editor vale nos dois)
+  async aplicarExtra(conta, b, p) {
     if (b.bio !== undefined) p.bio = txt(String(b.bio || '').replace(/[\u0000-\u0009\u000b-\u001f]/g, ''), 190);
     if (b.cor1 !== undefined) p.cor1 = HEX6.test(b.cor1) ? b.cor1 : '';
     if (b.fz !== undefined) p.fz = typeof b.fz === 'string' && b.fz.length <= 40 && /^[A-Za-z]+(?:\/[A-Za-z0-9_+-]+){1,2}$/.test(b.fz) ? b.fz : ''; // (1.0.2) o fuso (o horário da pessoa aparece ao lado do nome, se ela deixar)
@@ -278,7 +287,7 @@ export class Social {
         // (0.8.7) o tamanho dos widgets do Mural no cartão (médio ou grande; compacto é a bolinha de "cp") e quais aparecem (wf)
         const ws = {}; if (x.ws && x.ws.lb === 'g') ws.lb = 'g';
         // (0.8.7) itens do Mural soltos no cartão: cada um aponta para um item do Mural (categoria + nome)
-        const mi = {}; for (const k of MI) { const r = x.mi && x.mi[k]; if (r && typeof r === 'object' && ['f', 's', 'a', 'm', 'l', 'b', 'j'].includes(r.k) && gw[k]) { const t = txt(String(r.t || ''), 100); if (t) mi[k] = { k: r.k, t }; } }
+        const mi = {}; for (const k of MI) { const r = x.mi && x.mi[k]; if (r && typeof r === 'object' && MURAL_CATS.includes(r.k) && gw[k]) { const t = txt(String(r.t || ''), 100); if (t) mi[k] = { k: r.k, t }; } }
         for (const k of MI) if (gw[k] && !mi[k]) delete gw[k];
         const ht = Number(x.ht) > 0 ? num(x.ht, 300, 800, 0) : 0;
         p.pf = { v: 4, fp: um(x.fp, ZONAS, 'cc'), gw, bn: um(x.bn, ['faixa', 'cheio', 'nenhum'], 'faixa'), bp: um(x.bp, ['cima', 'baixo', 'esquerda', 'direita'], 'cima'), cp, ms: um(x.ms, ['p', 'm', 'g'], 'm'), w: num(x.w, 300, 560, 440), ht, eu: um(x.eu, ['auto', 'nada', 'nameplate', 'banner', 'fundo'], 'auto') };
@@ -302,16 +311,14 @@ export class Social {
       p[k] = a;
     }
     limparPerfil(b, p, nivelDe(conta)); // (1.0.0) os extras do Aero Bubble: moldura, abertura, acessórios, anel, som de entrar, moldura de câmera, cartão de ligação
-    await this.st.put('c:' + conta.id, conta);
-    await this.hub.mudou([conta.id, ...Object.keys(conta.amigos)]);
-    return resposta({ ok: true, extra: p });
+    return null;
   }
   // (0.8.7) o Mural: filmes, séries, animes, músicas, álbuns e jogos. Cada categoria tem o favorito (1), "que eu gosto" (até 20) e
   // "quero" (assistir/ouvir/jogar, até 20). Cada item: nome, subtítulo, capa e link (de sites conhecidos), nota de 0 a 10 (meias
   // estrelas) e um comentário. Cada categoria fica numa chave própria (o perfil continua leve na lista de amigos)
   async salvarMural(conta, b) {
     if (!this.hub.limitar('mural:' + conta.id, 20, 60000)) return erro('Calma: muitas mudanças no mural.');
-    const LINK = /^https:\/\/(www\.imdb\.com\/title\/tt\d+\/|anilist\.co\/anime\/\d+|www\.deezer\.com\/(track|album)\/\d+|open\.spotify\.com\/(track|album)\/[A-Za-z0-9]{22}|music\.youtube\.com\/(watch\?v=[A-Za-z0-9_-]{11}|playlist\?list=[A-Za-z0-9_-]{10,60})|store\.steampowered\.com\/app\/\d+\/|letterboxd\.com\/film\/[a-z0-9-]+\/|kitsu\.app\/anime\/\d+$|openlibrary\.org\/works\/OL\d+W$|books\.google\.com\/books\?id=[\w-]{6,20}$|en\.wikipedia\.org\/wiki\/[A-Za-z0-9_%().,'!-]+$)/;
+    const LINK = /^https:\/\/(www\.imdb\.com\/title\/tt\d+\/|anilist\.co\/(anime|manga)\/\d+|www\.deezer\.com\/(track|album)\/\d+|open\.spotify\.com\/(track|album)\/[A-Za-z0-9]{22}|music\.youtube\.com\/(watch\?v=[A-Za-z0-9_-]{11}|playlist\?list=[A-Za-z0-9_-]{10,60})|store\.steampowered\.com\/app\/\d+\/|letterboxd\.com\/film\/[a-z0-9-]+\/|kitsu\.app\/(anime|manga)\/\d+$|openlibrary\.org\/works\/OL\d+W$|books\.google\.com\/books\?id=[\w-]{6,20}$|en\.wikipedia\.org\/wiki\/[A-Za-z0-9_%().,'!-]+$)/;
     const limpa = (v, n) => txt(String(v || '').replace(/[\u0000-\u0009\u000b-\u001f]/g, ''), n);
     const item = (x) => {
       if (!x || typeof x !== 'object') return null;
@@ -324,7 +331,7 @@ export class Social {
       return o;
     };
     const m = b && typeof b.m === 'object' && b.m ? b.m : {}, novo = {};
-    for (const c of ['f', 's', 'a', 'm', 'l', 'b', 'j']) {
+    for (const c of MURAL_CATS) {
       const x = m[c] && typeof m[c] === 'object' ? m[c] : {};
       // (0.8.7) sem limite pequeno: até 100 em cada lista (o que cabe guardado numa chave só)
       const v = { fav: item(x.fav), gosto: (Array.isArray(x.gosto) ? x.gosto : []).slice(0, 100).map(item).filter(Boolean), quero: c === 'm' || c === 'l' || !Array.isArray(x.quero) ? [] : x.quero.slice(0, 100).map(item).filter(Boolean) };
@@ -338,7 +345,7 @@ export class Social {
       novo['mr:' + conta.id + ':' + c] = v.fav || v.gosto.length || v.quero.length || (v.agora && v.agora.length) ? v : null;
     }
     // (0.8.7) a ordem das abas (a pessoa arrasta no editor)
-    const ord = (Array.isArray(b && b.ord) ? b.ord : []).filter((c, i, l) => ['f', 's', 'a', 'm', 'l', 'b', 'j'].includes(c) && l.indexOf(c) === i);
+    const ord = (Array.isArray(b && b.ord) ? b.ord : []).filter((c, i, l) => MURAL_CATS.includes(c) && l.indexOf(c) === i);
     novo['mr:' + conta.id + ':o'] = ord.length ? ord : null;
     const tirar = Object.keys(novo).filter((k) => !novo[k]);
     for (const k of tirar) delete novo[k];
@@ -354,8 +361,8 @@ export class Social {
     const oid = await this.hub.get('f:' + String(codigo).toUpperCase());
     const o = oid && (await this.hub.get('c:' + oid));
     if (!o || (o.bloqueados || {})[conta.id]) return erro('Perfil não encontrado.', 404);
-    const ks = ['f', 's', 'a', 'm', 'l', 'b', 'j', 'o'].map((c) => 'mr:' + oid + ':' + c), d = await this.hub.ctx.storage.get(ks), m = {};
-    for (const c of ['f', 's', 'a', 'm', 'l', 'b', 'j']) { const v = d.get('mr:' + oid + ':' + c); if (v) m[c] = v; }
+    const ks = [...MURAL_CATS, 'o'].map((c) => 'mr:' + oid + ':' + c), d = await this.hub.ctx.storage.get(ks), m = {};
+    for (const c of MURAL_CATS) { const v = d.get('mr:' + oid + ':' + c); if (v) m[c] = v; }
     const ord = d.get('mr:' + oid + ':o'); if (Array.isArray(ord)) m.ord = ord;
     return resposta({ m, mv: (o.extra || {}).mv || 0 });
   }
@@ -593,7 +600,10 @@ export class Social {
       // (0.9.2) o push é por aparelho: o celular no fundo (ou fechado) recebe mesmo com o PC da pessoa aberto
       // (1.0.2) quem está na chamada com quem mandou não recebe push: já está ali com a pessoa
       const juntos = !!(cv.cham && cv.cham.quem && cv.cham.quem[id] && cv.cham.quem[conta.id]);
-      if (!bl && !r.mudo && c.status !== 'ocupado' && !juntos) await this.hub.push.avisar(id, { cid: cv.id, de: eu.nome || '', cod: eu.codigo, av: eu.av, g: cv.tipo === 'dm' ? '' : (cv.nome || '') }).catch(() => {}); // (0.9.1) push
+      // (1.0.3) não perturbe ou status com "sem notificações": só quem a pessoa escolheu em "quem pode passar" chega ao celular
+      const passa = !!(c.prefs && c.prefs.v && Array.isArray(c.prefs.v.npExclusivos) && c.prefs.v.npExclusivos.includes(eu.codigo));
+      const quieto = (c.status === 'ocupado' || !!(c.stc && c.stc.sn)) && !passa;
+      if (!bl && !r.mudo && !quieto && !juntos) await this.hub.push.avisar(id, { cid: cv.id, de: eu.nome || '', cod: eu.codigo, av: eu.av, g: cv.tipo === 'dm' ? '' : (cv.nome || '') }).catch(() => {}); // (0.9.1) push
       if (mudou) await this.st.put('c:' + id, c);
     }
     this.avisar([conta.id], { tipo: 'conv-msg', cid: cv.id, msg: { ...msg, de: eu.codigo }, nome: cv.nome || '', deNome: eu.nome });

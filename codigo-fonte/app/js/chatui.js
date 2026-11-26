@@ -125,6 +125,71 @@
   const fotoTw = (u, tam) => pelaCapa(u + '?format=jpg&name=' + tam);
   const numCurto = (n) => { if (n == null) return ''; try { return new Intl.NumberFormat(A.idioma && A.idioma() === 'en' ? 'en' : 'pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(n); } };
   let playerAero = null; // (0.9.6) o player de vídeo do chat (com tela cheia, volume, barra...), para os vídeos do post do X
+  // (1.0.3) a grade de fotos/vídeos de um post: até 4 aparecem; com mais (o X deixa até 20), a 4ª ganha o "+N" e todas abrem na galeria com setas
+  function gradeTw(ms, url, sens, mini) {
+    const U = A.ui, n = ms.length, vis = ms.slice(0, 4), resto = n - vis.length;
+    const g = h('div', { class: 'cx-tw-midias cx-grade n' + vis.length + (vis.length === 1 ? ' um' : '') + (sens ? ' sens' : '') + (mini ? ' mini' : '') });
+    if (vis.length === 1 && ms[0].w && ms[0].h) g.style.aspectRatio = Math.max(mini ? 1 : 0.6, Math.min(2.4, ms[0].w / ms[0].h)).toFixed(3);
+    const itens = ms.map((m) => ({ url: m.tipo === 'foto' ? fotoTw(m.url, 'large') : videoTw(m.url), video: m.tipo !== 'foto', nome: 'x-' + (m.tipo === 'foto' ? 'foto.jpg' : 'video.mp4'), link: url, poster: m.capa ? pelaCapa(m.capa) : '' }));
+    const galeria = (i) => U.verImagem(itens[i].url, { nome: itens[i].nome, link: url, video: itens[i].video, galeria: { itens, i } });
+    vis.forEach((m, i) => {
+      const cel = h('button', { type: 'button', class: 'cx-gcel' + (m.tipo !== 'foto' ? ' video' : ''), tabindex: '-1' });
+      const ultimo = i === vis.length - 1 && resto > 0;
+      if (m.tipo === 'foto' || ultimo) {
+        const capa = m.tipo === 'foto' ? fotoTw(m.url, vis.length === 1 && !mini ? 'medium' : 'small') : (m.capa ? pelaCapa(m.capa) : '');
+        if (capa) cel.append(h('img', { src: capa, alt: '', loading: 'lazy', decoding: 'async', draggable: 'false' }));
+        if (ultimo) cel.append(h('span', { class: 'cx-tw-mais' }, '+' + (resto + 1)));
+        cel.addEventListener('click', (e) => { e.stopPropagation(); if (g.classList.contains('sens')) return; galeria(i); });
+      } else {
+        if (m.capa) cel.append(h('img', { src: pelaCapa(m.capa), alt: '', loading: 'lazy', decoding: 'async', draggable: 'false' }));
+        cel.append(h('span', { class: 'cx-gplay' }, A.icone('play', 22)));
+        if (m.tipo === 'gif') cel.append(h('span', { class: 'cx-tw-selo' }, 'GIF'));
+        else if (m.dur) cel.append(h('span', { class: 'cx-tw-selo' }, Math.floor(m.dur / 60) + ':' + String(m.dur % 60).padStart(2, '0')));
+        cel.addEventListener('click', (e) => {
+          e.stopPropagation(); if (g.classList.contains('sens')) return;
+          const gif = m.tipo === 'gif';
+          // (0.9.6) vídeo de verdade usa o player do Aero (os botões aparecem ao passar o mouse); GIF continua em loop, sem som
+          if (!gif && playerAero) {
+            const pl = playerAero(videoTw(m.url), null), v = pl.querySelector('video');
+            if (m.capa) v.poster = pelaCapa(m.capa);
+            const vivo = h('div', { class: 'cx-gcel tocando' }, pl);
+            vivo.addEventListener('click', (ev) => ev.stopPropagation());
+            cel.replaceWith(vivo); const b = pl.querySelector('.mp-grande'); if (b) b.click();
+            return;
+          }
+          const v = h('video', { src: videoTw(m.url), class: 'cx-tw-video', autoplay: '', playsinline: '', preload: 'none', ...(gif ? { loop: '', muted: '' } : { controls: '' }), poster: m.capa ? pelaCapa(m.capa) : null });
+          if (gif) v.muted = true;
+          const vivo = h('div', { class: 'cx-gcel tocando' }, v);
+          v.addEventListener('click', (ev) => ev.stopPropagation());
+          cel.replaceWith(vivo);
+        });
+      }
+      g.append(cel);
+    });
+    if (!sens) return g;
+    const aviso = h('button', { type: 'button', class: 'cx-tw-aviso', onclick: (e) => { e.stopPropagation(); g.classList.remove('sens'); aviso.remove(); } }, A.icone('olho', 16), T('Conteúdo sensível. Clique para ver', 'Sensitive content. Click to view'));
+    return h('div', { class: 'cx-tw-midia-caixa' }, g, aviso);
+  }
+  const quandoTw = (t, curto) => { if (!t) return ''; try { return new Intl.DateTimeFormat(A.idioma && A.idioma() === 'en' ? 'en' : 'pt-BR', curto ? { day: 'numeric', month: 'short' } : { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(t)); } catch (e) { return ''; } };
+  // a pessoa do post (foto, nome, selo e @), que abre o perfil no X
+  function quemTw(a, mini) {
+    const U = A.ui, ir = (e) => { e.preventDefault(); e.stopPropagation(); U.abrirFora('https://x.com/' + a.nick); };
+    const av = a.av ? h('img', { class: 'cx-tw-av', src: pelaCapa(a.av), alt: '', loading: 'lazy', draggable: 'false' }) : h('span', { class: 'cx-tw-av' });
+    return [av, h('a', { class: 'cx-tw-quem' + (mini ? ' mini' : ''), href: 'https://x.com/' + a.nick, onclick: ir },
+      h('b', null, a.nome || a.nick, a.ok ? h('span', { class: 'cx-tw-ok', title: T('Verificado', 'Verified') }, A.icone('check', 11)) : null), h('small', null, '@' + a.nick))];
+  }
+  // (1.0.3) o post citado (a caixinha dentro do post) e o post respondido (em cima, ligado por uma linha), em tamanho menor
+  function miniTw(p, tipo) {
+    const U = A.ui, url = p.url, a = p.autor || {};
+    const caixa = h('div', { class: 'cx-tw-' + tipo, role: 'link', tabindex: '0', title: T('Abrir no X', 'Open on X') });
+    const q = quandoTw(p.t, true);
+    caixa.append(h('div', { class: 'cx-tw-topo mini' }, ...quemTw(a, true), q ? h('span', { class: 'cx-tw-quando' }, '· ' + q) : null));
+    if (p.texto) caixa.append(h('div', { class: 'cx-tw-txt' }, ...U.textoComLinks(p.texto)));
+    if ((p.midias || []).length) caixa.append(gradeTw(p.midias, url, p.sens, true));
+    caixa.addEventListener('click', (e) => { if (e.target.closest('a, .cx-gcel, .cx-tw-aviso')) return; e.stopPropagation(); U.abrirFora(url); });
+    caixa.addEventListener('keydown', (e) => { if (e.key === 'Enter') U.abrirFora(url); });
+    return caixa;
+  }
   function embedTweet(u, grudar = () => {}, soLink = false, extra = null) {
     const U = A.ui;
     const caixa = h('div', { class: 'cx-midia cx-tw cx-tw-carregando' }, h('div', { class: 'cx-tw-esq' }));
@@ -132,61 +197,19 @@
     dadosEmbed(u).then((d) => {
       if (!d || d.tipo !== 'tweet') { el.replaceWith(soLink ? h('div', { class: 'cx-txt' }, ...U.textoComLinks(u)) : h('span')); return; } // (0.9.6) sem prévia: volta o link
       const url = d.url || u, abrir = (e) => { if (e) { e.preventDefault(); e.stopPropagation(); } U.abrirFora(url); };
-      const a = d.autor || {};
-      const av = a.av ? h('img', { class: 'cx-tw-av', src: pelaCapa(a.av), alt: '', loading: 'lazy', draggable: 'false' }) : h('span', { class: 'cx-tw-av' });
-      const topo = h('div', { class: 'cx-tw-topo' }, av,
-        h('a', { class: 'cx-tw-quem', href: 'https://x.com/' + a.nick, onclick: (e) => { e.preventDefault(); e.stopPropagation(); U.abrirFora('https://x.com/' + a.nick); } },
-          h('b', null, a.nome || a.nick, a.ok ? h('span', { class: 'cx-tw-ok', title: T('Verificado', 'Verified') }, A.icone('check', 11)) : null), h('small', null, '@' + a.nick)),
-        h('span', { class: 'cx-tw-logo', 'aria-hidden': 'true' }, marcaX(14)));
-      const partes = [topo];
+      const partes = [];
+      if (d.pai) partes.push(miniTw(d.pai, 'pai'));
+      partes.push(h('div', { class: 'cx-tw-topo' }, ...quemTw(d.autor || {}), h('span', { class: 'cx-tw-logo', 'aria-hidden': 'true' }, marcaX(14))));
+      if (d.respA && !d.pai) partes.push(h('div', { class: 'cx-tw-respa' }, T('Respondendo a ', 'Replying to '), h('b', null, '@' + d.respA)));
       if (d.texto) partes.push(h('div', { class: 'cx-tw-txt' }, ...U.textoComLinks(d.texto)));
-      const ms = d.midias || [];
-      if (ms.length) {
-        const n = ms.length, g = h('div', { class: 'cx-tw-midias cx-grade n' + n + (n === 1 ? ' um' : '') + (d.sens ? ' sens' : '') });
-        if (n === 1 && ms[0].w && ms[0].h) g.style.aspectRatio = Math.max(0.6, Math.min(2.4, ms[0].w / ms[0].h)).toFixed(3);
-        const fotos = ms.map((m) => ({ url: m.tipo === 'foto' ? fotoTw(m.url, 'large') : videoTw(m.url), video: m.tipo !== 'foto', nome: 'x-' + (m.tipo === 'foto' ? 'foto.jpg' : 'video.mp4'), link: url }));
-        ms.forEach((m, i) => {
-          const cel = h('button', { type: 'button', class: 'cx-gcel' + (m.tipo !== 'foto' ? ' video' : ''), tabindex: '-1' });
-          if (m.tipo === 'foto') {
-            cel.append(h('img', { src: fotoTw(m.url, n === 1 ? 'medium' : 'small'), alt: '', loading: 'lazy', decoding: 'async', draggable: 'false' }));
-            cel.addEventListener('click', (e) => { e.stopPropagation(); if (g.classList.contains('sens')) return; U.verImagem(fotos[i].url, { nome: fotos[i].nome, link: url, galeria: { itens: fotos, i } }); });
-          } else {
-            if (m.capa) cel.append(h('img', { src: pelaCapa(m.capa), alt: '', loading: 'lazy', decoding: 'async', draggable: 'false' }));
-            cel.append(h('span', { class: 'cx-gplay' }, A.icone('play', 22)));
-            if (m.tipo === 'gif') cel.append(h('span', { class: 'cx-tw-selo' }, 'GIF'));
-            else if (m.dur) cel.append(h('span', { class: 'cx-tw-selo' }, Math.floor(m.dur / 60) + ':' + String(m.dur % 60).padStart(2, '0')));
-            cel.addEventListener('click', (e) => {
-              e.stopPropagation(); if (g.classList.contains('sens')) return;
-              const gif = m.tipo === 'gif';
-              // (0.9.6) vídeo de verdade usa o player do Aero (os botões aparecem ao passar o mouse); GIF continua em loop, sem som
-              if (!gif && playerAero) {
-                const pl = playerAero(videoTw(m.url), null), v = pl.querySelector('video');
-                if (m.capa) v.poster = pelaCapa(m.capa);
-                const vivo = h('div', { class: 'cx-gcel tocando' }, pl);
-                vivo.addEventListener('click', (ev) => ev.stopPropagation());
-                cel.replaceWith(vivo); const b = pl.querySelector('.mp-grande'); if (b) b.click();
-                return;
-              }
-              const v = h('video', { src: videoTw(m.url), class: 'cx-tw-video', autoplay: '', playsinline: '', ...(gif ? { loop: '', muted: '' } : { controls: '' }), poster: m.capa ? pelaCapa(m.capa) : null });
-              if (gif) v.muted = true;
-              const vivo = h('div', { class: 'cx-gcel tocando' }, v);
-              v.addEventListener('click', (ev) => ev.stopPropagation());
-              cel.replaceWith(vivo);
-            });
-          }
-          g.append(cel);
-        });
-        if (d.sens) {
-          const aviso = h('button', { type: 'button', class: 'cx-tw-aviso', onclick: (e) => { e.stopPropagation(); g.classList.remove('sens'); aviso.remove(); } }, A.icone('olho', 16), T('Conteúdo sensível. Clique para ver', 'Sensitive content. Click to view'));
-          partes.push(h('div', { class: 'cx-tw-midia-caixa' }, g, aviso));
-        } else partes.push(g);
-      }
+      if ((d.midias || []).length) partes.push(gradeTw(d.midias, url, d.sens));
+      if (d.cita) partes.push(miniTw(d.cita, 'cita'));
       const st = (ic, v, tit) => (v == null ? null : h('span', { class: 'cx-tw-num', title: tit }, A.icone(ic, 14), numCurto(v)));
-      const quando = d.t ? (() => { try { return new Intl.DateTimeFormat(A.idioma && A.idioma() === 'en' ? 'en' : 'pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(d.t)); } catch (e) { return ''; } })() : '';
-      partes.push(h('div', { class: 'cx-tw-nums' }, st('responder', d.resp, T('Respostas', 'Replies')), st('atualizar', d.rt, T('Reposts', 'Reposts')), st('coracao', d.cur, T('Curtidas', 'Likes')), st('olho', d.views, T('Visualizações', 'Views'))));
-      const rod = h('a', { class: 'cx-tw-rod', href: url, title: T('Abrir no X (botão direito: copiar o link)', 'Open on X (right-click: copy link)'), onclick: abrir }, marcaX(11), h('span', null, 'X' + (quando ? ' · ' + quando : '')));
-      partes.push(rod);
+      partes.push(h('div', { class: 'cx-tw-nums' }, st('responder', d.resp, T('Respostas', 'Replies')), st('atualizar', d.rt, T('Reposts', 'Reposts')), st('coracao', d.cur, T('Curtidas', 'Likes')), st('marcar', d.salvos, T('Salvos', 'Bookmarks')), st('olho', d.views, T('Visualizações', 'Views'))));
+      const quando = quandoTw(d.t);
+      partes.push(h('a', { class: 'cx-tw-rod', href: url, title: T('Abrir no X (botão direito: copiar o link)', 'Open on X (right-click: copy link)'), onclick: abrir }, marcaX(11), h('span', null, 'X' + (quando ? ' · ' + quando : ''))));
       caixa.addEventListener('contextmenu', (e) => { if (!e.target.closest('.cx-gcel')) menuLink(url, 'X', extra)(e); }); // (0.9.6) o link fica escondido: botão direito copia
+      caixa.classList.toggle('com-pai', !!d.pai);
       caixa.classList.remove('cx-tw-carregando'); caixa.replaceChildren(...partes); grudar();
     });
     return el;
@@ -395,7 +418,7 @@
       const el = ev.target; if (!el || !(el.tagName === 'IMG' || el.tagName === 'VIDEO') || !el.closest('.cx-midia')) return;
       const nw = el.naturalWidth || el.videoWidth, nh = el.naturalHeight || el.videoHeight; if (!nw || !nh) return;
       const sid = el.dataset.sid || (el.closest('[data-sid]') || {}).dataset?.sid; if (sid && !DIMS.has(sid)) { DIMS.set(sid, [nw, nh]); if (DIMS.size > 3000) DIMS.delete(DIMS.keys().next().value); }
-      if (el.closest('.cx-gcel, .cx-tw-topo, .cx-yt')) return; // (0.9.6) na grade (e no post do X / capa do YouTube) quem manda é a célula: a largura fixa esticava a foto (o "zoom")
+      if (el.closest('.cx-gcel, .cx-tw-topo, .cx-yt, .emb-lj, .emb-sp, .emb-x')) return; // (1.0.3) os cartões de loja/Spotify/Roblox/Steam cuidam das próprias fotos (a largura fixa dava o zoom na foto da Amazon); (0.9.6) na grade (e no post do X / capa do YouTube) quem manda é a célula: a largura fixa esticava a foto (o "zoom")
       // o limite de largura é o da caixa de dentro (GIF 300, imagem 320): passando dele, a imagem encolhia e a bolha não
       // (0.7.3) o GIF tem altura máxima de 260 (não 320): com 320 a conta dava uma largura maior que a do GIF na tela, e a bolha sobrava
       const gif = !!el.closest('.cx-gif-quadro'), lim = gif ? 300 : el.closest('.cx-img') ? 320 : MIDIA_W, alt = gif ? 260 : MIDIA_H[el.tagName];
@@ -540,7 +563,7 @@
     const rgbDe = (txt) => { const m = /rgba?\(([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:[ ,/]+([\d.]+%?))?/.exec(txt || ''); if (!m) return null; let a = m[4] == null ? 1 : parseFloat(m[4]); if (String(m[4]).endsWith('%')) a /= 100; return [+m[1], +m[2], +m[3], a]; };
     const contraste = (a, b) => { const x = Math.max(a, b), y = Math.min(a, b); return (x + 0.05) / (y + 0.05); };
     function letraDoCampo() {
-      inp.style.removeProperty('--bcf-campo');
+      inp.style.removeProperty('--bcf-campo'); inp.classList.remove('tem-bcf');
       if (!compositor.dataset.bc || !inp.isConnected) return;
       const cs = getComputedStyle(inp), fundoTema = document.documentElement.dataset.tema === 'escuro' ? [24, 30, 38] : [235, 242, 248];
       // o gradiente (aero, sabão...) conta pela cor do meio; a cor de fundo por cima do tema, com a transparência dela
@@ -551,7 +574,7 @@
       const lf = lum(mix(0), mix(1), mix(2)), t = rgbDe(cs.color); if (!t) return;
       const lt = lum(t[0], t[1], t[2]);
       if (contraste(lf, lt) >= 3.2) return;
-      inp.style.setProperty('--bcf-campo', contraste(lf, 1) >= contraste(lf, lum(16, 32, 44)) ? '#ffffff' : '#10202c');
+      inp.style.setProperty('--bcf-campo', contraste(lf, 1) >= contraste(lf, lum(16, 32, 44)) ? '#ffffff' : '#10202c'); inp.classList.add('tem-bcf');
     }
     minhaBolha();
     requestAnimationFrame(() => requestAnimationFrame(letraDoCampo)); inp.addEventListener("focus", () => { if (!inp.style.getPropertyValue("--bcf-campo")) letraDoCampo(); });
@@ -1127,7 +1150,7 @@
       if (v) v.addEventListener('loadedmetadata', () => { if (!v.videoWidth && !v.videoHeight && caixa.isConnected) { v.pause(); v.removeAttribute('src'); v.load(); caixa.replaceWith(U.pelicula(h('div', { class: 'cx-midia cx-midia-audio' }, tocadorAudio(url, m)))); } }, { once: true });
       return caixa;
     }
-    playerAero = tocadorVideo;
+    playerAero = tocadorVideo; if (A.embeds) A.embeds.player = tocadorVideo; // (1.0.3) o vídeo da TikTok usa o mesmo player
     function tocadorVideo(url, m) {
       const v = h('video', { src: url, preload: 'metadata', playsinline: '' });
       v.addEventListener('loadedmetadata', grudar, { once: true });
@@ -1369,7 +1392,7 @@
         const soGif = urls.length === 1 && so === urls[0] && (ehGif(so) || ehPaginaKlipy(so)), soFig = /^<fig:[A-Z0-9]{6}:[0-9a-f]{10}>$/i.test(so);
         const soDiscord = urls.length === 1 && so === urls[0] && !!tipoDiscord(so); // (0.6.9) só o link de um anexo do Discord: vira a mídia, sem o texto
         const ehAero = (u) => !!(o.ehLinkMidia && o.ehLinkMidia(u)), soAero = urls.length === 1 && so === urls[0] && ehAero(so); // (0.8.3) link de mídia do Aero
-        const soEmbed = urls.length === 1 && so === urls[0] && (!!idYoutube(so) || !!idTweet(so) || !!(A.perfil && A.perfil.codigoDoLink && A.perfil.codigoDoLink(so)) || ehSpotify(so) || ehReddit(so) || ehLoja(so)); // (0.9.6) só o link do YouTube/X: fica só o cartão (o link vai no botão direito)
+        const soEmbed = urls.length === 1 && so === urls[0] && (!!idYoutube(so) || !!idTweet(so) || !!(A.perfil && A.perfil.codigoDoLink && A.perfil.codigoDoLink(so)) || ehSpotify(so) || ehReddit(so) || ehLoja(so) || !!(A.embeds && A.embeds.ehTiktok && (A.embeds.ehTiktok(so) || A.embeds.ehInstagram(so) || (A.embeds.ehRoblox && A.embeds.ehRoblox(so)) || (A.embeds.ehSteam && A.embeds.ehSteam(so))))); // (0.9.6) só o link do YouTube/X: fica só o cartão (o link vai no botão direito)
         if (soGif) partes.push(ehPaginaKlipy(so) ? gifDePagina(so, m) : midiaGif(so));
         else if (!soDiscord && !soAero && !soEmbed) partes.push(h('div', { class: 'cx-txt' + (soFig ? ' so-figurinha' : '') }, ...comLinks(m.texto, o)));
         if (!soGif && !soDiscord && !soAero && !soEmbed && !soFig && A.idiomas && integOn('traducao')) { const tr = A.idiomas.bloco(m, o.ehMeu(m)); if (tr) partes.push(tr); } // (1.0.2) a tradução embaixo do texto
@@ -1381,6 +1404,10 @@
           if (idTweet(u)) { partes.push(embedTweet(u, grudar, soEmbed, () => itensMsg(m))); continue; }
           if (ehReddit(u)) { partes.push(embedReddit(u, grudar, soEmbed, () => itensMsg(m))); continue; } // (1.0.2)
           if (ehLoja(u) && A.embeds) { partes.push(A.embeds.loja(u, { dados: dadosEmbed, menu: menuLink(u, T('Loja', 'Store'), () => itensMsg(m)), grudar, soLink: soEmbed })); continue; } // (1.0.2) preço, imposto, fotos e avaliações
+          if (A.embeds && A.embeds.ehTiktok && A.embeds.ehTiktok(u)) { partes.push(A.embeds.tiktok(u, { dados: dadosEmbed, menu: menuLink(u, 'TikTok', () => itensMsg(m)), grudar, soLink: soEmbed })); continue; } // (1.0.3)
+          if (A.embeds && A.embeds.ehRoblox && A.embeds.ehRoblox(u)) { partes.push(A.embeds.roblox(u, { dados: dadosEmbed, menu: menuLink(u, 'Roblox', () => itensMsg(m)), grudar, soLink: soEmbed })); continue; } // (1.0.3)
+          if (A.embeds && A.embeds.ehSteam && A.embeds.ehSteam(u)) { partes.push(A.embeds.steam(u, { dados: dadosEmbed, menu: menuLink(u, 'Steam', () => itensMsg(m)), grudar, soLink: soEmbed })); continue; } // (1.0.3)
+          if (A.embeds && A.embeds.ehInstagram && A.embeds.ehInstagram(u)) { partes.push(A.embeds.instagram(u, { dados: dadosEmbed, menu: menuLink(u, 'Instagram', () => itensMsg(m)), grudar, soLink: soEmbed })); continue; } // (1.0.3)
           if (ehSpotify(u) && A.embeds) { partes.push(A.embeds.spotify(u, { dados: dadosEmbed, menu: menuLink(u, 'Spotify', () => itensMsg(m)), grudar })); continue; } // (1.0.2) com o trecho para ouvir
           if (!soGif && ehGif(u)) { partes.push(midiaGif(u)); continue; }
           if (!soGif && ehPaginaKlipy(u)) { partes.push(gifDePagina(u, m)); continue; }
@@ -1478,7 +1505,7 @@
       const paraMim = !meu && meChama(m.texto);
       const st = meu && o.statusDe ? h('span', { class: 'cx-status', dados: { seq: m.id }, title: '' }) : null;
       // (0.6.1) o texto vai numa bolha do tamanho dele (como no WhatsApp, com o vidro do Aero); "(editada)" e o status de leitura ficam
-      // DENTRO da bolha, no canto. Mensagem só de mídia (GIF, imagem, figurinha): o status fica ao lado dela.
+      // DENTRO da bolha, no canto. Mensagem só de mídia (GIF, imagem, figurinha): (1.0.3) o status fica por cima do canto dela, sem vão.
       const partes = corpo(m), bolhaTxt = [...partes].reverse().find((x) => x && x.classList && x.classList.contains('cx-txt') && !x.classList.contains('so-figurinha'));
       const rodape = [m.editado ? h('span', { class: 'cx-editado' }, T('(editada)', '(edited)')) : null, st].filter(Boolean);
       if (bolhaTxt && rodape.length) bolhaTxt.append(h('span', { class: 'cx-rodape' }, ...rodape));

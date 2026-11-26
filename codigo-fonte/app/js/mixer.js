@@ -141,24 +141,28 @@
     const forca = deslizante(T('Potência da supressão', 'Suppression strength'), { valor: mc.forca, aoMudar: (x) => { mc.forca = x; salvar(); } });
     const sens = deslizante(T('Sensibilidade', 'Sensitivity'), { valor: mc.sens, aoMudar: (x) => { mc.sens = x; salvar(); marcar(); }, desc: T('Mais alto: o microfone abre com sons mais baixinhos.', 'Higher: the mic opens with quieter sounds.') });
     const vol = deslizante(T('Volume do microfone', 'Microphone volume'), { max: 200, valor: mc.ganho, aoMudar: (x) => { mc.ganho = x; salvar(); A.mic.atualizar(); } });
-    const supr = U.chave(mc.supressao, (v) => { mc.supressao = v; salvar(); forca.classList.toggle('desativada', !v); });
+    // (1.0.3) a supressão do próprio navegador também liga e desliga junto (antes ela ficava como estava quando o microfone ligou)
+    const supr = U.chave(mc.supressao, async (v) => { mc.supressao = v; salvar(); forca.classList.toggle('desativada', !v); try { await X.reiniciar(); } catch (e) { /* ok */ } });
     forca.classList.toggle('desativada', !mc.supressao);
     const eco = U.chave(mc.eco, async (v) => { mc.eco = v; salvar(); try { await X.reiniciar(); } catch (e) { /* ok */ } });
     const agc = U.chave(mc.agc, async (v) => { mc.agc = v; salvar(); try { await X.reiniciar(); } catch (e) { /* ok */ } });
 
-    // medidor: a barra mostra o nível; o risco, o limiar da sensibilidade; a cor, se a porta está aberta
-    const barra = h('i', { class: 'nivel-barra' }), risco = h('i', { class: 'nivel-risco' });
-    const medidor = h('div', { class: 'nivel', role: 'img', 'aria-label': T('Nível do microfone', 'Microphone level') }, barra, risco);
+    // medidor: a barra clara é o que entra; a cheia, o que sai depois da supressão; o risco, o limiar da sensibilidade (já com o ruído
+    // de fundo medido); a cor, se a porta está aberta
+    const barra = h('i', { class: 'nivel-barra' }), entrada = h('i', { class: 'nivel-entrada' }), risco = h('i', { class: 'nivel-risco' });
+    const medidor = h('div', { class: 'nivel', role: 'img', 'aria-label': T('Nível do microfone', 'Microphone level') }, entrada, barra, risco);
     const estado = h('div', { class: 'peq suave' });
-    const marcar = () => { risco.style.left = A.limitar(((A.mic.limiarDb(mc.sens) + 70) / 60) * 100, 0, 100) + '%'; risco.hidden = !mc.supressao; };
+    const marcar = () => { const l = A.mic.ativo && A.mic.limiarAtual != null ? A.mic.limiarAtual : A.mic.limiarDb(mc.sens); risco.style.left = A.limitar(((l + 70) / 60) * 100, 0, 100) + '%'; risco.hidden = !mc.supressao; };
     marcar();
     const laco = () => {
       if (!vivo) return;
       if (A.mic.ativo) {
-        barra.style.transform = `scaleX(${A.mic.nivel().toFixed(3)})`;
+        entrada.style.transform = `scaleX(${A.mic.nivel().toFixed(3)})`;
+        barra.style.transform = `scaleX(${(A.mic.nivelSaida ? A.mic.nivelSaida() : A.mic.nivel()).toFixed(3)})`;
+        marcar();
         barra.classList.toggle('fechada', !!mc.supressao && !A.mic.aberto);
         estado.textContent = !X.ligado() ? T('Microfone mudo', 'Microphone muted') : mc.supressao ? (A.mic.aberto ? T('Captando voz', 'Picking up voice') : T('Ruído de fundo suprimido', 'Background noise suppressed')) : T('Captando', 'Picking up');
-      } else { barra.style.transform = 'scaleX(0)'; estado.textContent = T('Ligue o microfone para ver o nível.', 'Turn the microphone on to see the level.'); }
+      } else { barra.style.transform = entrada.style.transform = 'scaleX(0)'; estado.textContent = T('Ligue o microfone para ver o nível.', 'Turn the microphone on to see the level.'); }
       raf = requestAnimationFrame(laco);
     };
     raf = requestAnimationFrame(laco);

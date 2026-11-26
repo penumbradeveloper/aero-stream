@@ -1204,7 +1204,7 @@
     try {
       r.fonte = c.createMediaStreamSource(r.stream); r.gain = c.createGain();
       r.fonte.connect(r.gain); r.gain.connect(r.tela || r.somTela ? S.busTrans : S.busVoz);
-      if (!r.tela && !r.somTela) { r.medidor = c.createAnalyser(); r.medidor.fftSize = 512; r.fonte.connect(r.medidor); } // nível do microfone de cada pessoa (antes do volume que você escolheu)
+      if (!r.tela && !r.somTela) { r.medidor = c.createAnalyser(); r.medidor.fftSize = 2048; r.fonte.connect(r.medidor); } // nível do microfone de cada pessoa (antes do volume que você escolheu)
       // o Chrome só entrega o áudio de uma stream remota ao Web Audio se um elemento de mídia também a consome
       r.chamariz = new Audio(); r.chamariz.srcObject = r.stream; r.chamariz.muted = true; r.chamariz.play().catch(() => {});
     } catch (e) { A.log.aviso('audio', e); }

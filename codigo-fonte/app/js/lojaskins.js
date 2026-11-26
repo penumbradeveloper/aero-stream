@@ -16,7 +16,8 @@
   };
 
   // ---------- comprar (PIX) ----------
-  function comprar(s, info, depois) {
+  // (1.0.3) o mesmo PIX compra as integrações pagas da Comunidade (o = { integ: true })
+  function comprar(s, info, depois, o = {}) {
     const U = A.ui, corpo = h('div', { class: 'col', estilo: { gap: '10px' } });
     let fechou = false, timer = 0;
     const email = h('input', { class: 'campo', type: 'email', placeholder: T('Seu e-mail (para o recibo)', 'Your e-mail (for the receipt)'), maxlength: 254, value: A.store.ler('aero-email-recibo', '') });
@@ -36,7 +37,8 @@
           passo2(r);
         } catch (e) { erroEl.textContent = e.message; }
       } }),
-      h('div', { class: 'peq suave' }, T('O pagamento é pelo Mercado Pago, direto para a conta de quem fez a skin (o Aero fica só com a comissão). A skin fica na sua conta: baixa de novo em qualquer aparelho.', 'Payment goes through Mercado Pago, straight to the creator\'s account (Aero only keeps a fee). The skin stays on your account: download it again on any device.')));
+      h('div', { class: 'peq suave' }, o.integ ? T('O pagamento é pelo Mercado Pago, direto para a conta de quem fez a integração (o Aero fica só com a comissão). Ela fica na sua conta: instala de novo em qualquer aparelho.', 'Payment goes through Mercado Pago, straight to the creator\'s account (Aero only keeps a fee). It stays on your account: install it again on any device.')
+        : T('O pagamento é pelo Mercado Pago, direto para a conta de quem fez a skin (o Aero fica só com a comissão). A skin fica na sua conta: baixa de novo em qualquer aparelho.', 'Payment goes through Mercado Pago, straight to the creator\'s account (Aero only keeps a fee). The skin stays on your account: download it again on any device.')));
     const passo2 = (r) => {
       const status = h('div', { class: 'bolha-espera peq' }, h('span', { class: 'bolha-girando', 'aria-hidden': 'true' }), h('span', {}, T('Esperando o pagamento…', 'Waiting for the payment…')));
       corpo.replaceChildren(h('div', { class: 'bolha-valor' }, h('span', {}, reais(r.valor)), h('small', {}, 'PIX')),
@@ -51,8 +53,20 @@
       timer = setTimeout(conferir, 4000);
     };
     passo1();
-    const janela = U.modal(T('Comprar skin', 'Buy skin'), h('div', { dados: { protegido: '1' } }, corpo), { largura: 420, aoFechar: () => { fechou = true; clearTimeout(timer); } });
+    const janela = U.modal(o.integ ? T('Comprar integração', 'Buy integration') : T('Comprar skin', 'Buy skin'), h('div', { dados: { protegido: '1' } }, corpo), { largura: 420, aoFechar: () => { fechou = true; clearTimeout(timer); } });
   }
+
+  // (1.0.3) o aviso do Mercado Pago embaixo do preço (as skins e as integrações da Comunidade usam o mesmo)
+  L.vendedor = (info, preco, erroEl, semVenda) => {
+    const U = A.ui, vend = h('div', { class: 'col', estilo: { gap: '6px' } });
+    const pintarVend = () => vend.replaceChildren(+preco.value > 0 ? (info.vendedor ? h('div', { class: 'peq aer-ok' }, T('✔ Sua conta do Mercado Pago está conectada. Você recebe ', '✔ Your Mercado Pago account is connected. You get ') + Math.round((1 - info.comissao) * 100) + T('% de cada venda, direto nela.', '% of each sale, straight into it.'))
+      : info.splitPronto ? h('div', { class: 'col', estilo: { gap: '6px' } }, h('div', { class: 'peq' }, T('Para vender, conecte a sua conta do Mercado Pago: o dinheiro vai direto para ela (você recebe ', 'To sell, connect your Mercado Pago account: the money goes straight into it (you get ') + Math.round((1 - info.comissao) * 100) + T('% de cada venda).', '% of each sale).')),
+        U.btn(T('Conectar Mercado Pago', 'Connect Mercado Pago'), { tipo: 'sec', peq: true, icone: 'externo', onclick: async () => { try { const r = await A.api.req('loja/mp/conectar', {}); window.open(r.url, '_blank', 'noopener'); U.toast(T('Depois de conectar, feche e abra esta janela de novo.', 'After connecting, close and reopen this window.')); } catch (e) { erroEl.textContent = e.message; } } }))
+      : h('div', { class: 'peq suave' }, semVenda)) : null);
+    preco.addEventListener('input', pintarVend); pintarVend();
+    return vend;
+  };
+  L.comprar = comprar;
 
   // ---------- publicar ----------
   L.publicar = async (id) => {
@@ -62,12 +76,7 @@
     if (!info.pode) { U.toast(T('Publicar na loja é do Aero Bubble Donator.', 'Publishing in the store is on Aero Bubble Donator.')); return; }
     const preco = h('input', { class: 'campo', type: 'number', min: 0, max: 200, step: '0.5', value: 0 });
     const termos = h('input', { type: 'checkbox' }), erroEl = h('div', { class: 'peq est-erro' });
-    const vend = h('div', { class: 'col', estilo: { gap: '6px' } });
-    const pintarVend = () => vend.replaceChildren(+preco.value > 0 ? (info.vendedor ? h('div', { class: 'peq aer-ok' }, T('✔ Sua conta do Mercado Pago está conectada. Você recebe ', '✔ Your Mercado Pago account is connected. You get ') + Math.round((1 - info.comissao) * 100) + T('% de cada venda, direto nela.', '% of each sale, straight into it.'))
-      : info.splitPronto ? h('div', { class: 'col', estilo: { gap: '6px' } }, h('div', { class: 'peq' }, T('Para vender, conecte a sua conta do Mercado Pago: o dinheiro vai direto para ela (você recebe ', 'To sell, connect your Mercado Pago account: the money goes straight into it (you get ') + Math.round((1 - info.comissao) * 100) + T('% de cada venda).', '% of each sale).')),
-        U.btn(T('Conectar Mercado Pago', 'Connect Mercado Pago'), { tipo: 'sec', peq: true, icone: 'externo', onclick: async () => { try { const r = await A.api.req('loja/mp/conectar', {}); window.open(r.url, '_blank', 'noopener'); U.toast(T('Depois de conectar, feche e abra esta janela de novo.', 'After connecting, close and reopen this window.')); } catch (e) { erroEl.textContent = e.message; } } }))
-      : h('div', { class: 'peq suave' }, T('A venda de skins ainda não está disponível. Publique grátis por enquanto.', 'Selling skins is not available yet. Publish for free for now.'))) : null);
-    preco.addEventListener('input', pintarVend); pintarVend();
+    const vend = L.vendedor(info, preco, erroEl, T('A venda de skins ainda não está disponível. Publique grátis por enquanto.', 'Selling skins is not available yet. Publish for free for now.'));
     const TERMOS = T('Eu fiz esta skin ou tenho o direito de usar tudo o que está nela (imagens, sons e fontes). Ela não tem conteúdo ilegal, de ódio, sexual ou que copie a marca de alguém. Sei que a equipe do Aero pode tirá-la da loja (e barrar o mesmo arquivo) se houver denúncia procedente, e que quem comprou continua com ela.',
       'I made this skin or have the right to use everything in it (images, sounds and fonts). It has no illegal, hateful or sexual content, and does not copy anyone\'s brand. I know the Aero team can remove it from the store (and block the same file) after a valid report, and that buyers keep it.');
     const janela = U.modal(T('Publicar na loja', 'Publish in the store'), h('div', { class: 'col', estilo: { gap: '10px' }, dados: { protegido: '1' } },

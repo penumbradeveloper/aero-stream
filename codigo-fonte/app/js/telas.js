@@ -729,14 +729,14 @@
     offs.push(A.evt.on('hub:amigos', () => {
       contarPedidos();
       H.amigos.filter((a) => a.estado === 'recebido' && !amigosAntes.has(a.codigo)).forEach((a) => {
-        if (!U.naoPerturbe()) { U.toast(h('span', {}, h('b', {}, a.nome), ' ', T('quer ser seu amigo', 'wants to be your friend')), { avatar: a, som: 'msg', ms: 7000, acoes: [{ texto: T('Aceitar', 'Accept'), tipo: 'ok', onclick: () => API.amigos.aceitar(a.codigo) }] }); U.notificar(T('Pedido de amizade', 'Friend request'), a.nome + T(' quer ser seu amigo', ' wants to be your friend')); }
+        if (!U.naoPerturbe(a.codigo)) { U.toast(h('span', {}, h('b', {}, a.nome), ' ', T('quer ser seu amigo', 'wants to be your friend')), { avatar: a, som: 'msg', ms: 7000, acoes: [{ texto: T('Aceitar', 'Accept'), tipo: 'ok', onclick: () => API.amigos.aceitar(a.codigo) }] }); U.notificar(T('Pedido de amizade', 'Friend request'), a.nome + T(' quer ser seu amigo', ' wants to be your friend')); }
       });
       amigosAntes = new Set(H.amigos.filter((a) => a.estado === 'recebido').map((a) => a.codigo));
     }));
     offs.push(A.evt.on('hub:presenca', ({ p, novo }) => {
       // (0.6.0) só para os amigos em que você ligou "Avisar quando ficar online" (no perfil deles), e só quando a pessoa chega (o 1º aparelho)
       const a = H.amigos.find((x) => x.codigo === p.codigo);
-      if (novo && a && a.avisarOnline && p.estado === 'online' && H.dispositivosDe(p.codigo).length === 1 && !U.naoPerturbe()) { U.toast(h('span', {}, h('b', {}, a.apelido || p.nome), ' ', T('ficou online', 'is now online')), { avatar: p, som: 'online', ms: 3600 }); U.notificar(a.apelido || p.nome, T('ficou online', 'is now online')); }
+      if (novo && a && a.avisarOnline && p.estado === 'online' && H.dispositivosDe(p.codigo).length === 1 && !U.naoPerturbe(p.codigo)) { U.toast(h('span', {}, h('b', {}, a.apelido || p.nome), ' ', T('ficou online', 'is now online')), { avatar: p, som: 'online', ms: 3600 }); U.notificar(a.apelido || p.nome, T('ficou online', 'is now online')); }
     }));
     offs.push(A.evt.on('hub:sessao-invalida', () => dados.sair && dados.sair()));
     const ciclar = (d) => {

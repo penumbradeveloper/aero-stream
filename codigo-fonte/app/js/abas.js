@@ -8,6 +8,7 @@
   // (0.8.7) cenas animadas que mostram o que cada opção da Privacidade faz (data-e = o estado escolhido)
   const CENAS_PRIV = {
     discord: '<i class="pc-card"><i class="pc-av"></i><i class="pc-l1"></i><i class="pc-l2"></i><i class="pc-play"></i></i>',
+    dcsub: '<i class="pc-card"><i class="pc-ic"></i><i class="pc-l1"></i><i class="pc-l2"></i></i>', // (1.0.3) cada parte do que o Discord mostra
     lidos: '<i class="pc-balao"><i class="pc-l1"></i><i class="pc-l2"></i></i><b class="pc-ck"></b><b class="pc-ck pc-ck2"></b>',
     visto: '<i class="pc-av"></i><i class="pc-relogio"><b></b></i><i class="pc-l1"></i>',
     conta: '<i class="pc-jan"><i class="pc-tit"></i><i class="pc-x"></i><i class="pc-l1"></i><i class="pc-l2"></i></i><i class="pc-onda"></i><i class="pc-cursor"></i><i class="pc-rel"><b></b></i>',
@@ -35,7 +36,6 @@
   // (1.0.2) notificações: no celular (ligar/desligar e o que aparece) e, no Linux, quem passa pelo "não perturbe"
   const secaoNotif = () => {
     const cel = A.plat.apk || A.plat.toque, linux = A.plat.desktop && /Linux/.test(navigator.userAgent);
-    if (!cel && !linux) return [];
     const partes = [];
     if (cel) {
       const oQue = U.seg([['total', T('Só o total', 'Only the count')], ['texto', T('O texto', 'The text')]], A.cfg.v.notifConteudo === 'texto' ? 'texto' : 'total', (v) => { A.cfg.v.notifConteudo = v; A.cfg.salvar(); });
@@ -43,7 +43,7 @@
         opcao(T('Notificações no celular', 'Phone notifications'), U.chave(A.cfg.v.notifCel !== false, async (v) => { A.cfg.v.notifCel = v; A.cfg.salvar(); oQue.closest('.opcao').hidden = !v; try { if (v) await A.push.ligar(); else await A.push.desligar(); } catch (e) { /* ok */ } }), T('Avisa das mensagens com o Aero no fundo ou fechado.', 'Tells you about messages with Aero in the background or closed.')),
         ((x) => { x.hidden = A.cfg.v.notifCel === false; return x; })(opcao(T('O que aparece', 'What shows'), oQue, T('Com o Aero fechado aparece só quem mandou e quantas: as mensagens são cifradas e nem o servidor lê.', 'With Aero closed only who sent it and how many show: messages are encrypted and not even the server reads them.'))));
     }
-    if (linux) {
+    { // (1.0.3) em todo aparelho: a lista vale também para o não perturbe e o status com "sem notificações"
       const lista = h('div', { class: 'np-lista' });
       const amigos = () => ((A.hub && A.hub.amigos) || []).filter((a) => a.estado === 'aceita');
       const pintar = () => {
@@ -70,7 +70,7 @@
       };
       pintar();
       partes.push(h('div', { class: 'opcao quebra' }, h('div', { class: 'cresce' }, h('div', { estilo: { 'font-weight': '600' } }, T('Não perturbe: quem pode passar', 'Do not disturb: who gets through')),
-        h('div', { class: 'peq suave' }, T('Enquanto você compartilha a tela o sistema liga o "não perturbe". Só essas pessoas aparecem, num aviso só por pessoa com o total de mensagens.', 'While you share your screen the system turns on "do not disturb". Only these people show up, in one notice per person with the message count.')), lista)));
+        h('div', { class: 'peq suave' }, linux ? T('Essas pessoas continuam avisando no Não perturbe, no status com "Sem notificações" e enquanto você compartilha a tela (quando o sistema liga o "não perturbe" sozinho).', 'These people still notify you in Do not disturb, in a status with "No notifications" and while you share your screen (when the system turns on "do not disturb" by itself).') : T('Essas pessoas continuam avisando no Não perturbe e no status com "Sem notificações".', 'These people still notify you in Do not disturb and in a status with "No notifications".')), lista)));
     }
     return [secao(T('Notificações', 'Notifications'), ...partes)];
   };
@@ -639,14 +639,18 @@
         // (1.0.2) o que o Discord mostra: cada parte pode ficar de fora (tudo desligado: só o "Aero" com o logo)
         const dcOp = (k, v) => { dc[k] = v; A.cfg.salvar(); A.evt.emit('discord:config'); };
         const dcOpc = A.discord && A.discord.opcoes ? A.discord.opcoes() : { onde: true, conversa: 'tipo', chamada: 'sim', sala: true, conta: true, tempo: true };
-        const subDc = (rot, ctl, desc) => { const o = opcao(rot, ctl, desc); o.classList.add('sub-opcao'); o.hidden = dc.ativo === false; return o; };
+        // (1.0.3) cada parte com a sua figurinha (o cartão do Discord com o ícone do que aparece; riscada quando fica de fora)
+        const subDc = (ic, liga, rot, fazCtl, desc) => {
+          const c = cenaPriv('dcsub', !!liga); c.classList.add('pc-dc-' + ic); c.querySelector('.pc-ic').append(A.icone(ic, 16));
+          const o = comCena(c, opcao(rot, fazCtl((v) => { c.dataset.e = String(!!v); }), desc)); o.classList.add('sub-opcao'); o.hidden = dc.ativo === false; return o;
+        };
         const dcOpcoes = A.plat.desktop ? [
-          subDc(T('Onde estou no app', 'Where I am in the app'), U.chave(dcOpc.onde, (v) => dcOp('onde', v)), T('"Configurando: Aparência", "No Aero Talk", "Vendo as conexões"...', '"Configuring: Appearance", "In Aero Talk", "Browsing connections"...')),
-          subDc(T('Conversas', 'Chats'), U.seg([['nao', T('Não mostrar', 'Hide')], ['tipo', T('Só "Conversando"', 'Just "Chatting"')], ['nome', T('Com quem', 'With whom')]], dcOpc.conversa, (v) => dcOp('conversa', v)), T('Com quem: o nome da pessoa ou do grupo aparece no seu Discord.', 'With whom: the person\'s or group\'s name shows on your Discord.')),
-          subDc(T('Chamadas', 'Calls'), U.seg([['nao', T('Não mostrar', 'Hide')], ['sim', T('Só "Em uma chamada"', 'Just "In a call"')], ['nome', T('Com quem', 'With whom')]], dcOpc.chamada, (v) => dcOp('chamada', v)), T('Com quantas pessoas, e se você está mostrando a tela.', 'With how many people, and whether you are sharing your screen.')),
-          subDc(T('Salas', 'Rooms'), U.chave(dcOpc.sala, (v) => dcOp('sala', v)), T('Em uma sala, transmitindo ou assistindo, com quantas pessoas.', 'In a room, streaming or watching, with how many people.')),
-          subDc(T('Minha conta', 'My account'), U.chave(dcOpc.conta, (v) => dcOp('conta', v)), T('A sua foto e o seu nome #tag no ícone grande. Desligado: só o ícone do Aero.', 'Your photo and name #tag on the big icon. Off: just the Aero icon.')),
-          subDc(T('Tempo decorrido', 'Elapsed time'), U.chave(dcOpc.tempo, (v) => dcOp('tempo', v)), T('Há quanto tempo o Aero (ou a chamada, ou a sala) está aberto.', 'How long Aero (or the call, or the room) has been open.')),
+          subDc('apps', dcOpc.onde, T('Onde estou no app', 'Where I am in the app'), (marca) => U.chave(dcOpc.onde, (v) => { marca(v); dcOp('onde', v); }), T('"Configurando: Aparência", "No Aero Talk", "Vendo as conexões"...', '"Configuring: Appearance", "In Aero Talk", "Browsing connections"...')),
+          subDc('chat', dcOpc.conversa !== 'nao', T('Conversas', 'Chats'), (marca) => U.seg([['nao', T('Não mostrar', 'Hide')], ['tipo', T('Só "Conversando"', 'Just "Chatting"')], ['nome', T('Com quem', 'With whom')]], dcOpc.conversa, (v) => { marca(v !== 'nao'); dcOp('conversa', v); }), T('Com quem: o nome da pessoa ou do grupo aparece no seu Discord.', 'With whom: the person\'s or group\'s name shows on your Discord.')),
+          subDc('telefone', dcOpc.chamada !== 'nao', T('Chamadas', 'Calls'), (marca) => U.seg([['nao', T('Não mostrar', 'Hide')], ['sim', T('Só "Em uma chamada"', 'Just "In a call"')], ['nome', T('Com quem', 'With whom')]], dcOpc.chamada, (v) => { marca(v !== 'nao'); dcOp('chamada', v); }), T('Com quantas pessoas, e se você está mostrando a tela.', 'With how many people, and whether you are sharing your screen.')),
+          subDc('tela', dcOpc.sala, T('Salas', 'Rooms'), (marca) => U.chave(dcOpc.sala, (v) => { marca(v); dcOp('sala', v); }), T('Em uma sala, transmitindo ou assistindo, com quantas pessoas.', 'In a room, streaming or watching, with how many people.')),
+          subDc('pessoa', dcOpc.conta, T('Minha conta', 'My account'), (marca) => U.chave(dcOpc.conta, (v) => { marca(v); dcOp('conta', v); }), T('A sua foto e o seu nome #tag no ícone grande. Desligado: só o ícone do Aero.', 'Your photo and name #tag on the big icon. Off: just the Aero icon.')),
+          subDc('relogio', dcOpc.tempo, T('Tempo decorrido', 'Elapsed time'), (marca) => U.chave(dcOpc.tempo, (v) => { marca(v); dcOp('tempo', v); }), T('Há quanto tempo o Aero (ou a chamada, ou a sala) está aberto.', 'How long Aero (or the call, or the room) has been open.')),
         ] : [];
         const modoVisto = h('div', { class: 'opcao sub-opcao', hidden: p.visto === false }, h('div', { class: 'cresce' }, h('div', { estilo: { 'font-weight': '600' } }, T('O que conta', 'What counts')), h('div', { class: 'peq suave' }, T('"Quando eu saio": a hora em que você fechou o app ou ficou off-line. "Quando eu mexo no app": também a última vez que você usou o app, mesmo com ele aberto.', '"When I leave": the time you closed the app or went offline. "When I use the app": also the last time you used it, even with it open.'))),
           U.seg([['saida', T('Quando eu saio', 'When I leave')], ['atividade', T('Quando eu mexo no app', 'When I use the app')]], p.vistoModo || 'saida', (v) => { salvar({ vistoModo: v }); }));
@@ -1037,7 +1041,8 @@
         ...(() => { const ap = A.aparencia.secao(); return ap.partes.map((x) => secao(null, x)); })(), // (0.8.7) cada parte da aparência na sua caixa
         secaoBolhas(),
         ...(A.extras ? [secao(T('Ícone e sons', 'Icon and sounds'), A.extras.secaoApp())] : []), // (1.0.0) os extras do Aero Bubble no app
-        secao(T('Na chamada', 'In calls'), opcao(T('Ficar no meio com todo mundo', 'Stay in the middle with everyone'), U.chave(A.cfg.v.chamJuntos === true, (v) => (A.chamada && A.chamada.juntos ? A.chamada.juntos(v) : (A.cfg.v.chamJuntos = v, A.cfg.salvar()))), T('Você aparece junto com os outros, sem a linha que te separa. Ao maximizar alguém, todos vão para a fileira de baixo. Também dá para trocar clicando com o botão direito em você na chamada.', 'You show up with the others, without the line between you. When you maximize someone, everyone goes to the row below. You can also switch it by right-clicking yourself in the call.'))), // (1.0.2)
+        secao(T('Na chamada', 'In calls'), opcao(T('Ficar no meio com todo mundo', 'Stay in the middle with everyone'), U.chave(A.cfg.v.chamJuntos === true, (v) => (A.chamada && A.chamada.juntos ? A.chamada.juntos(v) : (A.cfg.v.chamJuntos = v, A.cfg.salvar()))), T('Você aparece junto com os outros, sem a linha que te separa. Ao maximizar alguém, todos vão para a fileira de baixo. Também dá para trocar clicando com o botão direito em você na chamada.', 'You show up with the others, without the line between you. When you maximize someone, everyone goes to the row below. You can also switch it by right-clicking yourself in the call.')),
+          opcao(T('Foto animada só quando a pessoa fala', 'Animated photo only while talking'), U.chave(A.cfg.v.chamGifFala === true, (v) => (A.chamada && A.chamada.gifFala ? A.chamada.gifFala(v) : (A.cfg.v.chamGifFala = v, A.cfg.salvar()))), T('Na chamada, quem tem foto animada (GIF) fica com ela parada e ela anima enquanto a pessoa fala.', 'In calls, animated (GIF) photos stay still and play while the person talks.'))), // (1.0.2) (1.0.3) foto animada só ao falar
         ...(A.extras && A.extras.secaoChamada ? [secao(T('Tela de chamada', 'Call screen'), A.extras.secaoChamada())] : []), // (1.0.2) cor, imagem, bolhas e acessórios da sua chamada, com prévia
         ...(A.aer ? [secao('Skins', A.aer.secao())] : []), // (1.0.0) as skins .aer fazem parte da aparência
       ]),

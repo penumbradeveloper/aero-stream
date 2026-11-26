@@ -551,6 +551,7 @@ details.mais > summary::before { content: "▸ "; } details.mais[open] > summary
 /* medidor do microfone */
 .nivel { position: relative; height: 12px; border-radius: 7px; overflow: hidden; background: rgba(120,150,170,.3); box-shadow: inset 0 1px 3px rgba(0,0,0,.25); }
 .nivel-barra { position: absolute; inset: 0; transform-origin: left; transform: scaleX(0); background: linear-gradient(90deg, var(--ok), #d7d33a 70%, var(--erro)); transition: filter .15s; } .nivel-barra.fechada { filter: grayscale(1) opacity(.6); }
+.nivel-entrada { position: absolute; inset: 0; transform-origin: left; transform: scaleX(0); background: linear-gradient(90deg, var(--ok), #d7d33a 70%, var(--erro)); opacity: .3; }
 .nivel-risco { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1px; background: var(--texto); border-radius: 2px; opacity: .8; }
 /* botão com setinha (som, microfone, compartilhar, controle): os dois formam uma cápsula só, com uma linha fina separando as metades */
 .par { display: inline-flex; align-items: center; position: relative; border-radius: 24px; transition: transform .25s var(--mola); }
@@ -900,6 +901,12 @@ input[type=range].ajustando::-webkit-slider-thumb { transform: scale(1.35); }
 .cham-tile.conectando .cham-quadro { opacity: .7; }
 .cham-mudo { position: absolute; right: 10px; top: 10px; display: none; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: rgba(224,72,72,.9); color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
 .cham-tile.mudo .cham-mudo { display: grid; }
+/* (1.0.3) desligou o som (não está ouvindo): o fone cortado, ao lado do microfone cortado se os dois, e a foto cinza */
+.cham-surdo { position: absolute; right: 10px; top: 10px; display: none; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: rgba(224,72,72,.9); color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+.cham-tile.surdo .cham-surdo { display: grid; }
+.cham-tile.surdo.mudo .cham-surdo { right: 44px; }
+.cham-tile.surdo .cham-av .avatar, .tk-cham-bolha:has(.tk-cham-mudo.surdo) .avatar { filter: grayscale(1); opacity: .8; }
+.cham-tile[data-mc] .cham-surdo { z-index: 4; }
 .cham-nome { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 100%; font-weight: 700; font-size: 15px; text-shadow: 0 1px 4px rgba(0,0,0,.55); }
 .cham-nome > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .cham-pontos { display: none; flex-direction: column; gap: 5px; margin-top: 4px; } .cham-pontos i { width: 6px; height: 6px; border-radius: 50%; background: #fff; opacity: .35; animation: chamPonto 1.2s ease-in-out infinite; }
@@ -1448,8 +1455,8 @@ input[type=range].ajustando::-webkit-slider-thumb { transform: scale(1.35); }
 .tk-divisor::before { content: ""; position: absolute; border-radius: 3px; background: color-mix(in srgb, var(--cor-2) 70%, transparent); }
 .tk-divisor.y::before { left: 30%; right: 30%; top: 2px; height: 4px; } .tk-divisor.x::before { top: 30%; bottom: 30%; left: 2px; width: 4px; }
 .tk-divisor:hover, .redimensionando .tk-divisor { opacity: 1; }
-.tk-cham-palco { justify-content: center; min-height: 0; } .tk-cham-palco[style*="height"] .tk-cham-bolhas .avatar { transition: none; }
-.tk-membros[style*="width"] { flex: none; }
+.tk-cham-palco { justify-content: center; min-height: 0; } .tk-cham-palco.tem-tam .tk-cham-bolhas .avatar { transition: none; }
+.tk-membros.tem-tam { flex: none; }
 /* (0.6.0) chat encaixável durante a transmissão: direita (padrão), esquerda ou solto */
 .chat-alca { cursor: grab; user-select: none; touch-action: none; }
 .sala[data-chat-lado=esq] .chat { order: -1; border-radius: 0 var(--raio-g) var(--raio-g) 0; }
@@ -1482,7 +1489,10 @@ input[type=range].ajustando::-webkit-slider-thumb { transform: scale(1.35); }
 @keyframes tvPop { 40% { transform: scale(.86); } 100% { transform: scale(1.14); } }
 [data-tema=escuro] .tv-tecla { border-color: rgba(255,255,255,.3); }
 /* (0.6.0) celular: tudo mais compacto (as telas ficavam grandes demais), nada passando por cima de nada */
-.cx-msg.eu .cx-bal.status-solto { padding-right: 26px; } .cx-msg.eu .cx-bal.status-solto > .cx-status { position: absolute; right: 10px; bottom: 6px; margin: 0; }
+/* (1.0.3) mensagem só de mídia: o balão fica do tamanho da mídia e o visto vai por cima do canto dela (antes o balão ocupava a largura toda e o
+   visto ficava lá na ponta, deixando um vão entre a foto e a borda) */
+.cx-msg.eu .cx-bal.status-solto { position: relative; width: fit-content; padding-right: 0; } .cx-msg.eu .cx-bal.status-solto > .cx-status { position: absolute; left: calc(100% + 4px); bottom: 2px; margin: 0; z-index: 1; pointer-events: none; } /* (1.0.3) fora da imagem/embed, do lado livre (longe da foto), sem abrir espaço na bolha */
+:is([data-cxlado=direita], [data-cxlado=todasdir]) .cx-msg.eu .cx-bal.status-solto > .cx-status { left: auto; right: calc(100% + 4px); }
 @media (max-width: 760px) {
   body { font-size: 15px; }
   h2 { font-size: 18px; } .cab { margin: 4px 2px 10px; } .cab h2 { font-size: 20px; }
@@ -1632,11 +1642,11 @@ input[type=range].ajustando::-webkit-slider-thumb { transform: scale(1.35); }
 @media (max-width: 760px) { #toasts > .toast:not(:last-child) { display: none; } } /* (0.7.0) no celular, um aviso por vez (eles empilhavam e cobriam a tela) */
 
 /* (0.7.1) faixa da chamada esticada: as fotos crescem junto e os botões descem para o pé da faixa (antes tudo ficava parado no meio) */
-.tk-cham-palco[style*="height"]:not(.com-tela) { container-type: size; justify-content: flex-start; }
-.tk-cham-palco[style*="height"]:not(.com-tela) .tk-cham-bolhas { flex: 1 1 auto; min-height: 0; align-items: center; align-content: center; }
-.tk-cham-palco[style*="height"]:not(.com-tela) { gap: 6px; }
-.tk-cham-palco[style*="height"]:not(.com-tela) .tk-cham-bolha .avatar { --t: clamp(28px, calc(100cqh - 100px), 190px) !important; }
-.tk-cham-palco[style*="height"]:not(.com-tela) .tk-cham-botoes { margin-top: auto; }
+.tk-cham-palco.tem-tam:not(.com-tela) { container-type: size; justify-content: flex-start; }
+.tk-cham-palco.tem-tam:not(.com-tela) .tk-cham-bolhas { flex: 1 1 auto; min-height: 0; align-items: center; align-content: center; }
+.tk-cham-palco.tem-tam:not(.com-tela) { gap: 6px; }
+.tk-cham-palco.tem-tam:not(.com-tela) .tk-cham-bolha .avatar { --t: clamp(28px, calc(100cqh - 100px), 190px) !important; }
+.tk-cham-palco.tem-tam:not(.com-tela) .tk-cham-botoes { margin-top: auto; }
 
 /* (0.7.1) celular com o teclado aberto: o app ocupa só a parte visível (acima do teclado). As abas de baixo saem, a faixa da chamada vira
    uma linha só (fotos pequenas e os botões) e o chat fica com o resto; o topo da conversa não sai do lugar */
@@ -1967,6 +1977,52 @@ html.ar-arrastando .home *, html.ar-arrastando .home *::before, html.ar-arrastan
 [data-tema=escuro] .bolha-plano { background: rgba(255,255,255,.06); }
 .bolha-plano:hover { transform: translateY(-3px); box-shadow: 0 10px 24px color-mix(in srgb, var(--b2) 30%, transparent); }
 .bolha-plano.meu { border-width: 2px; border-color: var(--b2); }
+/* (1.0.3) o cartão abre os exemplos; o Donator vem recomendado */
+.bolha-plano { cursor: pointer; }
+.bolha-plano.recomendado { border-width: 2px; border-color: var(--b2); background: linear-gradient(180deg, color-mix(in srgb, var(--b1) 26%, rgba(255,255,255,.45)), rgba(255,255,255,.35) 60%); box-shadow: 0 8px 26px color-mix(in srgb, var(--b2) 32%, transparent), inset 0 0 0 1px rgba(255,255,255,.4); padding-top: 34px; }
+[data-tema=escuro] .bolha-plano.recomendado { background: linear-gradient(180deg, color-mix(in srgb, var(--b2) 22%, rgba(255,255,255,.06)), rgba(255,255,255,.06) 60%); }
+.bolha-reco { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 5px 8px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #fff; background: linear-gradient(180deg, var(--b1), var(--b2)); text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.bolha-ver { display: inline-flex; align-items: center; justify-content: center; gap: 6px; align-self: stretch; padding: 7px 10px; border-radius: 12px; border: 1px dashed color-mix(in srgb, var(--b2) 55%, transparent); background: color-mix(in srgb, var(--b2) 8%, transparent); color: var(--b2); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: background .2s, border-color .2s; }
+.bolha-plano:hover .bolha-ver, .bolha-ver:focus-visible { background: color-mix(in srgb, var(--b2) 18%, transparent); border-style: solid; }
+[data-tema=escuro] .bolha-ver { color: var(--b1); }
+.bx-modal .modal-corpo, .bx-corpo { min-width: 0; }
+.modal.bx-modal { background: color-mix(in srgb, var(--bg-2) 95%, transparent); -webkit-backdrop-filter: blur(28px) saturate(1.2); backdrop-filter: blur(28px) saturate(1.2); }
+[data-tema=escuro] .modal.bx-modal { background: rgba(14, 22, 32, .95); }
+[data-visual=lite] .modal.bx-modal { background: var(--bg-2); } [data-tema=escuro][data-visual=lite] .modal.bx-modal { background: rgb(14, 22, 32); } /* (1.0.3) os exemplos dos planos ficavam transparentes demais: a página dos planos atrás atrapalhava a leitura */
+.bx-corpo { gap: 14px; }
+.bx-topo { position: relative; display: flex; align-items: center; gap: 12px; padding: 4px 4px 0; min-width: 0; overflow: hidden; border-radius: 14px; }
+.bx-topo .bx-esfera { position: relative; right: auto; top: auto; flex: none; width: 54px; height: 54px; opacity: .9; }
+.bx-tit { gap: 2px; min-width: 0; }
+.bx-reco { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; color: #fff; background: linear-gradient(180deg, var(--b1), var(--b2)); }
+.bx-seg { flex-wrap: wrap; }
+.bx-est { position: relative; display: grid; grid-template-columns: 14px 1fr; grid-template-rows: 10px 1fr; gap: 3px; width: 64px; height: 46px; padding: 4px; border-radius: 9px; background: linear-gradient(160deg, var(--e1), var(--e2)); box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 2px 6px rgba(0,0,0,.2); }
+.bx-est i { border-radius: 4px; background: rgba(255,255,255,.45); }
+.bx-est i:first-child { grid-column: 1 / 3; }
+.bx-est i:last-child { background: rgba(255,255,255,.7); }
+.bx-sec { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.bx-sec h4 { margin: 0; font-size: 14px; }
+.bx-nota { margin: -2px 0 2px; line-height: 1.4; overflow-wrap: anywhere; }
+.bx-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }
+.bx-peca { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px 8px; border-radius: 14px; background: color-mix(in srgb, var(--b2) 7%, rgba(255,255,255,.3)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--b2) 18%, transparent); min-width: 0; text-align: center; }
+[data-tema=escuro] .bx-peca { background: color-mix(in srgb, var(--b2) 10%, rgba(255,255,255,.04)); }
+.bx-peca > small { overflow-wrap: anywhere; }
+.bx-am { display: grid; place-items: center; min-height: 64px; width: 100%; padding: 6px; min-width: 0; }
+.bx-am .cx-msg { margin: 0; max-width: 100%; }
+.bx-nome { font-size: 17px; max-width: 100%; overflow-wrap: anywhere; }
+.bx-som { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; border: 0; cursor: pointer; color: #fff; background: linear-gradient(180deg, var(--b1), var(--b2)); box-shadow: 0 4px 12px color-mix(in srgb, var(--b2) 35%, transparent); }
+.bx-ic { width: 48px; height: 48px; }
+.bx-lim { display: grid; grid-template-columns: minmax(90px, 140px) 1fr auto; align-items: center; gap: 10px; font-size: 13px; }
+.bx-lim > b { white-space: nowrap; }
+.bx-lim-trilha { position: relative; height: 10px; border-radius: 999px; background: color-mix(in srgb, currentColor 10%, transparent); overflow: hidden; }
+.bx-lim-trilha > i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; }
+.bx-lim-ate { background: linear-gradient(90deg, var(--b1), var(--b2)); }
+.bx-lim-de { z-index: 1; background: color-mix(in srgb, currentColor 35%, transparent); }
+@media (max-width: 520px) { .bx-lim { grid-template-columns: 1fr auto; } .bx-lim-trilha { grid-column: 1 / -1; grid-row: 2; } }
+.bx-itens { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+.bx-item { display: flex; gap: 6px; align-items: flex-start; font-size: 13px; padding: 8px 10px; border-radius: 12px; background: color-mix(in srgb, var(--b2) 6%, transparent); min-width: 0; }
+.bx-item svg { flex: none; margin-top: 2px; color: var(--b2); }
+.bx-acao { display: flex; justify-content: flex-end; }
+.bx-acao .apoio-acao { margin: 0; background: linear-gradient(180deg, var(--b1), var(--b2)); }
 .bolha-esfera { position: absolute; right: -26px; top: -26px; width: 96px; height: 96px; border-radius: 50%; opacity: .55; pointer-events: none; background: radial-gradient(circle at 32% 28%, rgba(255,255,255,.9) 0 9%, transparent 12%), linear-gradient(160deg, var(--b1), var(--b2)); }
 .bolha-nome { font-size: 16px; position: relative; }
 .bolha-preco { display: flex; align-items: baseline; gap: 4px; } .bolha-preco span { font-size: 26px; font-weight: 800; color: var(--b2); } .bolha-preco small { color: var(--suave); }
@@ -2105,8 +2161,8 @@ html.ar-arrastando, html.ar-arrastando * { cursor: grabbing !important; user-sel
 .cx-msg[data-bc] .cx-txt:not(.so-figurinha) { --bcx: var(--bc, color-mix(in srgb, var(--cor-2) 40%, rgba(var(--vidro-rgb), .8))); background: color-mix(in srgb, var(--bcx) 82%, rgba(var(--vidro-rgb), .4)); color: var(--bcf, var(--texto)); border-color: color-mix(in srgb, var(--bcx) 60%, rgba(255,255,255,.5)); }
 .cx-msg[data-bc] .cx-txt:not(.so-figurinha) a { color: inherit; text-decoration: underline; }
 .cx-msg[data-bc] .cx-txt .cx-editado { color: inherit; opacity: .75; }
-.cx-msg[data-bc=padrao]:not([style*="--bc"]) .cx-txt:not(.so-figurinha) { background: none; background: linear-gradient(180deg, rgba(var(--vidro-rgb), .78), rgba(var(--vidro-rgb), .58)); border-color: rgba(255,255,255,.5); }
-.cx-msg.eu[data-bc=padrao]:not([style*="--bc"]) .cx-txt:not(.so-figurinha) { background: linear-gradient(180deg, color-mix(in srgb, var(--cor-2) 34%, rgba(var(--vidro-rgb), .7)), color-mix(in srgb, var(--cor) 30%, rgba(var(--vidro-rgb), .55))); }
+.cx-msg[data-bc=padrao]:not(.tem-bc) .cx-txt:not(.so-figurinha) { background: none; background: linear-gradient(180deg, rgba(var(--vidro-rgb), .78), rgba(var(--vidro-rgb), .58)); border-color: rgba(255,255,255,.5); }
+.cx-msg.eu[data-bc=padrao]:not(.tem-bc) .cx-txt:not(.so-figurinha) { background: linear-gradient(180deg, color-mix(in srgb, var(--cor-2) 34%, rgba(var(--vidro-rgb), .7)), color-mix(in srgb, var(--cor) 30%, rgba(var(--vidro-rgb), .55))); }
 /* (0.8.0) 10 modelos bem diferentes entre si */
 /* Aero: vidro brilhante, com o reflexo em cima */
 .cx-msg[data-bc=aero] .cx-txt:not(.so-figurinha) { position: relative; overflow: hidden; border-radius: 20px; border: 1px solid rgba(255,255,255,.85); background: linear-gradient(180deg, color-mix(in srgb, var(--bcx) 55%, #fff) 0%, var(--bcx) 100%); color: var(--bcf, #08324d);
@@ -2119,7 +2175,7 @@ html.ar-arrastando, html.ar-arrastando * { cursor: grabbing !important; user-sel
    é a do texto, alinhada com o nome; as ondas saem até ~6 px e não chegam na foto */
 .cx-msg[data-bc=aquario] .cx-txt > .pelicula { left: -11px; top: -11px; width: calc(100% + 22px); height: calc(100% + 22px); } /* sem borda: a caixa do desenho é a do texto */
 .cx-msg[data-bc=aquario] .cx-txt:not(.so-figurinha):not(.pel-ok)::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: 22px 28px 24px 30px / 26px 22px 30px 24px; background: linear-gradient(135deg, color-mix(in srgb, var(--bc, var(--cor)) 30%, rgba(var(--vidro-rgb), .55)), color-mix(in srgb, var(--bc, var(--cor-3)) 18%, rgba(var(--vidro-rgb), .4))); border: 1.5px solid rgba(255,255,255,.65); animation: pelicula 6.5s cubic-bezier(.45,0,.55,1) infinite; }
-.cx-msg[data-bc=aquario][style*="--bc"] .pelicula .pel-a { stop-color: color-mix(in srgb, var(--bc) 45%, rgba(var(--vidro-rgb), .55)); } .cx-msg[data-bc=aquario][style*="--bc"] .pelicula .pel-b, .cx-msg[data-bc=aquario][style*="--bc"] .pelicula .pel-c { stop-color: color-mix(in srgb, var(--bc) 25%, rgba(var(--vidro-rgb), .4)); }
+.cx-msg[data-bc=aquario].tem-bc .pelicula .pel-a { stop-color: color-mix(in srgb, var(--bc) 45%, rgba(var(--vidro-rgb), .55)); } .cx-msg[data-bc=aquario].tem-bc .pelicula .pel-b, .cx-msg[data-bc=aquario].tem-bc .pelicula .pel-c { stop-color: color-mix(in srgb, var(--bc) 25%, rgba(var(--vidro-rgb), .4)); }
 /* Bolha de sabão: quase transparente, com a borda furta-cor girando */
 .cx-msg[data-bc=sabao] .cx-txt:not(.so-figurinha) { position: relative; border-radius: 26px; border: 0; background: radial-gradient(ellipse 60% 50% at 30% 25%, rgba(255,255,255,.55), transparent 60%), color-mix(in srgb, var(--bc, #bfe6ff) 18%, rgba(var(--vidro-rgb), .25)); color: var(--bcf, var(--texto)); padding: 9px 16px; }
 .cx-msg[data-bc=sabao] .cx-txt:not(.so-figurinha)::after { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 2px; background: conic-gradient(from var(--sabao-a, 0deg), var(--bcg, #ff9ad5, #9ad8ff, #b5ff9a, #fff59a, #ff9ad5)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: sabao 6s linear infinite; pointer-events: none; opacity: .9; }
@@ -2456,7 +2512,7 @@ html.ar-arrastando, html.ar-arrastando * { cursor: grabbing !important; user-sel
 .tk-eu.compacto:hover .tk-eu-canto, .tk-eu.compacto.puxando .tk-eu-canto { opacity: 1; }
 .tk-eu.compacto .tk-eu-canto:hover { transform: scale(1.25); }
 .tk-eu.compacto.puxando { transform: none !important; transition: none; }
-html .tk-lado .tk-eu.compacto[style*="--eu-av"] .avatar { --t: var(--eu-av) !important; }
+html .tk-lado .tk-eu.compacto.tem-eu-av .avatar { --t: var(--eu-av) !important; }
 .ar-voador .tk-eu-canto { display: none !important; }
 /* o seu cartão com banner ou fundo do perfil: a imagem cobre o cartão todo, com um véu para a letra continuar legível */
 .tk-eu.eu-cheio::before { -webkit-mask-image: none; mask-image: none; opacity: 1; background: linear-gradient(90deg, rgba(var(--vidro-rgb), .55), rgba(var(--vidro-rgb), .18)), var(--np); }
@@ -3527,12 +3583,15 @@ canvas.pelicula { display: block; }
 .mq-cursor::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--cor) 70%, #fff); opacity: 0; }
 @keyframes mqToque { 0%, 20% { transform: scale(.6); opacity: 0; } 24% { opacity: .9; } 40%, 100% { transform: scale(2.6); opacity: 0; } }
 .mq-cartao .mq-cursor::after { animation: mqToque 4.4s ease-out infinite; }
-@keyframes mqDoca { 0%, 22% { transform: translate(-50%, 160%); } 34%, 70% { transform: translate(-50%, 0); } 82%, 100% { transform: translate(-50%, 160%); } }
-@keyframes mqCursor { 0% { left: 74%; top: 30%; scale: 1; } 20% { left: 50%; top: 90%; scale: 1; } 24% { scale: .8; } 28% { scale: 1; } 70% { left: 56%; top: 80%; } 86%, 100% { left: 74%; top: 30%; } }
-@keyframes mqAlca { 0%, 22% { opacity: 1; } 30%, 74% { opacity: 0; } 82%, 100% { opacity: 1; } }
+@keyframes mqDoca { 0%, 22% { transform: translate(-50%, 160%); } 32%, 80% { transform: translate(-50%, 0); } 90%, 100% { transform: translate(-50%, 160%); } }
+/* (1.0.3) a doca subindo levanta a tela de cima (como no app) e só desce quando o mouse sai dela */
+@keyframes mqDocaUi { 0%, 22% { padding-bottom: 7px; } 32%, 80% { padding-bottom: 38px; } 90%, 100% { padding-bottom: 7px; } }
+.mq-cartao.mq-doca > .mq-tela { animation: mqDocaUi 4.4s cubic-bezier(.2, 1.2, .4, 1) infinite; }
+@keyframes mqCursor { 0% { left: 74%; top: 30%; scale: 1; } 20% { left: 50%; top: 90%; scale: 1; } 24% { scale: .8; } 28% { scale: 1; } 40% { left: 56%; top: 84%; } 66% { left: 56%; top: 84%; } 78%, 100% { left: 74%; top: 30%; } }
+@keyframes mqAlca { 0%, 22% { opacity: 1; } 30%, 82% { opacity: 0; } 90%, 100% { opacity: 1; } }
 .mq-cartao .mq-doca { animation: mqDoca 4.4s cubic-bezier(.2, 1.2, .4, 1) infinite; } .mq-cartao .mq-cursor { animation: mqCursor 4.4s ease-in-out infinite; } .mq-cartao .mq-alca { animation: mqAlca 4.4s linear infinite; }
 [data-anim=nenhuma] .mq-tela * { animation: none !important; }
-[data-anim=nenhuma] .mq-tela > .mq-doca { transform: translate(-50%, 0); }
+[data-anim=nenhuma] .mq-tela > .mq-doca { transform: translate(-50%, 0); } [data-anim=nenhuma] .mq-cartao.mq-doca > .mq-tela { padding-bottom: 38px; }
 
 /* ============ (0.8.7) estúdio das configurações: páginas com orbes, estações com cenas, carteirinha, contatos estilo MSN, Aquarela e o editor do perfil ============ */
 .orbe-oPaleta { --o1: #ffc6e6; --o2: #d33c8f; } .orbe-chat { --o1: #8ed7ff; --o2: #1764c8; } .orbe-ajustes { --o1: #c8d6e2; --o2: #4f6b82; } .orbe-pessoa { --o1: #a6f0a0; --o2: #2f9a3c; } .orbe-coracao { --o1: #ffb3a8; --o2: #d8402e; }
@@ -3862,6 +3921,7 @@ select.campo.sel-aberto { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cor) 30
 .palco-luz { -webkit-mask: linear-gradient(180deg, #000 30%, transparent 85%); mask: linear-gradient(180deg, #000 30%, transparent 85%); }
 [data-tema=escuro] .palco-luz { opacity: .35; }
 .orbe-musica { --o1: #9ff0b8; --o2: #1a9e52; }
+.orbe-hq { --o1: #ffb38a; --o2: #d9481f; } .orbe-manga { --o1: #f6b3ff; --o2: #9b3fc4; } /* (1.0.3) HQs e Mangás no Mural */
 /* (0.8.7) a grade de emojis do chat com busca, também no indicador de digitação */
 .cx-emoji-caixa { display: contents; }
 .cx-emoji-busca-caixa { flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 999px; color: var(--suave); background: rgba(255,255,255,.45); box-shadow: inset 0 0 0 1px rgba(255,255,255,.7); }
@@ -3894,6 +3954,9 @@ select.campo.sel-aberto { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cor) 30
 /* (0.8.7) Privacidade: cada opção com uma cena animada do que ela faz */
 .opcao.com-cena { flex-wrap: nowrap; } .opcao.com-cena > .cresce { min-width: 0; }
 .opcao.com-cena:has(> .seg) { flex-wrap: wrap; } .opcao.com-cena > .seg { margin-left: 92px; }
+.opcao.com-cena > .seg { max-width: calc(100% - 92px); min-width: 0; } /* (1.0.3) a escolha nunca passa da borda */
+.opcao.com-cena > .seg { flex-wrap: wrap; } .opcao.com-cena > .seg button { flex: 1 1 auto; padding-left: 12px; padding-right: 12px; }
+@media (max-width: 620px) { .opcao.com-cena > .seg { margin-left: 0; max-width: 100%; } }
 .priv-cena { --pa: var(--cor, #2d9ee0); position: relative; contain: layout paint; flex: 0 0 78px; height: 54px; border-radius: 14px; overflow: hidden; align-self: flex-start;
   background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,.12)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.6), 0 2px 8px rgba(0,0,0,.08); }
 [data-tema=escuro] .priv-cena { background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.02)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
@@ -3911,6 +3974,14 @@ select.campo.sel-aberto { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cor) 30
 .pc-discord .pc-av { left: 6px; top: 7px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: inset 0 0 0 4px #ffd166; }
 .pc-discord .pc-l1 { left: 29px; top: 9px; width: 24px; opacity: .9; } .pc-discord .pc-l2 { left: 29px; top: 18px; width: 16px; opacity: .6; animation: pcLinha 2.4s ease-in-out infinite; }
 .pc-discord .pc-play { right: 5px; bottom: 5px; width: 0; height: 0; border: 5px solid transparent; border-left: 7px solid #fff; border-right: 0; animation: pcPulsa 1.2s ease-in-out infinite; }
+/* (1.0.3) as partes do Discord: o cartão menor com o ícone do que aparece (a mesma coluna da figurinha principal) */
+.opcao.sub-opcao.com-cena { padding-left: 0; }
+.pc-dcsub .pc-card { left: 14px; right: 14px; top: 13px; bottom: 13px; border-radius: 8px; background: linear-gradient(135deg, #5865f2, #8b6cff); box-shadow: 0 2px 8px rgba(88,101,242,.35); color: #fff; }
+.pc-dcsub .pc-ic { left: 5px; top: 50%; width: 18px; height: 18px; margin-top: -9px; display: grid; place-items: center; border-radius: 6px; background: rgba(255,255,255,.22); animation: pcIcone 2.4s ease-in-out infinite; }
+.pc-dcsub .pc-ic .ic { width: 12px; height: 12px; }
+.pc-dcsub .pc-l1 { left: 27px; top: 8px; width: 16px; opacity: .9; } .pc-dcsub .pc-l2 { left: 27px; top: 16px; width: 11px; opacity: .6; animation: pcLinha 2.4s ease-in-out infinite; }
+.pc-dc-chat .pc-ic { animation-delay: .3s; } .pc-dc-telefone .pc-ic { animation-delay: .6s; } .pc-dc-tela .pc-ic { animation-delay: .9s; } .pc-dc-pessoa .pc-ic { animation-delay: 1.2s; } .pc-dc-relogio .pc-ic { animation-delay: 1.5s; }
+@keyframes pcIcone { 50% { transform: scale(1.12); background: rgba(255,255,255,.34); } }
 /* Confirmação de leitura: o balão e os dois tiques que ficam azuis */
 .pc-lidos .pc-balao { left: 8px; top: 9px; width: 46px; height: 26px; border-radius: 12px 12px 4px 12px; background: var(--pa); color: #fff; animation: pcBalao 3.2s ease-in-out infinite; }
 .pc-lidos .pc-balao .pc-l1 { left: 7px; top: 7px; width: 30px; opacity: .85; } .pc-lidos .pc-balao .pc-l2 { left: 7px; top: 14px; width: 20px; opacity: .6; }
@@ -4286,6 +4357,28 @@ select.campo.sel-aberto { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cor) 30
 @keyframes muPipSai { to { opacity: 0; transform: translateY(12px) scale(.94); } }
 [data-anim=nenhuma] .mu-pip, [data-anim=nenhuma] .mu-pip-vis i { animation: none; }
 @media (max-width: 760px) { .mu-pip { display: none; } }
+/* (1.0.3) o PiP da Jam ("Ouvir junto"): sempre na tela enquanto você ouve junto, é por ele que se sai da Jam */
+.ouv-pip { position: fixed; left: 16px; bottom: 16px; z-index: 60; display: flex; align-items: center; gap: 10px; width: min(280px, calc(100vw - 32px)); padding: 7px 7px 7px 7px; border-radius: 18px; animation: muPipEntra .4s var(--mola, ease) both; }
+body:has(.mu-pip) .ouv-pip { bottom: 84px; }
+.ouv-pip.sai { animation: muPipSai .22s ease-in both; }
+.ouv-pip-capa { position: relative; flex: none; display: grid; place-items: center; width: 40px; height: 40px; overflow: hidden; border-radius: 11px; color: rgba(255,255,255,.85); background: linear-gradient(135deg, #1b4a6b, #0b2236); box-shadow: inset 0 0 0 1px rgba(255,255,255,.3); }
+.ouv-pip-capa img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ouv-pip-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ouv-pip-tx b, .ouv-pip-tx small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ouv-pip-tx b { font-size: 13px; }
+.ouv-pip-tx small { display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--suave); }
+.ouv-pip-tx small > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ouv-pip-tx small > svg { flex: none; }
+.ouv-pip > .btn { flex: none; }
+[data-tema=escuro] .ouv-pip-capa { box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+[data-anim=nenhuma] .ouv-pip, [data-anim=nenhuma] .ouv-pip .mu-pip-vis i { animation: none; }
+/* no celular as abas ficam fixas embaixo: o PiP fica logo acima delas e o conteúdo abre espaço para ele (não cobre o chat) */
+@media (max-width: 760px) {
+  .ouv-pip { left: 8px; bottom: calc(76px + var(--seg-baixo)); width: min(280px, calc(100vw - 16px)); padding: 5px 5px 5px 5px; }
+  .ouv-pip-capa { width: 36px; height: 36px; }
+  body:has(.ouv-pip) .home.col { padding-bottom: calc(140px + var(--seg-baixo)); }
+  html[data-teclado] .ouv-pip { display: none; }
+}
 .mu-menu { display: flex; flex-direction: column; gap: 10px; }
 .mu-agora { display: flex; gap: 12px; align-items: center; padding: 8px; border-radius: 16px; background: rgba(255,255,255,.07); }
 .mu-capa { width: 84px; height: 84px; flex-shrink: 0; border-radius: 14px; background: #111 center / cover; box-shadow: 0 4px 14px rgba(0,0,0,.3); }
@@ -4408,6 +4501,12 @@ select.campo.sel-aberto { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cor) 30
 .mr-img.q { aspect-ratio: 1; }
 .mr-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
 .mr-img-ic { opacity: .6; }
+/* (1.0.3) com a imagem carregada o controle de reserva some (aparecia no meio dos logos transparentes); jogo sem capa da Steam: o ícone do
+   jogo no meio, inteiro, como ícone de app (no lugar do logo gigante cortado) */
+.mr-img.com-img > .mr-img-ic { display: none; }
+.mr-img.icone-jogo { background: radial-gradient(circle at 50% 38%, rgba(255,255,255,.16), rgba(255,255,255,.02) 62%), linear-gradient(180deg, #1b2a3d, #0b1320); }
+.mr-img.icone-jogo > img.mr-icone-jogo { inset: 0; margin: auto; width: 68%; height: auto; aspect-ratio: 1; object-fit: contain; border-radius: 22%; filter: drop-shadow(0 6px 14px rgba(0,0,0,.45)); }
+.mr-ed-it .mr-img.icone-jogo > img.mr-icone-jogo, .mr-op .mr-img.icone-jogo > img.mr-icone-jogo { width: 80%; }
 .mr-it:hover .mr-img, .mr-it:focus-visible .mr-img { transform: translateY(-3px) scale(1.04); box-shadow: 0 8px 18px rgba(0,0,0,.35), 0 0 0 2px color-mix(in srgb, var(--cor, #2d9ee0) 70%, transparent); }
 .mr-fav { flex-direction: row; align-items: center; gap: 12px; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .mr-fav > .mr-img { width: 92px; flex: none; }
@@ -4497,6 +4596,10 @@ select.campo.sel-aberto { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cor) 30
 .mr-abas-ed { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,.08)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.5); }
 [data-tema=escuro] .mr-abas-ed { background: rgba(255,255,255,.04); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
 .mr-aba-ed { position: relative; flex: 1 1 70px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px 6px; border: 0; border-radius: 16px; font: inherit; font-size: 12px; color: var(--suave); background: transparent; cursor: pointer; touch-action: none; user-select: none; transition: background .2s, color .2s, transform .25s var(--mola, ease); }
+/* (1.0.3) cada aba do Mural com a sua cor (antes várias repetiam o mesmo azul) */
+.mr-aba-ed[data-c=f] .orbe { --o1: #ffa3b3; --o2: #c8243f; } .mr-aba-ed[data-c=s] .orbe { --o1: #8ff0e0; --o2: #0e8f86; } .mr-aba-ed[data-c=a] .orbe { --o1: #ffe08a; --o2: #d98a0a; }
+.mr-aba-ed[data-c=m] .orbe { --o1: #9ff0b8; --o2: #1a9e52; } .mr-aba-ed[data-c=l] .orbe { --o1: #b3bcff; --o2: #3f4fc9; } .mr-aba-ed[data-c=b] .orbe { --o1: #f3d3a4; --o2: #9a5b23; }
+.mr-aba-ed[data-c=h] .orbe { --o1: #ffb38a; --o2: #d9481f; } .mr-aba-ed[data-c=g] .orbe { --o1: #f6b3ff; --o2: #9b3fc4; } .mr-aba-ed[data-c=j] .orbe { --o1: #8ed7ff; --o2: #1764c8; }
 .mr-aba-ed .orbe { filter: saturate(.45); transform: scale(.88); transition: filter .25s, transform .45s var(--mola, ease); }
 .mr-aba-ed:hover .orbe { filter: none; transform: scale(1) translateY(-2px); }
 .mr-aba-ed.sel { color: var(--texto); background: linear-gradient(180deg, rgba(255,255,255,.8), rgba(255,255,255,.3) 50%, color-mix(in srgb, var(--cor-2) 25%, rgba(255,255,255,.2))); box-shadow: inset 0 0 0 1px rgba(255,255,255,.7); }
@@ -4564,11 +4667,30 @@ select.campo.sel-aberto { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cor) 30
 /* (0.8.7) a capa das integrações: a imagem de quem fez (ou o ícone do tipo no meio) */
 .ig-capa { position: relative; aspect-ratio: 16 / 9; width: 100%; display: grid; place-items: center; overflow: hidden;
   background: radial-gradient(80% 90% at 50% 0%, color-mix(in srgb, var(--cor) 38%, transparent), transparent 70%), linear-gradient(160deg, rgba(255,255,255,.14), rgba(255,255,255,.02)); }
+/* (1.0.3) o banner de cada integração: a cor dela no fundo, o ícone apagadinho grande à direita e a bolha com o ícone à esquerda */
+.ig-capa.ig-banner { isolation: isolate;
+  background: radial-gradient(120% 140% at 0% 100%, color-mix(in srgb, var(--b2) 55%, transparent), transparent 62%), linear-gradient(135deg, color-mix(in srgb, var(--b1) 55%, #0c1a2a), color-mix(in srgb, var(--b2) 70%, #07111d)); }
+/* (1.0.3) como no perfil: o banner em cima e o ícone numa bolha separada, metade para fora dele (tudo parado) */
+.ig-cabeca { position: relative; flex: none; padding-bottom: 30px; }
+.ig-cabeca > .ig-capa.ig-banner { aspect-ratio: 16 / 7; }
+.ig-cabeca.grande { flex: 1; display: flex; flex-direction: column; padding-bottom: 54px; }
+.ig-cabeca.grande > .ig-capa.ig-banner { flex: 1; aspect-ratio: auto; min-height: 170px; height: auto; border-radius: 16px; }
+.ig-av { position: absolute; left: 14px; bottom: 0; z-index: 2; width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center; overflow: hidden;
+  background: #0f1c28; box-shadow: 0 0 0 3px rgba(255,255,255,.6), 0 6px 16px rgba(0,0,0,.35); }
+.ig-cabeca.grande > .ig-av { left: 22px; bottom: 8px; width: 92px; height: 92px; }
+.ig-palco:has(> .ig-cabeca) { overflow: visible; } /* a bolha do ícone (e a borda dela) não é cortada pela caixa */
+.ig-av.com-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ig-av-orbe { --ot: 100% !important; width: 100%; height: 100%; animation: none !important; }
+.ig-criar-prev { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; } .ig-criar-prev:not(:has(> :not([hidden]))) { display: none; }
+.ig-criar-ic { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; flex: none; } .ig-criar-ic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ig-banner-marca { position: absolute; right: -10px; bottom: -18px; z-index: -1; color: #fff; opacity: .16; transform: rotate(-12deg); pointer-events: none; }
+.ig-banner-marca > .ic { stroke-width: 1.4; }
+.ig-av-orbe > .ic { width: 62% !important; height: 62% !important; }
 .ig-capa img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .ig-capa.grande { height: 100%; aspect-ratio: auto; min-height: 200px; border-radius: inherit; }
 .ig-criar-img { width: 160px; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; }
 .ig-criar-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.ig-palco { border-radius: 16px; overflow: hidden; display: flex; } .ig-palco > .ig-capa { flex: 1; }
+.ig-palco { border-radius: 16px; overflow: hidden; display: flex; } .ig-palco > .ig-capa, .ig-palco > .ig-cabeca { flex: 1; }
 
 /* (0.8.7) o Letterboxd no cartão enche o espaço que você deu a ele, de qualquer tamanho: as capas seguem a altura (ficam no formato de
    capa) e cabem quantas der na largura; o título encolhe junto. Nada de diminuir o widget inteiro (ficava minúsculo) */
@@ -4701,7 +4823,10 @@ select.campo.sel-aberto { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cor) 30
 .conteudo .vidro:not(.interno) { --sombra-max: 12px; }
 /* (0.8.7) nas páginas das Configurações a página fora da tela já fica escondida inteira: o "content-visibility" dos cartões só servia para
    recortar a sombra do que está dentro deles (botões, cartõezinhos, a carteirinha) na borda do cartão */
-.cfg-pagina .mosaico-bloco > .mosaico-col > section, .cfg-pagina .mosaico > section.larga { content-visibility: visible; }
+/* (1.0.3) de volta, com folga: a caixa fora da tela não é recalculada (cada passo de um deslizador de cor/vidro refazia o estilo de TODAS as
+   caixas da página, ~100 ms por passo em PC fraco), e o que está dentro tem 24 px para a sombra sair sem ser cortada */
+.cfg-pagina .mosaico-bloco > .mosaico-col > section, .cfg-pagina .mosaico > section.larga { content-visibility: auto; overflow-clip-margin: 24px; }
+.mosaico-col.medindo > * { content-visibility: visible !important; }
 /* (0.8.7) os desenhos do Mural não usam a cor do perfil (com o perfil branco ficavam todos brancos) */
 .pv.pv-ml, .pv.pv-mf { --pc: #2f9be6; }
 .pv-mf-degrade i { background: linear-gradient(135deg, #2f9be6, #b06cff); }
@@ -4869,8 +4994,8 @@ input[type=color]::-moz-color-swatch { background-image: radial-gradient(circle 
 .cx-presente[hidden] { display: none; }
 @keyframes cxPresente { from { opacity: 0; transform: translateY(8px) scale(.9); } }
 /* (0.9.1) a letra do campo de mensagem troca sozinha quando some no fundo dele (veja letraDoCampo no chatui) */
-.cx-compor[data-bc] .cx-linha > .cx-inp.campo[style*="--bcf-campo"] { color: var(--bcf-campo) !important; caret-color: var(--bcf-campo) !important; }
-.cx-compor[data-bc] .cx-linha > .cx-inp.campo[style*="--bcf-campo"]::placeholder { color: color-mix(in srgb, var(--bcf-campo) 60%, transparent) !important; }
+.cx-compor[data-bc] .cx-linha > .cx-inp.campo.tem-bcf { color: var(--bcf-campo) !important; caret-color: var(--bcf-campo) !important; }
+.cx-compor[data-bc] .cx-linha > .cx-inp.campo.tem-bcf::placeholder { color: color-mix(in srgb, var(--bcf-campo) 60%, transparent) !important; }
 /* (0.9.1) o menu do botão direito fica sempre por cima de tudo, inclusive da foto em tela cheia (que fica numa janela acima das outras) */
 .menu-ctx, .menu-sub { z-index: 500 !important; }
 /* ===================== (0.9.1) lado das suas mensagens: à esquerda como as dos outros, ou à direita (como no WhatsApp) =====================
@@ -4919,6 +5044,8 @@ input[type=color]::-moz-color-swatch { background-image: radial-gradient(circle 
 .ig-chip { display: inline-flex; align-items: center; gap: 5px; }
 .ig-chip .ic { width: 13px; height: 13px; }
 .ig-selo.com { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; background: color-mix(in srgb, var(--cor-2, var(--cor)) 24%, transparent); }
+.ig-selo.preco { background: color-mix(in srgb, var(--ok) 22%, transparent); white-space: nowrap; flex: none; } /* (1.0.3) o preço das integrações pagas da Comunidade */
+.ig-preco { width: 110px; max-width: 100%; }
 .ig-publicar { border: 2px dashed color-mix(in srgb, var(--cor) 45%, transparent) !important; }
 .ig-publicar:hover { border-color: var(--cor) !important; }
 button.ig-autor { border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; padding: 4px 8px 4px 4px; border-radius: 14px; }
@@ -5088,7 +5215,7 @@ button.ig-autor:hover { background: color-mix(in srgb, var(--cor) 12%, transpare
 .cx-hora-lado { position: absolute; top: 11px; left: -4px; right: -4px; text-align: center; font-size: 10.5px; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--texto-2, currentColor); opacity: 0; pointer-events: none; transition: opacity .12s; }
 .cx-msg.junto:hover .cx-hora-lado, .cx-msg.junto:focus-visible .cx-hora-lado, .cx-msg.junto:has(:focus-visible) .cx-hora-lado { opacity: .7; }
 /* (0.9.5) prévia de post do Twitter/X */
-.cx-midia.cx-tw { display: flex; flex-direction: column; gap: 8px; width: min(440px, calc(100% - 8px)); box-sizing: border-box; padding: 12px 13px 11px; border-left: 3px solid color-mix(in srgb, var(--texto) 55%, transparent); }
+.cx-midia.cx-tw { display: flex; flex-direction: column; gap: 8px; width: 440px; max-width: calc(100% - 8px); box-sizing: border-box; padding: 12px 13px 11px; border-left: 3px solid color-mix(in srgb, var(--texto) 55%, transparent); }
 .cx-tw-carregando { min-height: 120px; }
 .cx-tw-esq { height: 96px; border-radius: 12px; background: linear-gradient(90deg, color-mix(in srgb, var(--texto) 6%, transparent), color-mix(in srgb, var(--texto) 12%, transparent), color-mix(in srgb, var(--texto) 6%, transparent)); background-size: 200% 100%; animation: twEsq 1.4s linear infinite; }
 @keyframes twEsq { to { background-position: -200% 0; } }
@@ -5117,6 +5244,24 @@ button.ig-autor:hover { background: color-mix(in srgb, var(--cor) 12%, transpare
 .cx-tw-num { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
 .cx-tw-rod { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--texto); opacity: .6; text-decoration: none; cursor: pointer; width: fit-content; }
 .cx-tw-rod:hover { opacity: .9; text-decoration: underline; }
+/* (1.0.3) post citado (caixinha dentro), post respondido (em cima, com a linha da conversa) e o "+N" quando há mais de 4 fotos */
+.cx-tw-cita, .cx-tw-pai { display: flex; flex-direction: column; gap: 6px; min-width: 0; cursor: pointer; }
+.cx-tw-cita { padding: 9px 10px; border-radius: 14px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--texto) 18%, transparent); background: color-mix(in srgb, var(--texto) 4%, transparent); }
+.cx-tw-cita:hover { background: color-mix(in srgb, var(--texto) 8%, transparent); }
+.cx-tw-pai { position: relative; padding: 0 0 4px 0; }
+.cx-tw-pai::after { content: ""; position: absolute; left: 13px; top: 30px; bottom: -6px; width: 2px; border-radius: 2px; background: color-mix(in srgb, var(--texto) 22%, transparent); }
+.cx-tw-pai > :not(.cx-tw-topo) { margin-left: 36px; }
+.cx-tw-pai .cx-tw-txt, .cx-tw-cita .cx-tw-txt { font-size: 13px; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+.cx-tw-topo.mini { gap: 7px; }
+.cx-midia.cx-tw .cx-tw-topo.mini > .cx-tw-av { width: 28px; height: 28px; max-width: 28px; max-height: 28px; }
+.cx-tw-quem.mini { flex-direction: row; align-items: baseline; gap: 5px; flex: 0 1 auto; }
+.cx-tw-quem.mini b { font-size: 13px; } .cx-tw-quem.mini small { font-size: 12px; }
+.cx-tw-quando { flex: none; font-size: 12px; opacity: .6; white-space: nowrap; }
+.cx-tw-respa { margin-top: -4px; font-size: 12.5px; opacity: .7; } .cx-tw-respa b { color: #1d9bf0; font-weight: 600; }
+.cx-tw-midias.mini { border-radius: 11px; }
+.cx-tw-midias.mini.um { max-height: 240px; } .cx-tw-midias.mini.um > .cx-gcel { max-height: 240px; }
+.cx-tw-midias.mini.n2 { grid-auto-rows: 120px; } .cx-tw-midias.mini.n3 { grid-template-rows: 90px 90px; } .cx-tw-midias.mini.n4 { grid-auto-rows: 90px; }
+.cx-tw-mais { position: absolute; inset: 0; display: grid; place-items: center; font-size: 26px; font-weight: 800; color: #fff; background: rgba(8,12,18,.55); text-shadow: 0 2px 8px rgba(0,0,0,.5); pointer-events: none; }
 
 /* (0.9.6) escolher um GIF para a foto ou o banner: busca e mosaico em 3 colunas (a área que rola tem folga para a sombra não cortar) */
 .pf-gif-rola { height: min(56vh, 460px); overflow-y: auto; padding: 4px; margin: -4px; }
@@ -5731,6 +5876,13 @@ body[data-aer-letras=surgir][data-aer-letras-titulos] :is(h1, h2, h3), body[data
 .est-val { min-width: 48px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
 .est-dica { margin: 0; }
 .est-sub { margin: 10px 0 0; font-size: 14px; }
+/* (1.0.3) a aba Molduras e bolhas do Estúdio */
+.est-artes { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; min-width: 0; }
+.est-arte { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 14px; min-width: 0; }
+.est-arte-ic { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: color-mix(in srgb, var(--cor) 18%, transparent); color: var(--cor3, var(--cor)); }
+.est-arte-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+.est-arte > .btn { align-self: flex-start; margin-top: auto; }
+.est-artes-acoes { gap: 8px; flex-wrap: wrap; }
 .est-erro { color: var(--erro); }
 .est-css { font-family: monospace; font-size: 12.5px; min-height: 180px; resize: vertical; }
 .est-vivo { gap: 8px; align-items: center; }

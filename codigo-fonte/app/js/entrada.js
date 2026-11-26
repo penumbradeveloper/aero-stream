@@ -56,7 +56,7 @@
   }
   E.pausarLocal = pausarLocal;
   // (0.7.9) o Esc é do jogo: no app do PC ele nem chega ao Chromium, que soltaria o mouse e sairia da tela cheia (o main.js manda ele para cá)
-  const teclasDoJogo = () => { if (window.aero && window.aero.teclasDoJogo) window.aero.teclasDoJogo(!!E.lock && !E.pausaLocal); };
+  const teclasDoJogo = () => { if (window.aero && window.aero.teclasDoJogo) window.aero.teclasDoJogo(!!E.lock && !E.pausaLocal, !!E.lock && !E.pausaLocal && E.imersivo()); }; // (1.0.3) e se o modo imersivo está ligado (KDE: os atalhos do sistema vão para o amigo)
   if (window.aero && window.aero.aoEscDoJogo) window.aero.aoEscDoJogo((baixo) => { if (!E.lock || E.pausaLocal) return; const c = meu(); if (!c || c.st !== 'ativo' || !c.real || !perm().teclado) return; if (baixo) { teclasAbertas.add('Escape'); env({ t: 'kd', c: 'Escape', k: 'Escape' }); } else { teclasAbertas.delete('Escape'); env({ t: 'ku', c: 'Escape' }); } });
   // (0.7.9) Ctrl + Alt + F12 abre a bolha e pausa; Ctrl + Alt + F11 larga o controle na hora. No Linux o sistema pega Ctrl + Alt + F1 a F12 para trocar
   // de terminal e a tecla nem chega aqui: com o Shift junto ele deixa passar
@@ -78,7 +78,7 @@
   // NÃO agem no seu computador: vão só para o dele. O navegador só deixa segurar esses atalhos em tela cheia, então o modo imersivo põe a
   // tela cheia junto. Pausar (Ctrl+Alt+F12, a bolha ou o combo do controle) devolve o teclado para você
   E.imersivo = () => !!(A.cfg.v.entrada || {}).imersivo;
-  E.definirImersivo = (on) => { const c = A.cfg.v.entrada || (A.cfg.v.entrada = {}); c.imersivo = !!on; A.cfg.salvar(); emit('imersivo', !!on); if (!on) soltarImersivo(); };
+  E.definirImersivo = (on) => { const c = A.cfg.v.entrada || (A.cfg.v.entrada = {}); c.imersivo = !!on; A.cfg.salvar(); emit('imersivo', !!on); if (!on) soltarImersivo(); teclasDoJogo(); };
   let cheiaPorImersivo = false;
   function aplicarImersivo() {
     if (!E.lock || E.pausaLocal || !E.imersivo() || !navigator.keyboard || !navigator.keyboard.lock) return;
@@ -396,6 +396,8 @@
       const n = nativo();
       if (motivo === 'gamepad-precisa-vigem' && n && n.instalarVigem) { // o ViGEmBus vem junto com o app do Windows: um clique instala
         E.oferecerVigem();
+      } else if ((motivo === 'permissao-uinput' || motivo === 'sem-uinput') && n && n.liberarUinput) { // (1.0.3) Linux: um clique libera (a senha do sistema)
+        E.oferecerUinput();
       } else if (msg) A.ui.toast(A.T(msg[0], msg[1]), { tipo: 'erro', ms: 14000 });
       else if (!c.mouse && !c.teclado && !c.gamepad) A.ui.toast(A.T('Este computador não conseguiu ligar o controle remoto (' + motivo + '). Veja o LEIA-ME ou copie o relatório de diagnóstico.', 'This computer could not enable remote input (' + motivo + '). See the README or copy the diagnostic report.'), { tipo: 'erro', ms: 12000 });
       return c;
@@ -414,6 +416,16 @@
     if (r.ok && c) { semPadAvisados.clear(); for (const p of S.participantes) if (p.ctl && p.ctl.dono === S.id && p.ctl.st === 'ativo') S.enviarDC(p.id, { t: 'cap', ...c }); }
     return r;
   };
+  // (1.0.3) Linux: em vez de mandar ler o LEIA-ME, o botão libera o /dev/uinput (o sistema pede a senha uma vez) e o controle já passa a valer
+  E.liberarUinput = async () => {
+    const n = nativo(); if (!n || !n.liberarUinput) return { ok: false };
+    const r = await n.liberarUinput().catch(() => ({ ok: false }));
+    const c = r.ok ? await E.capacidades() : null, ok = !!(c && (c.mouse || c.teclado));
+    if (r.motivo !== 'cancelado') A.ui.toast(ok ? A.T('Pronto! Os amigos já podem controlar o seu computador no modo jogo.', 'Done! Friends can now control your computer in game mode.') : A.T('Não consegui liberar o controle remoto. Reiniciar o computador costuma resolver.', 'Could not enable remote control. Restarting the computer usually fixes it.'), { tipo: ok ? 'ok' : 'erro', ms: 9000 });
+    if (ok) { avisados.delete('permissao-uinput'); avisados.delete('sem-uinput'); for (const p of S.participantes) if (p.ctl && p.ctl.dono === S.id && p.ctl.st === 'ativo') S.enviarDC(p.id, { t: 'cap', ...c }); A.evt.emit('entrada:liberada', c); }
+    return { ok };
+  };
+  E.oferecerUinput = () => A.ui.toast(A.T('Para os amigos controlarem o seu computador no modo jogo, o Linux precisa liberar o teclado e o mouse virtuais (pede a sua senha uma vez).', 'For friends to control your computer in game mode, Linux needs to allow the virtual keyboard and mouse (asks for your password once).'), { ms: 0, acoes: [{ texto: A.T('Liberar', 'Allow'), tipo: 'ok', onclick: () => E.liberarUinput() }, { texto: A.T('Agora não', 'Not now'), tipo: 'sec' }] });
   E.oferecerVigem = () => A.ui.toast(A.T('Mouse e teclado dos amigos já funcionam. Para os controles (gamepad) dos amigos, falta instalar o ViGEmBus (o Windows pede permissão uma vez).', 'Friends\' mouse and keyboard already work. For friends\' gamepads, ViGEmBus needs to be installed (Windows asks for permission once).'), { ms: 0, acoes: [{ texto: A.T('Instalar agora', 'Install now'), tipo: 'ok', onclick: () => E.instalarVigem() }, { texto: A.T('Agora não', 'Not now'), tipo: 'sec', onclick: () => { const cfgE = A.cfg.v.entrada; cfgE.vigemDispensado = Date.now(); A.cfg.salvar(); } }] });
   // (0.7.8) o amigo apertou o controle e este PC não tem como criar um controle virtual: antes não acontecia nada, sem aviso para ninguém.
   // Agora os dois ficam sabendo (uma vez por pessoa), mesmo que o aviso já tenha sido dispensado

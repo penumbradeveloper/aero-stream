@@ -299,7 +299,7 @@
       ms, w: entre(x.w, 300, 560, 440), ht: +x.ht > 0 ? entre(x.ht, 300, 800, 0) : 0 });
     if (x.eu) pf.eu = x.eu;
     pf.ws = {}; for (const k of GRANDES) if (x.ws && x.ws[k] === 'g') pf.ws[k] = 'g';
-    pf.mi = {}; for (const k of MI) { const r = x.mi && x.mi[k]; if (r && typeof r === 'object' && /^[fsamlbj]$/.test(String(r.k)) && typeof r.t === 'string' && r.t) pf.mi[k] = { k: r.k, t: r.t }; } // (0.8.7) itens do Mural no cartão
+    pf.mi = {}; for (const k of MI) { const r = x.mi && x.mi[k]; if (r && typeof r === 'object' && /^[fsamlbjhg]$/.test(String(r.k)) && typeof r.t === 'string' && r.t) pf.mi[k] = { k: r.k, t: r.t }; } // (0.8.7) itens do Mural no cartão
     if (x.ba === false) pf.ba = false; // (0.8.2) a borda animada desligada
     if (x.bt === 'donator') pf.bt = 'donator'; // (0.8.2) o Supporter pode usar a borda do Donator
     if (x.fo === 'so') pf.fo = 'so'; // (0.9.6) só a foto vai para o canto (sem coluna própria: o resto do cartão fica igual)
@@ -959,28 +959,10 @@
   }
 
   // ---------- (1.0.2) perfil exclusivo: a bio e as cores que só um amigo vê ----------
-  P.editarExclusivo = (p) => {
-    const U = A.ui, x = p.meuExc || {}, eu = API.eu || {};
-    const bio = h('textarea', { class: 'campo', rows: 4, maxlength: 190, placeholder: T('A bio que só ', 'The bio only ') + (p.apelido || p.nome) + T(' vê', ' sees') }); bio.value = x.bio || '';
-    const cor = (k, pad) => h('input', { type: 'color', class: 'perfil-cor', value: x[k] || pad, 'aria-label': k === 'cor1' ? T('Cor principal', 'Main color') : T('Segunda cor', 'Second color') });
-    const c1 = cor('cor1', eu.cor1 || '#2d9ee0'), c2 = cor('cor2', eu.cor2 || '#7fd3ff');
-    const usarCores = U.chave(!!(x.cor1 || x.cor2), (v) => { coresL.classList.toggle('apagado', !v); });
-    const coresL = h('div', { class: 'linha' + (x.cor1 || x.cor2 ? '' : ' apagado'), estilo: { gap: '10px' } }, c1, c2);
-    const salvar = async (apagar) => {
-      try {
-        P.esquecer(p.codigo);
-        const d = await API.req('perfil/exclusivo', apagar ? { codigo: p.codigo, apagar: true } : { codigo: p.codigo, bio: bio.value, ...(usarCores.checked !== false && !coresL.classList.contains('apagado') ? { cor1: c1.value, cor2: c2.value } : {}) });
-        p.meuExc = d.meuExc || undefined; A.som.tocar('sucesso'); m.fechar();
-        U.toast(apagar ? T('Agora ela vê o seu perfil público.', 'They now see your public profile.') : T('Pronto: só ela vê esse perfil.', 'Done: only they see this profile.'), { tipo: 'ok', ms: 2600 });
-      } catch (e) { U.toast(e.message, { tipo: 'erro' }); }
-    };
-    const m = U.modal(T('Perfil para ', 'Profile for ') + (p.apelido || p.nome), h('div', { class: 'col', estilo: { gap: '10px' } },
-      h('p', { class: 'peq suave', estilo: { margin: 0 } }, T('Ela vê o seu perfil com esta bio e estas cores, e pode trocar para o público quando quiser. O resto do perfil continua igual.', 'They see your profile with this bio and colors, and can switch to the public one anytime. The rest stays the same.')),
-      bio, h('div', { class: 'opcao curta' }, h('div', { class: 'cresce' }, T('Cores só para ela', 'Colors just for them')), usarCores), coresL), {
-      largura: 420,
-      acoes: [...(p.meuExc ? [{ texto: T('Apagar', 'Delete'), tipo: 'perigo', onclick: () => salvar(true) }] : []), { texto: T('Salvar', 'Save'), onclick: () => salvar(false) }],
-    });
-  };
+  // o perfil que o amigo fez para você: o inteiro (1.0.3) ou, nos antigos, só a bio e as cores por cima do público
+  P.comExc = (q) => (!q.exc ? q : q.exc.x ? { ...q, ...q.exc } : { ...q, bio: q.exc.bio || q.bio, cor1: q.exc.cor1 || q.cor1, cor2: q.exc.cor2 || q.cor2 });
+  // (1.0.3) é o próprio editor do perfil, no modo "para esta pessoa"
+  P.editarExclusivo = (p, depois) => P.editar({ para: p, depois });
 
   // ---------- ver o perfil de alguém ----------
   P.ver = async (codigo) => {
@@ -1026,7 +1008,7 @@
       if (a) extras.append(h('div', { class: 'opcao curta' }, h('div', { class: 'cresce' }, T('Entra na minha tela sem pedir', 'Joins my screen without asking')), U.chave(a.confia, (v) => API.amigos.confianca(codigo, v).catch((e) => U.toast(e.message, { tipo: 'erro' })))));
       // (0.6.0) avisar quando ESTA pessoa ficar online (o aviso deixou de ser para todo mundo)
       extras.append(h('div', { class: 'opcao curta' }, h('div', { class: 'cresce' }, T('Avisar quando ficar online', 'Notify me when they come online')), U.chave(!!p.avisarOnline, (v) => { P.esquecer(codigo); API.req('amigos/avisar-online', { codigo, sim: v }).catch((e) => U.toast(e.message, { tipo: 'erro' })); })));
-      extras.append(h('div', { class: 'opcao curta' }, h('div', { class: 'cresce' }, h('div', {}, T('Perfil só para esta pessoa', 'Profile just for this person')), h('small', { class: 'suave' }, p.meuExc ? T('Ela vê a bio e as cores que você fez para ela.', 'They see the bio and colors you made for them.') : T('Uma bio e cores que só ela vê (Supporter).', 'A bio and colors only they see (Supporter).'))), U.btn(p.meuExc ? T('Editar', 'Edit') : T('Criar', 'Create'), { peq: true, tipo: 'sec', icone: 'lapis', onclick: () => P.editarExclusivo(p) }))); // (1.0.2)
+      extras.append(h('div', { class: 'opcao curta' }, h('div', { class: 'cresce' }, h('div', {}, T('Perfil só para esta pessoa', 'Profile just for this person')), h('small', { class: 'suave' }, p.meuExc ? T('Ela vê o perfil que você fez para ela.', 'They see the profile you made for them.') : T('Um perfil inteiro que só ela vê (Supporter).', 'A whole profile only they see (Supporter).'))), U.btn(p.meuExc ? T('Editar', 'Edit') : T('Criar', 'Create'), { peq: true, tipo: 'sec', icone: 'lapis', onclick: () => P.editarExclusivo(p) }))); // (1.0.2)
       extras.append(h('div', { class: 'linha', estilo: { 'justify-content': 'flex-end' } }, U.btn(T('Remover amigo', 'Remove friend'), { tipo: 'perigo', peq: true, onclick: async () => { if (await U.confirmar(T('Remover ', 'Remove ') + p.nome + '?', { perigo: true })) { await API.amigos.remover(codigo).catch((e) => U.toast(e.message, { tipo: 'erro' })); m.fechar(); } } })));
     }
     if (!souEu) extras.append(h('div', { class: 'linha', estilo: { 'justify-content': 'center' } }, U.btn(T('Bloquear', 'Block'), { icone: 'bloquear', tipo: 'link', peq: true, onclick: async () => { if (await P.bloquear(p, true)) m.fechar(); } }), U.btn(T('Denunciar', 'Report'), { icone: 'bandeira', tipo: 'link', peq: true, onclick: () => { m.fechar(); A.admin && A.admin.denunciar(p); } })));
@@ -1035,7 +1017,7 @@
     const opCartao = { verFotos: true, souEu: souEu ? () => { m.fechar(); P.editar(); } : null }, larg0 = Math.max(480, P.arranjoDe(p).w + 40);
     const montar = (q) => (A.mural ? A.mural.juntar(cartao(q, opCartao), q) : cartao(q, opCartao));
     // (1.0.2) o amigo fez um perfil só para você: abre nele, e dá para ver o público
-    const mesclar = (q) => (q.exc ? { ...q, bio: q.exc.bio || q.bio, cor1: q.exc.cor1 || q.cor1, cor2: q.exc.cor2 || q.cor2 } : q);
+    const mesclar = (q) => P.comExc(q);
     let cartaoEl = montar(mesclar(p));
     const trocaExc = p.exc ? U.seg([['exc', T('Feito para você', 'Made for you')], ['pub', T('Público', 'Public')]], 'exc', (v) => { const novo = montar(v === 'exc' ? mesclar(p) : p); cartaoEl.replaceWith(novo); cartaoEl = novo; requestAnimationFrame(() => { caberLargura(); caberMural(); vigiar(); }); }) : null;
     if (trocaExc) trocaExc.classList.add('perfil-troca-exc');
@@ -1075,7 +1057,7 @@
     if (miniAberto) { const mesma = miniAberto.codigo === codigo; miniAberto(); if (mesma) return; }
     let p; try { p = await P.buscar(codigo); } catch (e) { U.toast(e.message, { tipo: 'erro' }); return; }
     const eu = API.eu || {}, souEu = codigo === eu.codigo;
-    if (p.exc) p = { ...p, bio: p.exc.bio || p.bio, cor1: p.exc.cor1 || p.cor1, cor2: p.exc.cor2 || p.cor2 }; // (1.0.2) o perfil que o amigo fez só para você
+    if (p.exc) p = P.comExc(p); // (1.0.2) o perfil que o amigo fez só para você
     const c1 = p.cor1 || '#2d9ee0', c2 = p.cor2 || p.cor1 || '#7fd3ff', banner = urlBanner(p.codigo, p.bannerV);
     const ds = H.dispositivosDe ? H.dispositivosDe(codigo) : [];
     const sala = null, on = souEu || ds.length > 0; // (0.9.6) sem salas: a tela é só nas chamadas
@@ -1146,9 +1128,16 @@
     return { blob: b, url: URL.createObjectURL(b) };
   }
 
-  P.editar = async () => {
-    const U = A.ui;
+  // (1.0.3) para: o perfil feito só para um amigo. É este mesmo editor (tudo o que entrar nele vale aqui também), começando do
+  // exclusivo que já existe; a foto, o nome, a #, o status e as imagens enviadas continuam os do perfil público
+  P.editar = async (op = {}) => {
+    const U = A.ui, para = op.para || null;
     let eu; try { eu = await API.req('eu'); } catch (e) { U.toast(e.message, { tipo: 'erro' }); return; }
+    if (para) {
+      let x; try { x = (await API.req('perfil/exclusivo', { codigo: para.codigo, ler: true })).meuExc || {}; } catch (e) { U.toast(e.message, { tipo: 'erro' }); return; }
+      eu = { ...eu }; for (const [k, v] of Object.entries(x)) { if (v === null) delete eu[k]; else eu[k] = v; }
+      if (x.fd === undefined && (x.fundo1 !== undefined || x.fundo2 !== undefined)) delete eu.fd; // os antigos (só bio e cores)
+    }
     const st = { fundo1: eu.fundo1 || '', fundo2: eu.fundo2 || '', cor1: eu.cor1 || '', cor2: eu.cor2 || '', bio: eu.bio || '', discord: eu.discord || '', spotify: eu.spotify || null, bannerNovo: null, tirarBanner: false, nome: eu.nome, tag: eu.tag, fotoNova: null,
       // (0.8.0) estilo do nome, fundo (degradê de várias cores / banner), nameplate e arranjo do perfil
       nm: { f: 'padrao', e: 'solido', c: [], ...(eu.nm || {}) },
@@ -1207,14 +1196,15 @@
     // (0.8.0) a prévia no tamanho de verdade do cartão, diminuída para caber na coluna (a conta é a mesma: só a escala muda)
     const escala = (c) => (parseFloat(c.style.zoom) || 1);
     // a escala é a do cartão mais largo (560 px): assim um cartão mais estreito aparece mais estreito na prévia, como fica de verdade
+    // (1.0.3) lê a largura antes de escrever qualquer coisa e só escreve o que mudou (antes cada chamada obrigava a página a se medir de novo)
     function encaixar(c) {
-      c.style.width = st.pf.w + 'px';
+      const w = st.pf.w + 'px', put = (el, k, v) => { if (el.style[k] !== v) el.style[k] = v; };
       // (0.8.7) com o Mural do lado (aba Mural): o cartão no tamanho dele; quem diminui os dois juntos é o --mlz (antes ele encolhia duas vezes)
       const ml = previa.parentElement && previa.parentElement.dataset.ml;
-      if (ml === 'esquerda' || ml === 'direita') { previa.style.width = st.pf.w + 'px'; c.style.zoom = '1'; return; }
-      previa.style.removeProperty('width');
+      if (ml === 'esquerda' || ml === 'direita') { put(c, 'width', w); put(previa, 'width', w); put(c, 'zoom', '1'); return; }
+      if (previa.style.width) previa.style.removeProperty('width');
       const cabe = previa.clientWidth || 560;
-      c.style.zoom = String(Math.min(1, cabe / 560));
+      put(c, 'width', w); put(c, 'zoom', String(Math.min(1, cabe / 560)));
     }
     // (0.8.0) segurar e arrastar: um widget mostra os quadradinhos (soltar num ocupado troca os dois de lugar), a foto mostra os 9
     // lugares do cartão e o banner mostra os lados. O que estiver embaixo do mouse acende.
@@ -1738,7 +1728,7 @@
             if (v !== 'pers') await U.mudarStatus(v, true);
             else if ((A.api.eu || eu).status !== 'online') await U.mudarStatus('online');
           }), 'st', ['online', 'ausente', 'ocupado', 'invisivel', 'pers']);
-          return bloco('pessoa', T('Status', 'Status'), seg, persCx);
+          return para ? null : bloco('pessoa', T('Status', 'Status'), seg, persCx);
         })(), // (0.8.3)
         // (0.9.6) quem não gosta de insígnias no perfil pode esconder (as suas somem do cartão, do mini perfil e da lista do grupo)
         (() => { // (1.0.0) liga ou desliga todas e escolhe exatamente quais aparecem: cada uma num cartão com a prévia, o nome e o que ela é,
@@ -1792,8 +1782,8 @@
               U.chave(st.pf.ba !== false, (v) => { if (v) delete st.pf.ba; else st.pf.ba = false; if (qual) qual.hidden = !v; pintar(); })),
             qual ? h('div', { class: 'linha', estilo: { gap: '8px', 'flex-wrap': 'wrap' } }, qual) : null);
         })() : null,
-        bloco('lapis', T('Você', 'You'), h('div', { class: 'rot' }, T('Foto', 'Photo')), h('div', { class: 'linha', estilo: { 'flex-wrap': 'wrap' } }, foto, U.btn(T('Trocar foto', 'Change photo'), { icone: 'camera', tipo: 'sec', peq: true, onclick: () => foto.click() }), U.btn(T('Escolher GIF', 'Choose a GIF'), { icone: 'gif', tipo: 'sec', peq: true, onclick: async () => { const f = await P.escolherGif(T('Um GIF para a sua foto', 'A GIF for your photo')); if (!f) return; try { st.fotoNova = await P.prepararFoto(f); pintar(); } catch (e) { U.toast(e.message, { tipo: 'erro' }); } } }), h('span', { class: 'peq suave' }, T('GIF animado de até 20 MB também vale', 'Animated GIFs up to 20 MB work too'))), recentes,
-        h('div', { class: 'linha', estilo: { gap: '10px', 'align-items': 'flex-start', 'flex-wrap': 'wrap' } },
+        bloco('lapis', T('Você', 'You'), para && A.extras ? A.extras.faixaPrevia(4) : null, para ? dica(T('A foto, o nome, a # e as imagens enviadas são as do seu perfil público. Todo o resto aqui fica só para ', 'Your photo, name, # and uploaded images are the ones from your public profile. Everything else here is just for ') + (para.apelido || para.nome) + '.') : null, para ? null : h('div', { class: 'rot' }, T('Foto', 'Photo')), para ? null : h('div', { class: 'linha', estilo: { 'flex-wrap': 'wrap' } }, foto, U.btn(T('Trocar foto', 'Change photo'), { icone: 'camera', tipo: 'sec', peq: true, onclick: () => foto.click() }), U.btn(T('Escolher GIF', 'Choose a GIF'), { icone: 'gif', tipo: 'sec', peq: true, onclick: async () => { const f = await P.escolherGif(T('Um GIF para a sua foto', 'A GIF for your photo')); if (!f) return; try { st.fotoNova = await P.prepararFoto(f); pintar(); } catch (e) { U.toast(e.message, { tipo: 'erro' }); } } }), h('span', { class: 'peq suave' }, T('GIF animado de até 20 MB também vale', 'Animated GIFs up to 20 MB work too'))), recentes,
+        para ? null : h('div', { class: 'linha', estilo: { gap: '10px', 'align-items': 'flex-start', 'flex-wrap': 'wrap' } },
           h('div', { class: 'cresce', estilo: { 'min-width': '160px' } }, h('div', { class: 'rot' }, T('Nome', 'Name')), nomeI),
           h('div', { class: 'cresce', estilo: { 'min-width': '160px' } }, h('div', { class: 'rot' }, T('Sua # (única)', 'Your # (unique)')), tagI, tagMsg)),
         h('div', { class: 'rot' }, T('Biografia', 'Bio')), bio));
@@ -1817,7 +1807,7 @@
     // (0.8.7) a aba Mural: de que lado do cartão ele fica (ou sem mural) e o que tem nele
     const muralCaixa = h('div', { class: 'col' }, h('div', { class: 'suave peq' }, T('Carregando o mural...', 'Loading the wall...')));
     A.mural.esquecer(eu.codigo);
-    A.mural.dados(eu.codigo, eu.mv).then((m) => { st.mural = JSON.parse(JSON.stringify(m || {})); muralCaixa.replaceChildren(A.mural.editor(st.mural, () => { st.muralMudou = true; pintar(); pintarMural(true); }, () => pintarMural(true))); pintar(); pintarMural(true); })
+    A.mural.dados(eu.codigo, eu.mv).then((m) => { st.mural = JSON.parse(JSON.stringify(m || {})); muralCaixa.replaceChildren(para ? dica(T('Os itens do Mural são os do seu perfil público. Aqui você escolhe o lado e o fundo dele só para ', 'The Wall items are the ones from your public profile. Here you pick its side and background just for ') + (para.apelido || para.nome) + '.') : A.mural.editor(st.mural, () => { st.muralMudou = true; pintar(); pintarMural(true); }, () => pintarMural(true))); pintar(); pintarMural(true); })
       .catch(() => muralCaixa.replaceChildren(dica(T('Não deu para abrir o mural agora.', 'Could not open the wall now.'))));
     const ladoMural = U.seg([['', T('Sem mural', 'No wall')], ['esquerda', T('Esquerda', 'Left')], ['direita', T('Direita', 'Right')], ['cima', T('Em cima', 'Top')], ['baixo', T('Embaixo', 'Bottom')]], st.ml, (v) => { st.ml = v; A.som.tocar('click'); pintar(); pintarMural(); });
     visual(ladoMural, 'ml', ['nada', 'esquerda', 'direita', 'cima', 'baixo']); // (0.8.7) cada lado com o desenho do cartão e do mural
@@ -1869,6 +1859,7 @@
       if (!max) { salvos.replaceChildren(h('div', { class: 'rot' }, T('Perfis salvos', 'Saved profiles')), dica('🔒 ' + T('Com o Aero Bubble Supporter: guarde até 5 perfis e troque num clique.', 'With Aero Bubble Supporter: keep up to 5 profiles and switch in one click.'))); return; }
       const fazer = async (acao, i, extra = {}) => {
         try {
+          if (acao === 'salvar') await salvarJa(true); // as mudanças do editor entram antes no perfil, e o espaço guarda o que você está vendo
           const x = await API.req('perfis-salvos', { acao, i, ...extra });
           // (1.0.2) o editor reabre com o perfil que acabou de entrar: antes ele voltava com o perfil antigo da memória (e salvar desfazia a troca)
           if (acao === 'usar') { m.fechar(false); try { await API.carregarEu(); } catch (_) { /* ok */ } P.esquecer(eu.codigo); A.evt.emit('perfil'); U.toast(T('Perfil trocado!', 'Profile switched!'), { tipo: 'ok', ms: 2200 }); setTimeout(() => P.editar(), 320); return; }
@@ -1884,10 +1875,9 @@
           x ? U.btn('', { icone: 'fechar', peq: true, tipo: 'sec', redondo: true, titulo: T('Apagar', 'Delete'), onclick: () => fazer('apagar', i) }) : null);
       });
       salvos.replaceChildren(h('div', { class: 'rot' }, T('Perfis salvos', 'Saved profiles')), ...linhas,
-        dica(T('Guarda o perfil como está salvo agora (estilo do nome, fundo, nameplate, arranjo, bio e música). A foto e o banner continuam os de agora.', 'Keeps your profile as it is saved now (name style, background, nameplate, layout, bio and song). Your photo and banner stay the same.')));
+        dica(T('Guarda o perfil como está no editor (estilo do nome, fundo, nameplate, arranjo, bio e música); as mudanças são salvas junto. A foto e o banner continuam os de agora.', 'Keeps your profile as it is in the editor (name style, background, nameplate, layout, bio and song); your changes are saved too. Your photo and banner stay the same.')));
     };
-    API.req('perfis-salvos', { acao: 'listar' }).then(pintarSalvos).catch(() => {});
-    abaPerfil.append(salvos);
+    if (!para) { API.req('perfis-salvos', { acao: 'listar' }).then(pintarSalvos).catch(() => {}); abaPerfil.append(salvos); }
     const abas = { perfil: abaPerfil, widgets: abaWidgets, mural: abaMural, nome: abaNome, fundo: abaFundo, np: abaNp, arranjo: abaArranjo };
     if (A.extras) abas.extras = A.extras.abaPerfil(st, pintar, { rot, dica }); // (1.0.0) os extras do Aero Bubble (moldura, abertura, acessórios, chamada)
     const caixaAba = h('div', { class: 'perfil-aba' });
@@ -1909,30 +1899,49 @@
     new ResizeObserver(() => { const c = previa.querySelector('.perfil-cartao'); if (c) encaixar(c); }).observe(previa);
     const corpo = h('div', { class: 'perfil-editor' }, h('div', { class: 'perfil-previa-caixa' }, h('i', { class: 'palco-luz', 'aria-hidden': 'true' }), previa, h('i', { class: 'palco-chao', 'aria-hidden': 'true' }), muralPrev), h('div', { class: 'col pf-ed-dir', estilo: { gap: '12px', 'min-width': '0' } }, segAbas, caixaAba));
     pintarJa();
-    const m = U.modal(T('Seu perfil', 'Your profile'), corpo, {
-      largura: 1160, classe: 'perfil-modal', som: ['perfil-abrir', 'perfil-fechar'], acoes: [{ texto: T('Cancelar', 'Cancel'), tipo: 'sec', valor: false }, { texto: T('Salvar perfil', 'Save profile'), valor: true }],
+    // o que vai para o servidor: o mesmo pacote no perfil público e no feito para um amigo
+    const pacote = () => {
+      const fd = st.fd, legado = fd.t === 'cor' ? [fd.c[0] || '', ''] : fd.t === 'degrade' ? [fd.c[0] || '', fd.c[fd.c.length - 1] || ''] : ['', ''];
+      return { ...(A.extras ? A.extras.paraSalvar(st) : {}), bio: st.bio, cor1: st.cor1, cor2: st.cor2, fundo1: legado[0], fundo2: legado[1], discord: st.discord, spotify: st.spotify,
+        ml: st.ml, lb: st.lb, gl: st.gl, lbf: [], nm: st.nm, fd: st.tirarFd ? { ...st.fd, tirarImagem: true } : st.fd, np: st.np.t === 'nenhum' ? { t: 'nenhum', tirarImagem: !!st.tirarNp } : st.np, pf: st.pf,
+        mf: st.mf.t === 'vidro' ? { t: 'vidro', tirarImagem: !!st.tirarMf } : st.tirarMf ? { ...st.mf, tirarImagem: true } : st.mf };
+    };
+    // (1.0.3) salvar o perfil sem fechar o editor: o "Salvar perfil" e o "Guardar aqui" dos perfis salvos (que antes guardava o perfil de
+    // ANTES das mudanças do editor, e parecia que não tinha salvado nada)
+    const salvarJa = async (quieto) => {
+      await edStatus.salvarPendente();
+      if (st.nome.trim() !== eu.nome || st.tag !== eu.tag) await API.salvarPerfil({ nome: st.nome, tag: st.tag });
+      if (st.fotoNova) { if (st.fotoNova.blob) await API.subirImagem('avatar', st.fotoNova.blob); else await API.salvarAvatar(st.fotoNova); }
+      // fundo1/fundo2 seguem junto (quem ainda usa uma versão antiga vê pelo menos as cores do degradê)
+      if (st.muralMudou) { await A.mural.salvar(st.mural); A.mural.esquecer(eu.codigo); }
+      if (st.clNovo && A.extras && A.extras.tem(3)) { try { const r = await API.subirImagem('ligacao', st.clNovo); st.clV = r.clV; } catch (e) { U.toast(e.message, { tipo: 'erro' }); } } // (1.0.0) o cartão de ligação
+      await API.req('perfil-extra', pacote());
+      if (st.np.t === 'imagem' && st.npNovo) await API.subirImagem('nameplate', st.npNovo.blob);
+      if (st.fd.t === 'imagem' && st.fdNovo) await API.subirImagem('fundo', st.fdNovo.blob);
+      if (st.mf.t === 'imagem' && st.mfNovo) await API.subirImagem('mural', st.mfNovo.blob);
+      if (st.tirarBanner) await API.req('banner', { dados: '' });
+      else if (st.bannerNovo) { if (st.bannerNovo.blob) await API.subirImagem('banner', st.bannerNovo.blob); else await API.req('banner', { dados: st.bannerNovo }); }
+      await API.carregarEu(); if (!quieto) { A.som.tocar('sucesso'); U.toast(T('Perfil salvo!', 'Profile saved!'), { tipo: 'ok', ms: 2500 }); }
+      A.evt.emit('perfil'); // (0.5.9-7) o nome, a # e a foto novos aparecem no topo e no Aero Talk na hora, sem refazer a tela (U.atualizarVivos)
+    };
+    const quem = para ? para.apelido || para.nome : '';
+    const m = U.modal(para ? T('Perfil para ', 'Profile for ') + quem : T('Seu perfil', 'Your profile'), corpo, {
+      largura: 1160, classe: 'perfil-modal' + (para ? ' pf-exc' : ''), som: ['perfil-abrir', 'perfil-fechar'],
+      acoes: [...(para && para.meuExc ? [{ texto: T('Voltar ao público', 'Back to public'), tipo: 'perigo', valor: 'apagar' }] : []), { texto: T('Cancelar', 'Cancel'), tipo: 'sec', valor: false }, { texto: para ? T('Salvar para ', 'Save for ') + quem : T('Salvar perfil', 'Save profile'), valor: true }],
       aoFechar: async (v) => {
         P.pararPrevia(); offGl();
         if (!v) return;
-        try {
-          await edStatus.salvarPendente();
-          if (st.nome.trim() !== eu.nome || st.tag !== eu.tag) await API.salvarPerfil({ nome: st.nome, tag: st.tag });
-          if (st.fotoNova) { if (st.fotoNova.blob) await API.subirImagem('avatar', st.fotoNova.blob); else await API.salvarAvatar(st.fotoNova); }
-          // fundo1/fundo2 seguem junto (quem ainda usa uma versão antiga vê pelo menos as cores do degradê)
-          const fd = st.fd, legado = fd.t === 'cor' ? [fd.c[0] || '', ''] : fd.t === 'degrade' ? [fd.c[0] || '', fd.c[fd.c.length - 1] || ''] : ['', ''];
-          if (st.muralMudou) { await A.mural.salvar(st.mural); A.mural.esquecer(eu.codigo); }
-          if (st.clNovo && A.extras && A.extras.tem(3)) { try { const r = await API.subirImagem('ligacao', st.clNovo); st.clV = r.clV; } catch (e) { U.toast(e.message, { tipo: 'erro' }); } } // (1.0.0) o cartão de ligação
-          await API.req('perfil-extra', { ...(A.extras ? A.extras.paraSalvar(st) : {}), bio: st.bio, cor1: st.cor1, cor2: st.cor2, fundo1: legado[0], fundo2: legado[1], discord: st.discord, spotify: st.spotify,
-            ml: st.ml, lb: st.lb, gl: st.gl, lbf: [], nm: st.nm, fd: st.tirarFd ? { ...st.fd, tirarImagem: true } : st.fd, np: st.np.t === 'nenhum' ? { t: 'nenhum', tirarImagem: !!st.tirarNp } : st.np, pf: st.pf,
-            mf: st.mf.t === 'vidro' ? { t: 'vidro', tirarImagem: !!st.tirarMf } : st.tirarMf ? { ...st.mf, tirarImagem: true } : st.mf });
-          if (st.np.t === 'imagem' && st.npNovo) await API.subirImagem('nameplate', st.npNovo.blob);
-          if (st.fd.t === 'imagem' && st.fdNovo) await API.subirImagem('fundo', st.fdNovo.blob);
-          if (st.mf.t === 'imagem' && st.mfNovo) await API.subirImagem('mural', st.mfNovo.blob);
-          if (st.tirarBanner) await API.req('banner', { dados: '' });
-          else if (st.bannerNovo) { if (st.bannerNovo.blob) await API.subirImagem('banner', st.bannerNovo.blob); else await API.req('banner', { dados: st.bannerNovo }); }
-          await API.carregarEu(); A.som.tocar('sucesso'); U.toast(T('Perfil salvo!', 'Profile saved!'), { tipo: 'ok', ms: 2500 });
-          A.evt.emit('perfil'); // (0.5.9-7) o nome, a # e a foto novos aparecem no topo e no Aero Talk na hora, sem refazer a tela (U.atualizarVivos)
-        } catch (e) { U.toast(e.message, { tipo: 'erro' }); }
+        if (para) {
+          try {
+            P.esquecer(para.codigo);
+            const d = await API.req('perfil/exclusivo', v === 'apagar' ? { codigo: para.codigo, apagar: true } : { codigo: para.codigo, perfil: pacote() });
+            para.meuExc = d.meuExc || undefined; A.som.tocar('sucesso');
+            U.toast(v === 'apagar' ? T('Agora ela vê o seu perfil público.', 'They now see your public profile.') : T('Pronto: só ela vê esse perfil.', 'Done: only they see this profile.'), { tipo: 'ok', ms: 2600 });
+            if (op.depois) op.depois();
+          } catch (e) { U.toast(e.message, { tipo: 'erro' }); }
+          return;
+        }
+        try { await salvarJa(); } catch (e) { U.toast(e.message, { tipo: 'erro' }); }
       },
     });
   };

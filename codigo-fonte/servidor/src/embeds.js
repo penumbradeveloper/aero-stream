@@ -121,7 +121,29 @@ export function impostoBR(valor, moeda, cotacao) {
   return { ii: Math.round(ii * 100) / 100, icms: Math.round(icms * 100) / 100, total: Math.round((ii + icms) * 100) / 100, final: Math.round((usd + ii + icms) * 100) / 100, moeda: 'USD' };
 }
 
-export async function loja(url) {
+// (1.0.3) link enorme de produto (o do AliExpress passa de 800 letras): fica só o endereço do produto, e o preço que o próprio link traz
+// (pdp_npi = "6@dis!BRL!R$ 512,47!R$ 389,53!!!79.99!60.80!...") vira a dica de preço, porque a página nova do AliExpress não traz o preço no HTML
+export function canonLoja(bruto) {
+  const s = String(bruto || '').trim().slice(0, 4000);
+  const ali = /^https?:\/\/((?:[a-z]{2,3}|www|m)\.)?aliexpress\.(com|us|ru)\/item\/(\d{6,20})\.html/i.exec(s);
+  if (ali) {
+    let dica = null;
+    try {
+      const npi = new URL(s).searchParams.get('pdp_npi') || '';
+      const p = npi.split('!');
+      if (/^[A-Z]{3}$/.test(p[1] || '')) { const de = precoDe(p[2]), por = precoDe(p[3]); if (por || de) dica = { moeda: p[1], preco: por || de, de: por && de && de > por ? de : null }; }
+      let ext = {}; try { ext = JSON.parse(new URL(s).searchParams.get('pdp_ext_f') || '{}') || {}; } catch (_) { ext = {}; }
+      if (ext.ship_from === 'BR') dica = { ...(dica || {}), nacional: true }; // enviado do Brasil: sem imposto de importação
+    } catch (_) { dica = null; }
+    return { url: 'https://' + (ali[1] || 'www.') + 'aliexpress.' + ali[2] + '/item/' + ali[3] + '.html', dica };
+  }
+  const amz = /^(https?:\/\/(?:(?:www|smile)\.)?amazon\.[a-z.]{2,8}\/)(?:[^\s?#]*\/)?(?:dp|gp\/product)\/([A-Z0-9]{10})/i.exec(s);
+  if (amz) return { url: amz[1] + 'dp/' + amz[2], dica: null };
+  return { url: s.slice(0, 400), dica: null };
+}
+
+export async function loja(bruto) {
+  const { url, dica } = canonLoja(bruto);
   const m = RE_LOJA.exec(url); if (!m) return null;
   const ali = !!m[3];
   let html = '', final = url;
@@ -166,6 +188,8 @@ export async function loja(url) {
     if (!d.titulo && j) d.titulo = txt(procura(j, 'subject') || '', 300);
   }
   if (!d.titulo) return null;
+  if (d.preco == null && dica && dica.preco) { d.preco = dica.preco; d.moeda = dica.moeda; if (dica.de) d.de = dica.de; }
+  if (dica && dica.nacional) { d.incluso = true; d.nacional = true; }
   if (d.preco != null && !d.moeda) d.moeda = 'USD';
   if (!d.incluso && d.preco != null) d.imposto = impostoBR(d.preco, d.moeda, d.moeda === 'USD' ? 1 : null);
   if (d.moeda === 'BRL' && !d.incluso && d.preco != null) { // preço já em reais (AliExpress Brasil): calcula a partir de uma cotação aproximada

@@ -26,12 +26,14 @@ ipcRenderer.on('kms-fim', (_e, m) => { for (const cb of fimKms) { try { cb(Strin
 if (typeof window !== 'undefined') window.addEventListener('unload', () => ipcRenderer.send('kms-cmd', 'parar')); // a interface recarregou: a captura não fica rodando sozinha
 
 contextBridge.exposeInMainWorld('aero', {
-  teclasDoJogo: (on) => ipcRenderer.send('teclas-do-jogo', !!on),
+  teclasDoJogo: (on, imersivo) => ipcRenderer.send('teclas-do-jogo', !!on, !!imersivo),
   toqueTrava: () => ipcRenderer.send('toque-trava'),
   aoEscDoJogo: (cb) => { ipcRenderer.on('esc-do-jogo', (_e, baixo) => cb(!!baixo)); },
   cofreLocal: { fechar: (t) => ipcRenderer.sendSync('cofre-local', 'f', String(t)), abrir: (t) => ipcRenderer.sendSync('cofre-local', 'a', String(t)) },
   info: () => chamar('info'),
   ocioso: () => chamar('ocioso'),
+  abrirSteam: (id) => chamar('abrir-steam', String(id)), // (1.0.3) o cartão da Steam abre o jogo no app da Steam instalado
+  jogarRoblox: (id) => chamar('jogar-roblox', String(id)), // (1.0.3) o Jogar do cartão do Roblox abre o app instalado (o Sober no Linux)
   copiar: (t) => chamar('copiar', String(t)),
   mostrar: () => chamar('mostrar'),
   telaCheia: (on) => chamar('tela-cheia', !!on),
@@ -150,6 +152,7 @@ contextBridge.exposeInMainWorld('aero', {
   entrada: {
     disponivel: () => chamar('entrada-disponivel'),
     instalarVigem: () => chamar('vigem-instalar'),
+    liberarUinput: () => chamar('uinput-liberar'), // (1.0.3) Linux: libera o controle remoto com a senha do sistema
     aoCursorHost: (cb) => { const f = (_e, p) => { try { cb(p); } catch (e) { /* ok */ } }; ipcRenderer.on('cursor-host', f); return () => ipcRenderer.removeListener('cursor-host', f); },
     aoMira: (cb) => { const f = (_e, on) => { try { cb(!!on); } catch (e) { /* ok */ } }; ipcRenderer.on('entrada-mira', f); return () => ipcRenderer.removeListener('entrada-mira', f); },
     aoHost: (cb) => { const f = () => { try { cb(); } catch (e) { /* ok */ } }; ipcRenderer.on('entrada-host', f); return () => ipcRenderer.removeListener('entrada-host', f); },

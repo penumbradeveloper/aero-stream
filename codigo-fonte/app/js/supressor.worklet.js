@@ -11,7 +11,7 @@ const N = 512, H = 256, NB = N / 2 + 1;
 class SupressorAero extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.p = { ligado: true, forca: 60, limiar: -45 };
+    this.p = { ligado: true, forca: 60, limiar: -45, margem: 8 };
     this.port.onmessage = (e) => { if (!e.data) return; if (e.data.p) Object.assign(this.p, e.data.p); if (typeof e.data.ref === 'number') this.refNovo = e.data.ref; };
     // (1.0.2) anti-eco: "ref" é o nível do que o Aero está tocando agora. "acop" é quanto desse som volta pelo microfone (dB), aprendido
     // sozinho; a referência demora a cair (o eco chega atrasado e a sala ressoa um pouco)
@@ -34,6 +34,9 @@ class SupressorAero extends AudioWorkletProcessor {
     this.ataque = Math.exp(-1 / (0.004 * sampleRate)); this.solta = Math.exp(-1 / (0.06 * sampleRate));
     this.segura = Math.round(0.22 * sampleRate); // segura 220 ms depois da última sílaba (não corta o final das palavras)
     this.blocos = 0; this.pico = -90;
+    // (1.0.3) nível do ruído de fundo (segue os vales: desce rápido, sobe ~0,5 dB/s). A sensibilidade conta a partir dele: num quarto
+    // barulhento a porta não fica aberta o tempo todo, e num quarto quieto continua abrindo com voz baixinha
+    this.piso = -60; this.limiarEf = -45;
   }
 
   fft(inv) {
@@ -108,7 +111,13 @@ class SupressorAero extends AudioWorkletProcessor {
       if (this.acop < -45) this.acop = -45; else if (this.acop > -3) this.acop = -3;
       eco = db < this.ref + this.acop + 9; // até 9 dB acima do eco esperado ainda é eco; a sua voz passa disso
     }
-    if (db > p.limiar && !eco) this.ultimoSom = this.t;
+    if (db > -100) {
+      if (this.t < 0.4 * sampleRate) { this.nPiso = (this.nPiso || 0) + 1; this.piso = this.nPiso === 1 ? db : this.piso + (db - this.piso) / this.nPiso; } // começo: a média dos primeiros 0,4 s (se for fala, cai na primeira pausa)
+      else this.piso = db < this.piso ? 0.7 * this.piso + 0.3 * db : this.piso + 0.0027; // ~1 dB/s para cima
+    }
+    // nunca acima de -22 dB: num lugar muito barulhento a voz ainda abre a porta
+    this.limiarEf = Math.min(Math.max(p.limiar, this.piso + (+p.margem || 0)), Math.max(p.limiar, -22));
+    if (db > this.limiarEf && !eco) this.ultimoSom = this.t;
     const fala = this.t - this.ultimoSom < this.segura;
     this.aberto = !p.ligado || fala;
     const reducao = 20 + f * 0.8; // dB que a porta fechada abaixa (60 -> 68 dB; 95+ -> mudo)
@@ -127,7 +136,7 @@ class SupressorAero extends AudioWorkletProcessor {
     }
     for (let k = 1; k < saidas[0].length; k++) saidas[0][k].set(sai);
     this.t += n;
-    if (++this.blocos >= 16) { this.port.postMessage({ aberto: this.aberto, db: this.pico }); this.blocos = 0; this.pico = -90; }
+    if (++this.blocos >= 16) { this.port.postMessage({ aberto: this.aberto, db: this.pico, limiar: this.limiarEf }); this.blocos = 0; this.pico = -90; }
     return true;
   }
 }

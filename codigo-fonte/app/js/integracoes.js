@@ -33,7 +33,7 @@
   // ---------- as travas do CSS ----------
   const PROIBIDAS = new Set(['content', 'pointer-events', '-webkit-app-region', 'app-region', 'behavior', '-moz-binding', 'user-modify', '-webkit-user-modify', 'quotes', 'counter-reset', 'counter-increment', 'counter-set']);
   const VALOR_RUIM = /(url\s*\(|image-set\s*\(|src\s*\(|expression\s*\(|javascript:|@import|attr\s*\()/i;
-  const SELETOR_RUIM = /(\[data-protegido|\.integ-|#integ|\.cfg-|\.fundo-modal|\.modal\b|\.toast|#toasts|:root|^\s*html\b)/i;
+  const SELETOR_RUIM = /(\[data-protegido|\.integ-|#integ|\.cfg-|\.fundo-modal|\.modal\b|\.toast|#toasts|:root|^\s*html\b|\[\s*style\b)/i; // (1.0.3) [style] deixava o app todo lento (qualquer mudança de estilo recalculava tudo)
   // devolve o CSS limpo e o que foi tirado
   // (0.8.7) pref: as animações (@keyframes) da integração ganham um prefixo, para nunca trocar uma animação do próprio app
   I.sanitizar = (css, pref) => {
@@ -105,6 +105,8 @@
   // (0.8.7) a imagem da integração: quem fez coloca no pacote (PNG, JPG, WebP ou GIF embutido, sem link para fora, até ~300 KB)
   const imagemOk = (u) => (typeof u === 'string' && u.length < 420000 && /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+=*$/.test(u) ? u : '');
   I.imagemOk = imagemOk;
+  const iconeOk = (u) => (u && u.length < 160000 ? imagemOk(u) : ''); // (1.0.3) o ícone de quem fez (a bolha redonda, separada do banner)
+  I.iconeOk = iconeOk;
   I.lerPacote = (texto) => {
     const bruto = String(texto || '').trim();
     let j = null; if (bruto.startsWith('{')) { try { j = JSON.parse(bruto); } catch (e) { throw new Error(T('O pacote .json tem um erro de escrita.', 'The .json package has a syntax error.')); } }
@@ -133,7 +135,7 @@
     const presets = (Array.isArray(j.presets) ? j.presets : []).slice(0, 8).map((p) => (p && p.tema && typeof p.tema === 'object' ? { nome: txt(p.nome, 30) || 'Preset', tema: p.tema } : null)).filter(Boolean);
     const css = String(j.css || '').slice(0, 60000);
     const r = I.sanitizar(css, id);
-    return { id, nome, autor: txt(j.autor, 40), desc: txt(j.descricao || j.desc, 600), versao: txt(j.versao, 12), imagem: imagemOk(j.imagem), css, opcoes, sons, barras: lista(j.barras, 6), bolhas: bolhasDe(j.bolhas), presets, molduras: fotosDe(j.molduras, false), aneis: fotosDe(j.aneis, true), tirados: r.tirados };
+    return { id, nome, autor: txt(j.autor, 40), desc: txt(j.descricao || j.desc, 600), versao: txt(j.versao, 12), imagem: imagemOk(j.imagem), icone: iconeOk(j.icone), css, opcoes, sons, barras: lista(j.barras, 6), bolhas: bolhasDe(j.bolhas), presets, molduras: fotosDe(j.molduras, false), aneis: fotosDe(j.aneis, true), tirados: r.tirados };
   };
   // as opções, as barras e as bolhas de cada integração ligada viram atributos no <body>; os sons entram nos sons de digitação
   const marcados = new Set();
@@ -279,7 +281,7 @@
         if (!x || x.pac || !x.com || !x.com.id) continue;
         try {
           const d = await A.api.req('integ/' + encodeURIComponent(x.com.id) + '/pacote');
-          const pk = I.lerPacote(JSON.stringify({ ...d.pac, id: x.com.id, autor: d.autor, imagem: d.imagem || '' }));
+          const pk = I.lerPacote(JSON.stringify({ ...d.pac, id: x.com.id, autor: d.autor, imagem: d.imagem || '', icone: d.icone || '' }));
           const { tirados, ...guardar } = pk; void tirados;
           const y = cfg()[k]; if (y && !y.pac) { y.pac = guardar; mudou = true; }
         } catch (e) { A.log.aviso('integração da conta sem pacote: ' + x.com.id); }
@@ -353,12 +355,28 @@
     else if (tipo === 'pasta') c.append(h('div', { class: 'ig-pasta' }, h('i'), h('i'), h('i')));
     return c;
   };
-  // (0.8.7) a capa: a imagem que quem fez colocou; sem imagem, o ícone do tipo no meio (sem a animação fora do lugar)
-  const capaInteg = (x, grande) => {
-    const img = x.imagem || (x.pac && x.pac.imagem);
-    if (img) return h('div', { class: 'ig-capa' + (grande ? ' grande' : '') }, h('img', { src: img, alt: '', draggable: 'false' }));
-    return h('div', { class: 'ig-capa vazia' + (grande ? ' grande' : ''), 'aria-hidden': 'true' }, A.orbe(x.icone || (tipos()[x.tipo] || ['', 'apps'])[1], grande ? 76 : 46));
+  // (1.0.3) a cabeça do cartão, como no perfil: o banner em cima (a imagem de quem fez ou a cor da integração) e o ícone numa bolha
+  // separada, metade para fora do banner. Tudo parado (sem animação)
+  const COR_INTEG = { musica: ['#4ade80', '#0f8a4a'], celmic: ['#7dd3fc', '#1d6fd1'], gunslol: ['#c4b5fd', '#6d3fd6'], assistindo: ['#fda4af', '#c8284e'], traducao: ['#fcd34d', '#d0780c'], dicionario: ['#99f6e4', '#0d8f80'], horario: ['#f9a8d4', '#b8338a'] };
+  const PALETA = [['#7dd3fc', '#1d6fd1'], ['#4ade80', '#0f8a4a'], ['#fda4af', '#c8284e'], ['#fcd34d', '#d0780c'], ['#c4b5fd', '#6d3fd6'], ['#99f6e4', '#0d8f80'], ['#f9a8d4', '#b8338a'], ['#fdba74', '#c2410c'], ['#a5b4fc', '#3f4fc9'], ['#bef264', '#4d8a0c']];
+  const corInteg = (id) => { if (COR_INTEG[id]) return COR_INTEG[id]; let n = 0; for (const c of String(id || '')) n = (n * 31 + c.charCodeAt(0)) >>> 0; return PALETA[n % PALETA.length]; };
+  const bannerInteg = (id, icone, grande, imagem, iconeImg) => {
+    const [c1, c2] = corInteg(id);
+    const capa = h('div', { class: 'ig-capa ig-banner' + (grande ? ' grande' : ''), 'aria-hidden': 'true' });
+    const av = h('div', { class: 'ig-av', 'aria-hidden': 'true' });
+    const c = h('div', { class: 'ig-cabeca' + (grande ? ' grande' : ''), estilo: { '--b1': c1, '--b2': c2 } }, capa, av);
+    c.definir = (img, ic) => {
+      if (img) capa.replaceChildren(h('img', { src: img, alt: '', draggable: 'false' }));
+      else capa.replaceChildren(h('span', { class: 'ig-banner-marca' }, A.icone(icone, grande ? 150 : 96)));
+      capa.classList.toggle('com-img', !!img);
+      if (ic) { av.className = 'ig-av com-img'; av.replaceChildren(h('img', { src: ic, alt: '', draggable: 'false' })); }
+      else { const o = A.orbe(icone, grande ? 84 : 56); o.classList.add('ig-av-orbe'); o.style.setProperty('--o1', c1); o.style.setProperty('--o2', c2); av.className = 'ig-av'; av.replaceChildren(o); }
+    };
+    c.definir(imagem, iconeImg);
+    return c;
   };
+  const capaInteg = (x, grande) => bannerInteg(x.id, x.icone || (tipos()[x.tipo] || ['', 'apps'])[1], grande, x.imagem || (x.pac && x.pac.imagem), x.pac && x.pac.icone);
+  const reais = (v) => (v ? 'R$ ' + (+v).toFixed(2).replace('.', ',') : T('Grátis', 'Free')); // (1.0.3) as integrações pagas da Comunidade
   const estrelas = (n, tam = 14) => h('span', { class: 'ig-estrelas', 'aria-label': n.toFixed(1) + T(' de 5 estrelas', ' of 5 stars'), estilo: { '--n': String(n), '--t': tam + 'px' } }, '★★★★★');
   const quando = (t) => { const d = (Date.now() - t) / 1000; if (d < 60) return T('agora', 'now'); if (d < 3600) return Math.floor(d / 60) + ' min'; if (d < 86400) return Math.floor(d / 3600) + ' h'; return new Date(t).toLocaleDateString(); };
 
@@ -373,6 +391,8 @@
     const chips = h('div', { class: 'ig-chips' });
     const grade = h('div', { class: 'ig-grade' });
     const pagina = h('div', { class: 'ig-pagina', hidden: true });
+    // (1.0.3) o Estúdio manda as artes dele para o mesmo "Publicar na Comunidade"
+    I.publicarDoEstudio = (pac) => criar({ publicar: true, pac });
     const btCriar = U.btn(T('Instalar a sua', 'Install your own'), { icone: 'mais', peq: true, onclick: () => avisoComunidade().then((sim) => { if (sim) criar(); }) });
     const lista = h('div', { class: 'ig-lista' }, h('div', { class: 'ig-topo' }, segOrigem, campo, btCriar), chips, grade);
     el.append(h('div', { class: 'cab' }, titulo, h('span', { class: 'suave peq' }, T('Deixe o Aero do seu jeito', 'Make Aero your own'))), lista, pagina);
@@ -413,11 +433,11 @@
     }
     // ---------- (0.9.1) a Comunidade ----------
     const imgs = new Map(); // id -> Promise da imagem (pedida uma vez, só quando o cartão aparece)
-    const imagemCom = (x) => { if (!x.img) return Promise.resolve(''); if (!imgs.has(x.id + '@' + x.atual)) imgs.set(x.id + '@' + x.atual, A.api.req('integ/' + x.id + '/imagem').then((d) => I.imagemOk(d.imagem || '')).catch(() => '')); return imgs.get(x.id + '@' + x.atual); };
+    const imagemCom = (x) => { if (!x.img && !x.ic) return Promise.resolve({}); if (!imgs.has(x.id + '@' + x.atual)) imgs.set(x.id + '@' + x.atual, A.api.req('integ/' + x.id + '/imagem').then((d) => ({ img: I.imagemOk(d.imagem || ''), ic: I.iconeOk(d.icone || '') })).catch(() => ({}))); return imgs.get(x.id + '@' + x.atual); };
     const comInstalada = (id) => cfg()['com-' + id];
     const capaCom = (x, grande) => {
-      const c = h('div', { class: 'ig-capa vazia' + (grande ? ' grande' : ''), 'aria-hidden': 'true' }, A.orbe((CATS()[x.cat] || CATS().misc)[1], grande ? 76 : 46));
-      imagemCom(x).then((u) => { if (u && c.isConnected !== false) { c.classList.remove('vazia'); c.replaceChildren(h('img', { src: u, alt: '', draggable: 'false' })); } });
+      const c = bannerInteg(x.id, (CATS()[x.cat] || CATS().misc)[1], grande);
+      imagemCom(x).then((u) => { if (u.img || u.ic) c.definir(u.img, u.ic); });
       return c;
     };
     const cartaoCom = (x, i) => {
@@ -425,7 +445,7 @@
       return h('button', { type: 'button', class: 'ig-cartao vidro' + (inst ? ' instalada' : ''), estilo: { '--i': Math.min(i, 12) }, onclick: () => abrirCom(x) },
         capaCom(x),
         h('div', { class: 'ig-cartao-txt' },
-          h('div', { class: 'ig-cartao-nome' }, h('b', {}, x.nome), x.oculta ? h('span', { class: 'ig-selo breve' }, T('Em revisão', 'Under review')) : velha ? h('span', { class: 'ig-selo novo' }, T('Atualização', 'Update')) : inst ? h('span', { class: 'ig-selo ok' }, T('Instalada', 'Installed')) : null),
+          h('div', { class: 'ig-cartao-nome' }, h('b', {}, x.nome), x.oculta ? h('span', { class: 'ig-selo breve' }, T('Em revisão', 'Under review')) : velha ? h('span', { class: 'ig-selo novo' }, T('Atualização', 'Update')) : inst ? h('span', { class: 'ig-selo ok' }, T('Instalada', 'Installed')) : x.preco ? h('span', { class: 'ig-selo preco' }, reais(x.preco)) : null),
           h('div', { class: 'suave peq ig-cartao-resumo' }, x.resumo || T('Por ', 'By ') + x.autor),
           h('div', { class: 'ig-cartao-pe' }, h('span', { class: 'ig-tipo' }, A.icone((CATS()[x.cat] || CATS().misc)[1], 13), (CATS()[x.cat] || CATS().misc)[0]), x.votos ? h('span', { class: 'ig-nota' }, estrelas(x.nota, 12), h('small', {}, x.nota.toFixed(1))) : null, h('small', { class: 'suave' }, (x.inst || 0) + ' ↓'))));
     };
@@ -441,7 +461,7 @@
     // instalar (ou atualizar) uma da Comunidade: o pacote vem do servidor e passa de novo pelas travas daqui
     async function instalarCom(x) {
       const d = await A.api.req('integ/' + x.id + '/pacote');
-      const p = I.lerPacote(JSON.stringify({ ...d.pac, id: x.id, autor: d.autor, imagem: d.imagem || '' }));
+      const p = I.lerPacote(JSON.stringify({ ...d.pac, id: x.id, autor: d.autor, imagem: d.imagem || '', icone: d.icone || '' }));
       if (!I.sanitizar(p.css, p.id).css && !p.opcoes.length && !p.sons && !p.presets.length && !p.bolhas.some((b) => b.arte) && !(p.molduras || []).length && !(p.aneis || []).length) throw new Error(T('Esta integração não passou nas travas de segurança.', 'This integration did not pass the safety locks.'));
       I.instalarPacote(p, 'com-' + x.id, { id: x.id, atual: d.atual || 0, cat: d.cat });
       try { await A.api.req('integ/' + x.id + '/instalar', { sim: true }); } catch (e) { /* só estatística */ }
@@ -457,7 +477,15 @@
       const pintarAcao = () => {
         acao.replaceChildren();
         const y = comInstalada(x.id);
-        if (!y) acao.append(U.btn(T('Instalar', 'Install'), { icone: 'download', grande: true, onclick: async (e) => { const b = e.currentTarget; b.disabled = true; try { await instalarCom(x); U.toast(T('Instalada. As opções dela ficam em Configurações > Integrações.', 'Installed. Its options are in Settings > Integrations.'), { tipo: 'ok' }); } catch (er) { U.toast(er.message, { tipo: 'erro' }); } b.disabled = false; pintarAcao(); } }));
+        // (1.0.3) paga e ainda não é sua: o botão compra (PIX, direto para quem fez) e instala em seguida
+        if (!y && x.preco && !(dados && dados.tenho)) acao.append(U.btn(T('Comprar por ', 'Buy for ') + reais(x.preco), { icone: 'pix', grande: true, onclick: () => {
+          if (!A.aer || !A.aer.loja || !A.aer.loja.comprar) { U.toast(T('Compras ainda não estão disponíveis neste aparelho.', 'Purchases are not available on this device yet.')); return; }
+          A.aer.loja.comprar({ id: x.id, nome: x.nome, preco: x.preco }, notas.loja || {}, async () => {
+            try { await instalarCom(x); U.toast(T('Comprada e instalada. Ela fica na sua conta.', 'Bought and installed. It stays on your account.'), { tipo: 'ok' }); } catch (er) { U.toast(er.message, { tipo: 'erro' }); }
+            if (aberta === x) abrirCom(x);
+          }, { integ: true });
+        } }));
+        else if (!y) acao.append(U.btn(T('Instalar', 'Install'), { icone: 'download', grande: true, onclick: async (e) => { const b = e.currentTarget; b.disabled = true; try { await instalarCom(x); U.toast(T('Instalada. As opções dela ficam em Configurações > Integrações.', 'Installed. Its options are in Settings > Integrations.'), { tipo: 'ok' }); } catch (er) { U.toast(er.message, { tipo: 'erro' }); } b.disabled = false; pintarAcao(); } }));
         else {
           if ((y.com && y.com.atual || 0) < (x.atual || 0)) acao.append(U.btn(T('Atualizar', 'Update'), { icone: 'download', grande: true, onclick: async () => { try { await instalarCom(x); } catch (er) { U.toast(er.message, { tipo: 'erro' }); } pintarAcao(); } }));
           acao.append(h('label', { class: 'linha ig-ligar' }, h('span', {}, y.trava ? T('Desligada pela trava', 'Turned off by the lock') : T('Ligada', 'On')), U.chave(I.ligada('com-' + x.id), (v) => { I.ligar('com-' + x.id, v); pintarAcao(); })),
@@ -495,8 +523,11 @@
       pagina.scrollIntoView({ block: 'start' });
       try { dados = await A.api.req('integ/' + x.id + '/pacote'); } catch (e) { coment.replaceChildren(h('div', { class: 'suave peq' }, e.message)); return; }
       if (aberta !== x) return;
-      Object.assign(x, { atual: dados.atual, oculta: dados.oculta }); pintarAcao();
-      { const p = I.lerPacote(JSON.stringify({ ...dados.pac, id: x.id }));
+      Object.assign(x, { atual: dados.atual, oculta: dados.oculta, preco: dados.preco || 0 }); pintarAcao();
+      if (!dados.tenho && dados.itens) { // (1.0.3) paga: antes de comprar mostra só o que ela traz
+        const n = dados.itens, um = (k, a, b) => n[k] && n[k] + (n[k] === 1 ? a : b);
+        detalhes.replaceChildren(...[n.css && T('Visual novo (CSS)', 'New look (CSS)'), um('opcoes', T(' opção nas Configurações', ' option in Settings'), T(' opções nas Configurações', ' options in Settings')), n.sons && T('Sons de digitação', 'Typing sounds'), um('barras', T(' barra das abas', ' tab bar'), T(' barras das abas', ' tab bars')), um('bolhas', T(' bolha de conversa', ' chat bubble'), T(' bolhas de conversa', ' chat bubbles')), um('presets', T(' preset de cores', ' color preset'), T(' presets de cores', ' color presets')), um('molduras', T(' moldura da foto', ' photo frame'), T(' molduras da foto', ' photo frames')), um('aneis', T(' anel de voz', ' voice ring'), T(' anéis de voz', ' voice rings'))].filter(Boolean).map((t) => h('li', {}, t)));
+      } else { const p = I.lerPacote(JSON.stringify({ ...dados.pac, id: x.id }));
         const it = [p.css && T('Visual novo (CSS)', 'New look (CSS)'), p.opcoes.length && p.opcoes.length + (p.opcoes.length === 1 ? T(' opção nas Configurações', ' option in Settings') : T(' opções nas Configurações', ' options in Settings')), p.sons && T('Sons de digitação', 'Typing sounds'), p.barras.length && p.barras.length + (p.barras.length === 1 ? T(' barra das abas', ' tab bar') : T(' barras das abas', ' tab bars')), p.bolhas.length && p.bolhas.length + (p.bolhas.length === 1 ? T(' bolha de conversa', ' chat bubble') : T(' bolhas de conversa', ' chat bubbles')), p.presets.length && p.presets.length + (p.presets.length === 1 ? T(' preset de cores', ' color preset') : T(' presets de cores', ' color presets')), p.molduras.length && p.molduras.length + (p.molduras.length === 1 ? T(' moldura da foto', ' photo frame') : T(' molduras da foto', ' photo frames')), p.aneis.length && p.aneis.length + (p.aneis.length === 1 ? T(' anel de voz', ' voice ring') : T(' anéis de voz', ' voice rings')), p.tirados.length && T('As travas deste aparelho tiram ', 'This device\'s locks remove ') + p.tirados.length + T(' trecho(s) não permitido(s)', ' disallowed part(s)')].filter(Boolean);
         detalhes.replaceChildren(...it.map((t) => h('li', {}, t)));
         const vt = A.bolhaArte && !x.oculta && A.bolhaArte.vitrine(x.id, p.bolhas, async (b) => {
@@ -565,8 +596,16 @@
       arq.addEventListener('change', async () => { const f = arq.files && arq.files[0]; if (!f) return; if (f.size > 120000) { U.toast(T('Arquivo grande demais.', 'File too large.'), { tipo: 'erro' }); return; } area.value = await f.text(); conferirJa(); });
       const info = h('div', { class: 'peq suave ig-criar-info' });
       // (0.8.7) a imagem que aparece no cartão e na página dela
-      let imgEsc = '';
+      let imgEsc = '', icEsc = '';
       const imgPrev = h('div', { class: 'ig-criar-img', hidden: true });
+      // (1.0.3) o ícone (a bolha redonda do cartão), separado do banner
+      const icPrev = h('div', { class: 'ig-criar-ic', hidden: true });
+      const icArq = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp,image/gif', hidden: true });
+      icArq.addEventListener('change', () => {
+        const f = icArq.files && icArq.files[0]; if (!f) return;
+        if (f.size > 110000) { U.toast(T('Ícone grande demais (até 110 KB).', 'Icon too large (up to 110 KB).'), { tipo: 'erro' }); return; }
+        const fr = new FileReader(); fr.onload = () => { const u = I.iconeOk(String(fr.result || '')); if (!u) return; icEsc = u; icPrev.hidden = false; icPrev.replaceChildren(h('img', { src: u, alt: '' })); }; fr.readAsDataURL(f);
+      });
       const imgArq = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp,image/gif', hidden: true });
       imgArq.addEventListener('change', () => {
         const f = imgArq.files && imgArq.files[0]; if (!f) return;
@@ -609,28 +648,38 @@
           area.value = JSON.stringify(pkg, null, 2); conferirJa();
         });
       };
+      // (1.0.3) o preço: 0 = grátis; para vender, a conta do Mercado Pago de quem publica precisa estar conectada
+      const preco = pub ? h('input', { class: 'campo ig-preco', type: 'number', min: 0, max: 200, step: '0.5', value: (op.de && op.de.preco) || 0, 'aria-label': T('Preço em reais', 'Price in reais') }) : null;
+      const precoErro = h('div', { class: 'peq est-erro' });
+      if (preco) preco.addEventListener('keydown', (e) => e.stopPropagation());
+      const precoBloco = !preco ? null : h('div', { class: 'col', estilo: { gap: '6px' } },
+        h('label', { class: 'linha', estilo: { gap: '8px', 'flex-wrap': 'wrap' } }, h('b', { class: 'peq' }, T('Preço (R$, 0 = grátis)', 'Price (R$, 0 = free)')), preco),
+        A.aer && A.aer.loja && A.aer.loja.vendedor ? A.aer.loja.vendedor(notas.loja || {}, preco, precoErro, T('A venda de integrações ainda não está disponível. Publique grátis por enquanto.', 'Selling integrations is not available yet. Publish for free for now.')) : null, precoErro);
       let enviando = false;
       const enviarPub = async () => {
         if (enviando) return;
         const p = conferirJa(); if (!p) { U.toast(T('Cole um CSS ou um pacote primeiro.', 'Paste a CSS or package first.'), { tipo: 'erro' }); return; }
         if (p.tirados.length) { U.toast(T('Tire as partes que as travas não permitem antes de publicar (' + p.tirados.slice(0, 3).join(', ') + ').', 'Remove the parts the locks do not allow before publishing (' + p.tirados.slice(0, 3).join(', ') + ').'), { tipo: 'erro', ms: 5000 }); return; }
         let bruto; const v = area.value.trim(); try { bruto = v.startsWith('{') ? JSON.parse(v) : { css: v }; } catch (e) { return; }
-        bruto.nome = p.nome; if (imgEsc) bruto.imagem = imgEsc;
+        bruto.nome = p.nome; if (imgEsc) bruto.imagem = imgEsc; if (icEsc) bruto.icone = icEsc;
         enviando = true;
         try {
-          const r = await A.api.req('integ/publicar', { pac: bruto, cat, id: op.de ? op.de.id : undefined, manterImagem: !imgEsc });
+          const v = preco ? Math.max(0, +preco.value || 0) : 0;
+          if (v && (v < 2 || v > 200)) { precoErro.textContent = T('O preço vai de R$ 2 a R$ 200 (ou grátis).', 'Price goes from R$ 2 to R$ 200 (or free).'); enviando = false; return; }
+          const r = await A.api.req('integ/publicar', { pac: bruto, cat, id: op.de ? op.de.id : undefined, manterImagem: !imgEsc, manterIcone: !icEsc, preco: v });
           m.fechar(); A.som.tocar('sucesso'); U.toast(op.de ? T('Publicação atualizada.', 'Upload updated.') : T('Publicada na Comunidade!', 'Published to Community!'), { tipo: 'ok' });
           try { notas = await A.api.req('integ'); notasGuardadas = { t: Date.now(), d: notas }; } catch (e) { /* ok */ } aberta = null; pagina.hidden = true; lista.hidden = false; pintarChips(); pintar(true); void r;
         } catch (e) { U.toast(e.message, { tipo: 'erro', ms: 5000 }); enviando = false; }
       };
       const m = U.modal(pub ? (op.de ? T('Atualizar a publicação', 'Update the upload') : T('Publicar na Comunidade', 'Publish to Community')) : T('Instalar a sua integração', 'Install your own integration'), h('div', { class: 'col', estilo: { gap: '10px' } },
-        pub ? h('p', { class: 'peq suave' }, T('Ela passa pelas travas antes de entrar: nada de links, @import, fontes de fora ou código. Quem instala pode avaliar e denunciar.', 'It goes through the locks first: no links, @import, external fonts or code. People who install can rate and report it.')) : null, catSeg,
-        h('div', { class: 'linha', estilo: { gap: '8px', 'flex-wrap': 'wrap' } }, U.btn(T('Abrir arquivo', 'Open file'), { icone: 'pasta', tipo: 'sec', peq: true, onclick: () => arq.click() }), U.btn(T('Imagem', 'Image'), { icone: 'imagem', tipo: 'sec', peq: true, onclick: () => imgArq.click() }), pub && A.bolhaArte ? U.btn(T('Estúdio de bolhas', 'Bubble studio'), { icone: 'bolhas', tipo: 'sec', peq: true, onclick: abrirEstudio }) : null, pub && A.bolhaArte && A.bolhaArte.estudioFotos ? U.btn(T('Molduras e anéis', 'Frames and rings'), { icone: 'imagem', tipo: 'sec', peq: true, onclick: abrirEstudioFotos }) : null, h('span', { class: 'peq suave' }, '.css · .json')), arq, imgArq, imgPrev, area, info, exemplo),
+        pub ? h('p', { class: 'peq suave' }, T('Ela passa pelas travas antes de entrar: nada de links, @import, fontes de fora ou código. Quem instala pode avaliar e denunciar.', 'It goes through the locks first: no links, @import, external fonts or code. People who install can rate and report it.')) : null, catSeg, precoBloco,
+        h('div', { class: 'linha', estilo: { gap: '8px', 'flex-wrap': 'wrap' } }, U.btn(T('Abrir arquivo', 'Open file'), { icone: 'pasta', tipo: 'sec', peq: true, onclick: () => arq.click() }), U.btn(T('Ícone', 'Icon'), { icone: 'imagem', tipo: 'sec', peq: true, onclick: () => icArq.click() }), U.btn(T('Banner', 'Banner'), { icone: 'imagem', tipo: 'sec', peq: true, onclick: () => imgArq.click() }), pub && A.bolhaArte ? U.btn(T('Estúdio de bolhas', 'Bubble studio'), { icone: 'bolhas', tipo: 'sec', peq: true, onclick: abrirEstudio }) : null, pub && A.bolhaArte && A.bolhaArte.estudioFotos ? U.btn(T('Molduras e anéis', 'Frames and rings'), { icone: 'imagem', tipo: 'sec', peq: true, onclick: abrirEstudioFotos }) : null, h('span', { class: 'peq suave' }, '.css · .json')), arq, imgArq, icArq, h('div', { class: 'ig-criar-prev' }, icPrev, imgPrev), area, info, exemplo),
       { largura: 620, acoes: [{ texto: T('Cancelar', 'Cancel'), tipo: 'sec', valor: false }, pub ? { texto: op.de ? T('Atualizar', 'Update') : T('Publicar', 'Publish'), tipo: 'ok', onclick: () => enviarPub() } : { texto: T('Instalar', 'Install'), tipo: 'ok', onclick: () => {
         const p = conferirJa(); if (!p) { U.toast(T('Cole um CSS ou um pacote primeiro.', 'Paste a CSS or package first.'), { tipo: 'erro' }); return; }
         if (!I.sanitizar(p.css, p.id).css && !p.opcoes.length && !p.sons && !p.presets.length && !p.bolhas.some((b) => b.arte) && !(p.molduras || []).length && !(p.aneis || []).length) { U.toast(T('Não sobrou nada depois das travas.', 'Nothing left after the locks.'), { tipo: 'erro' }); return; }
         const ja = cfg()['loc-' + p.id];
         if (imgEsc) p.imagem = imgEsc; else if (!p.imagem && ja && ja.pac && ja.pac.imagem) p.imagem = ja.pac.imagem;
+        if (icEsc) p.icone = icEsc; else if (!p.icone && ja && ja.pac && ja.pac.icone) p.icone = ja.pac.icone;
         I.instalarPacote(p); m.fechar(); U.toast(ja ? T('Atualizada, com as suas opções de antes.', 'Updated, keeping your previous options.') : T('Instalada. As opções dela ficam em Configurações > Integrações.', 'Installed. Its options are in Settings > Integrations.'), { tipo: 'ok' }); pintar();
       } }] });
     }

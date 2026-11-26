@@ -8,6 +8,9 @@ import { CORS, resposta, erro, txt, aleatorio, hex, enviar, TAG_REGEX, normaliza
 import { Social, privDe, bloqueio } from './social.js';
 import { capaOk } from './midia.js';
 import * as Embeds from './embeds.js';
+import * as EmbSocial from './embsocial.js';
+import * as EmbRoblox from './embroblox.js';
+import * as EmbSteam from './embsteam.js';
 import { Acesso } from './acesso.js';
 import { Admin } from './admin.js';
 import { Bolha, planoDe, seloFiel } from './bolha.js';
@@ -369,30 +372,46 @@ export class Hub {
     const vs = podeVisto ? (await this.get('vs:' + oid)) || 0 : 0, va = podeVisto && pv.vistoModo === 'atividade' ? (await this.get('va:' + oid)) || 0 : 0;
     const visto = Math.max(vs, va) || undefined, vm = visto && pv.vistoModo === 'atividade' ? 'atividade' : undefined;
     let uid, assinatura; if (await this.admin.ehDev(conta)) { if (!o.uid) await this.admin.garantir(o); uid = o.uid; assinatura = await this.bolha.resumoDev(o); } // (0.8.2) a assinatura também, só para o desenvolvedor
-    return resposta({ uid, assinatura, codigo: o.codigo, nome: o.nome, tag: o.tag || '', av: o.avatarV || 0, ins: o.ins || [], sl: await this.selos(o), criado: o.criado, visto, vm, amizade: rel ? rel.estado : null, avisarOnline: !!(rel && rel.avisarOnline), podeMensagem: oid !== conta.id && this.social.podeEscrever(conta, o), apelido: (conta.apelidos || {})[oid] || '', ...this.extraPublico(o), fz: oid === conta.id || (rel && rel.estado === 'aceita') ? ((o.extra || {}).fz || '') : '', ...this.exclusivos(conta, o, rel) });
+    return resposta({ uid, assinatura, codigo: o.codigo, nome: o.nome, tag: o.tag || '', av: o.avatarV || 0, ins: o.ins || [], sl: await this.selos(o), criado: o.criado, visto, vm, amizade: rel ? rel.estado : null, avisarOnline: !!(rel && rel.avisarOnline), podeMensagem: oid !== conta.id && this.social.podeEscrever(conta, o), apelido: (conta.apelidos || {})[oid] || '', ...this.extraPublico(o), fz: oid === conta.id || (rel && rel.estado === 'aceita') ? ((o.extra || {}).fz || '') : '', ...(await this.exclusivos(conta, o, rel)) });
   }
 
-  // (1.0.2) perfil exclusivo: um amigo pode ter um jeito do perfil só para você (bio e cores). Você vê o exclusivo e escolhe ver o público
-  exclusivos(conta, o, rel) {
+  // (1.0.2) perfil exclusivo: um amigo pode ter um jeito do perfil só para você. Você vê o exclusivo e escolhe ver o público
+  // (1.0.3) é o perfil inteiro (o mesmo editor do perfil): cada um fica numa chave própria "px:<dono>:<amigo>" (a conta não cresce);
+  // os de antes (só bio e cores, dentro da conta) continuam valendo. Um campo null = no exclusivo ele foi tirado
+  async excDe(dono, para) { return (await this.get('px:' + dono.id + ':' + para)) || ((dono.extra || {}).pp || {})[para] || null; }
+  async exclusivos(conta, o, rel) {
     if (!rel || rel.estado !== 'aceita' || o.id === conta.id) return {};
-    const exc = nivelDe(o) >= 4 ? ((o.extra || {}).pp || {})[conta.id] : null, meu = ((conta.extra || {}).pp || {})[o.id];
+    const cru = nivelDe(o) >= 4 ? await this.excDe(o, conta.id) : null, meu = await this.excDe(conta, o.id);
+    const exc = cru ? { ...this.extraPublico({ ...o, extra: { ...(o.extra || {}), ...cru } }), x: 2 } : null;
     return { exc: exc || undefined, meuExc: meu || undefined };
   }
   async perfilExclusivo(conta, b) {
-    if (nivelDe(conta) < 4) return erro('O perfil exclusivo é do Aero Bubble Supporter.', 403);
     const oid = await this.get('f:' + String(b.codigo || '').toUpperCase()), rel = oid && conta.amigos[oid];
     if (!rel || rel.estado !== 'aceita') return erro('Só dá para fazer um perfil exclusivo para um amigo.', 404);
-    conta.extra = conta.extra || {}; const pp = (conta.extra.pp = conta.extra.pp || {});
-    if (b.apagar) delete pp[oid];
-    else {
-      const COR = /^#[0-9a-f]{6}$/i;
-      if (!pp[oid] && Object.keys(pp).length >= 30) return erro('Você já tem 30 perfis exclusivos. Apague um antes.', 400);
-      const x = { bio: txt(String(b.bio || '').replace(/[\u0000-\u0009\u000b-\u001f]/g, ''), 190), cor1: COR.test(b.cor1) ? b.cor1.toLowerCase() : '', cor2: COR.test(b.cor2) ? b.cor2.toLowerCase() : '' };
-      if (!x.bio && !x.cor1 && !x.cor2) delete pp[oid]; else pp[oid] = x;
+    if (b.ler) return resposta({ ok: true, meuExc: await this.excDe(conta, oid) }); // abrir o editor (sem o plano, como prévia)
+    if (nivelDe(conta) < 4) return erro('O perfil exclusivo é do Aero Bubble Supporter.', 403);
+    conta.extra = conta.extra || {};
+    const velhos = conta.extra.pp || {}, lista = new Set([...(conta.extra.ppx || []), ...Object.keys(velhos)]);
+    let novo = null;
+    if (!b.apagar) {
+      if (!lista.has(oid) && lista.size >= 30) return erro('Você já tem 30 perfis exclusivos. Apague um antes.', 400);
+      // o perfil inteiro (vem do editor) ou só a bio e as cores (versões antigas do app)
+      const pedido = b.perfil && typeof b.perfil === 'object' ? { ...b.perfil } : { bio: b.bio, cor1: b.cor1 || '', cor2: b.cor2 || '' };
+      for (const k of ['fz', 'tirarImagem']) delete pedido[k];
+      for (const k of ['fd', 'np', 'mf']) if (pedido[k] && typeof pedido[k] === 'object') pedido[k] = { ...pedido[k], tirarImagem: false }; // as imagens são as do perfil público: nada é apagado daqui
+      if (pedido.cl !== undefined) delete pedido.cl;
+      const work = JSON.parse(JSON.stringify(conta.extra)); delete work.pp; delete work.ppx;
+      const r = await this.social.aplicarExtra(conta, pedido, work); if (r) return r;
+      novo = {};
+      for (const k of Object.keys(pedido)) novo[k] = work[k] === undefined ? null : work[k];
+      if (JSON.stringify(novo).length > 60000) return erro('Esse perfil ficou grande demais.', 400);
     }
-    if (!Object.keys(pp).length) delete conta.extra.pp;
+    if (novo) { await this.put({ ['px:' + conta.id + ':' + oid]: novo }); lista.add(oid); }
+    else { await this.ctx.storage.delete('px:' + conta.id + ':' + oid); lista.delete(oid); }
+    if (velhos[oid]) { delete velhos[oid]; if (!Object.keys(velhos).length) delete conta.extra.pp; }
+    if (lista.size) conta.extra.ppx = [...lista]; else delete conta.extra.ppx;
     await this.put({ ['c:' + conta.id]: conta }); await this.mudou([oid]);
-    return resposta({ ok: true, meuExc: pp[oid] || null });
+    return resposta({ ok: true, meuExc: novo });
   }
 
   async banner(codigo) { return this.servirImagem('bn:', codigo); }
@@ -610,7 +629,9 @@ export class Hub {
   // (0.7.1) dados de um link para o embed do chat: link de página do Klipy (klipy.com/gifs/nome) vira o GIF de verdade; vídeo do YouTube
   // ganha o título e o canal (o oEmbed do YouTube não responde para páginas de outro site, então quem pergunta é o servidor). Guardado 1 h.
   async embed(conta, url) {
-    const u = txt(url.searchParams.get('u') || '', 400);
+    const bruto = String(url.searchParams.get('u') || '').slice(0, 4000);
+    // (1.0.3) link de loja enorme (AliExpress): a chave é o produto (antes o link era cortado em 400 letras e o cartão não aparecia)
+    const u = Embeds.RE_LOJA.test(bruto.slice(0, 400)) || /aliexpress\.|amazon\./i.test(bruto.slice(0, 40)) ? Embeds.canonLoja(bruto).url : txt(bruto, 400);
     if (!this.limitar('emb:' + conta.id, 120, 60000)) return erro('Devagar!', 429);
     this.cacheEmbed = this.cacheEmbed || new Map();
     const ja = this.cacheEmbed.get(u); if (ja && Date.now() - ja.t < 3600000) return resposta(ja.d);
@@ -623,26 +644,42 @@ export class Hub {
       try { d = await Embeds.spotify(u); } catch (_) { d = null; }
     } else if (Embeds.RE_REDDIT.test(u)) { // (1.0.2) Reddit: fotos (até 20), vídeo com som, texto e números
       try { d = await Embeds.reddit(u); } catch (_) { d = null; }
+    } else if (EmbSocial.RE_TIKTOK.test(u)) { // (1.0.3) TikTok: vídeo, fotos com música, números e perfil
+      try { d = await EmbSocial.tiktok(u.split('?')[0]); } catch (_) { d = null; }
+    } else if (EmbSocial.RE_INSTAGRAM.test(u)) { // (1.0.3) Instagram: o que o link diz; o player oficial abre no clique
+      d = EmbSocial.instagram(u);
+    } else if (EmbSteam.RE_STEAM.test(u)) { // (1.0.3) Steam: jogo (fotos, trailers, análises, tags, preço) e perfil (fundo, nível, vitrines)
+      try { d = await EmbSteam.steam(u); } catch (_) { d = null; }
+    } else if (EmbRoblox.RE_ROBLOX.test(u)) { // (1.0.3) Roblox: jogo, perfil, item/pacote e comunidade
+      try { d = await EmbRoblox.roblox(u); } catch (_) { d = null; }
     } else if (Embeds.RE_LOJA.test(u)) { // (1.0.2) Amazon e AliExpress: preço, imposto, fotos e avaliações
-      try { d = await Embeds.loja(u); } catch (_) { d = null; }
+      try { d = await Embeds.loja(bruto); } catch (_) { d = null; }
     } else if (tw) {
       try {
-        const r = await fetch('https://api.fxtwitter.com/status/' + tw[2], { headers: { 'User-Agent': 'AeroStream-embed/1.0' } });
-        const j = r.ok ? await r.json() : null, t = j && j.tweet;
+        // (1.0.3) o post inteiro: até 20 fotos/vídeos, o post citado (a caixinha dentro) e, se for resposta, o post respondido em cima
+        const pegaTw = async (id) => { const r = await fetch('https://api.fxtwitter.com/status/' + id, { headers: { 'User-Agent': 'AeroStream-embed/1.0' } }); const j = r.ok ? await r.json() : null; return (j && j.tweet) || null; };
+        const t = await pegaTw(tw[2]);
         if (t && t.author) {
           const img = (x) => (typeof x === 'string' && /^https:\/\/pbs\.twimg\.com\/[^\s"'<>]{1,300}$/.test(x) ? x : '');
           const vid = (x) => (typeof x === 'string' && /^https:\/\/video\.twimg\.com\/[^\s"'<>]{1,400}$/.test(x) ? x : '');
-          const mp4 = (m) => { const l = (m.formats || []).filter((f) => f && f.container === 'mp4' && vid(f.url)).sort((a, b) => (a.bitrate || 0) - (b.bitrate || 0)); const bom = l.filter((f) => (f.bitrate || 0) <= 2300000).pop() || l[0]; return (bom && bom.url) || vid(m.url); };
+          const mp4 = (m) => { const l = (m.formats || m.variants || []).filter((f) => f && (f.container === 'mp4' || f.content_type === 'video/mp4') && vid(f.url)).sort((a, b) => (a.bitrate || 0) - (b.bitrate || 0)); const bom = l.filter((f) => (f.bitrate || 0) <= 2300000).pop() || l[0]; return (bom && bom.url) || vid(m.url); };
           const num = (x) => (x != null && x !== '' && Number.isFinite(+x) && +x >= 0 ? Math.floor(+x) : null);
-          const midias = ((t.media && t.media.all) || []).slice(0, 4).map((m) => {
-            if (m.type === 'photo') { const f = img(m.url); return f ? { tipo: 'foto', url: f.replace(/\?.*$/, ''), w: num(m.width) || 0, h: num(m.height) || 0 } : null; }
-            if (m.type === 'video' || m.type === 'gif') { const v = mp4(m); return v ? { tipo: m.type === 'gif' ? 'gif' : 'video', url: v, capa: img(m.thumbnail_url), w: num(m.width) || 0, h: num(m.height) || 0, dur: Math.round(+m.duration || 0) } : null; }
-            return null;
-          }).filter(Boolean);
-          const a = t.author;
-          d = { tipo: 'tweet', url: 'https://x.com/' + txt(a.screen_name || 'i', 15) + '/status/' + tw[2], texto: txt(t.text || '', 1200), t: num(t.created_timestamp) ? num(t.created_timestamp) * 1000 : 0,
-            autor: { nome: txt(a.name || '', 60), nick: txt(a.screen_name || '', 15), av: img(a.avatar_url), ok: !!(a.verification && a.verification.verified) },
-            resp: num(t.replies), rt: num(t.retweets), cur: num(t.likes), views: num(t.views), sens: !!t.possibly_sensitive, midias };
+          const post = (t, fundo) => {
+            const midias = ((t.media && t.media.all) || []).slice(0, 20).map((m) => {
+              if (m.type === 'photo') { const f = img(m.url); return f ? { tipo: 'foto', url: f.replace(/\?.*$/, ''), w: num(m.width) || 0, h: num(m.height) || 0 } : null; }
+              if (m.type === 'video' || m.type === 'gif') { const v = mp4(m); return v ? { tipo: m.type === 'gif' ? 'gif' : 'video', url: v, capa: img(m.thumbnail_url), w: num(m.width) || 0, h: num(m.height) || 0, dur: Math.round(+m.duration || 0) } : null; }
+              return null;
+            }).filter(Boolean);
+            const a = t.author || {};
+            const o = { url: 'https://x.com/' + txt(a.screen_name || 'i', 15) + '/status/' + txt(String(t.id || ''), 25), texto: txt(t.text || '', fundo ? 600 : 1200), t: num(t.created_timestamp) ? num(t.created_timestamp) * 1000 : 0,
+              autor: { nome: txt(a.name || '', 60), nick: txt(a.screen_name || '', 15), av: img(a.avatar_url), ok: !!(a.verification && a.verification.verified) },
+              resp: num(t.replies), rt: num(t.retweets), cur: num(t.likes), salvos: num(t.bookmarks), views: num(t.views), sens: !!t.possibly_sensitive, midias };
+            if (t.replying_to) o.respA = txt(t.replying_to, 15);
+            return o;
+          };
+          d = { tipo: 'tweet', ...post(t), url: 'https://x.com/' + txt((t.author && t.author.screen_name) || 'i', 15) + '/status/' + tw[2] };
+          if (t.quote && t.quote.author) d.cita = post(t.quote, true);
+          if (t.replying_to_status && /^\d{5,25}$/.test(String(t.replying_to_status))) { try { const p = await pegaTw(t.replying_to_status); if (p && p.author) d.pai = post(p, true); } catch (_) { /* sem o post de cima */ } }
         }
       } catch (_) { d = null; }
     } else if (k) {
@@ -828,7 +865,7 @@ export class Hub {
     if (rota === 'bolha/kofi' && request.method === 'POST') return this.bolha.kofi(request); // o aviso de pagamento do Ko-fi (formulário, não JSON)
     if (rota === 'bolha/mp' && request.method === 'POST') return this.bolha.mp(request, url); // (0.7.14) o aviso do Mercado Pago
     { const lp = await this.loja.rotaPublica(rota, request, url); if (lp) return lp; } // (1.0.0) a volta do Mercado Pago de quem vende skins e o aviso das compras
-    const binario = /^conv\/[^/]+\/(anexo|foto)$/.test(rota) || /^conv\/[^/]+\/anexo-grande\/[0-9a-f]+\/\d+$/.test(rota) || /^imagem\/(avatar|banner|nameplate|fundo|mural|ligacao|acessorio|jogo)$/.test(rota) || rota === 'figurinhas' || rota === 'emojis' || rota === 'feedback/anexo' || rota === 'integ/arte' || rota === 'loja/publicar'; // anexo do Aero Talk e foto/banner: bytes, não JSON
+    const binario = /^conv\/[^/]+\/(anexo|foto|banner)$/.test(rota) /* (1.0.3) o banner do grupo também é imagem (dava "JSON inválido") */ || /^conv\/[^/]+\/anexo-grande\/[0-9a-f]+\/\d+$/.test(rota) || /^imagem\/(avatar|banner|nameplate|fundo|mural|ligacao|acessorio|jogo)$/.test(rota) || rota === 'figurinhas' || rota === 'emojis' || rota === 'feedback/anexo' || rota === 'integ/arte' || rota === 'loja/publicar'; // anexo do Aero Talk e foto/banner: bytes, não JSON
     if ((request.method === 'POST' || request.method === 'PUT') && !binario) {
       try { b = await request.json(); } catch (_) { return erro('JSON inválido.'); }
     }

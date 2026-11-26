@@ -431,10 +431,10 @@
     }
     return av;
   };
-  BA.estudioFotos = (molduras, aneis, aoSalvar) => {
+  BA.estudioFotos = (molduras, aneis, aoSalvar, op = {}) => {
     const copia = (l) => (l || []).filter((b) => b && b.arte).map((b) => ({ id: b.id, nome: b.nome, arte: JSON.parse(JSON.stringify(b.arte)) }));
     const listas = { mo: copia(molduras), an: copia(aneis) };
-    let tipo = listas.mo.length || !listas.an.length ? 'mo' : 'an', sel = 0, voz = 0.6;
+    let tipo = op.tipo === 'an' || op.tipo === 'mo' ? op.tipo : listas.mo.length || !listas.an.length ? 'mo' : 'an', sel = 0, voz = 0.6;
     const atual = () => listas[tipo][sel];
     const abas = h('div', { class: 'ba-abas' }), palco = h('div', { class: 'ba-palco ba-palco-foto' }), ctrl = h('div', { class: 'ba-ctrl' });
     const nova = (img) => ({ id: '', nome: tipo === 'an' ? T('Meu anel', 'My ring') : T('Minha moldura', 'My frame'), arte: { img, escala: 140, x: 0, y: 0, camada: 'frente', giro: 0, pulso: false, ...(tipo === 'an' ? { voz: 60 } : {}) } });

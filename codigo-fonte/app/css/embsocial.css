@@ -1,0 +1,76 @@
+/* (1.0.3) cartões de TikTok e Instagram (e a base .emb-x dos cartões novos): legível nos dois temas, fotos sem zoom, nada sai da caixa */
+.cx-midia.emb-x { --ex-c1: #25f4ee; --ex-c2: #fe2c55; --ex-bg: rgba(255,255,255,.88); --ex-txt: #0f1722; --ex-suave: rgba(15,23,34,.6); --ex-linha: rgba(15,23,34,.1);
+  display: flex; flex-direction: column; gap: 9px; width: 420px; max-width: calc(100% - 8px); box-sizing: border-box; padding: 12px; border-radius: 18px; color: var(--ex-txt); overflow: hidden;
+  background: radial-gradient(110% 70% at 0% 0%, color-mix(in srgb, var(--ex-c1) 12%, transparent), transparent 55%), radial-gradient(110% 70% at 100% 100%, color-mix(in srgb, var(--ex-c2) 10%, transparent), transparent 55%), var(--ex-bg);
+  box-shadow: inset 0 0 0 1px var(--ex-linha), 0 8px 24px rgba(0,0,0,.16); }
+[data-tema=escuro] .cx-midia.emb-x { --ex-bg: rgba(16,20,28,.92); --ex-txt: #eef3f8; --ex-suave: rgba(238,243,248,.62); --ex-linha: rgba(255,255,255,.1); box-shadow: inset 0 0 0 1px var(--ex-linha), 0 8px 24px rgba(0,0,0,.4); }
+.cx-midia.emb-ig { --ex-c1: #fd5949; --ex-c2: #285aeb; }
+.emb-x.carregando { min-height: 150px; }
+.ex-esq { height: 120px; border-radius: 12px; background: linear-gradient(90deg, color-mix(in srgb, var(--ex-txt) 6%, transparent), color-mix(in srgb, var(--ex-txt) 12%, transparent), color-mix(in srgb, var(--ex-txt) 6%, transparent)); background-size: 200% 100%; animation: ex-brilho 1.3s linear infinite; }
+@keyframes ex-brilho { to { background-position: -200% 0; } }
+[data-visual=lite] .ex-esq, [data-anim=nenhuma] .ex-esq { animation: none; }
+.ex-topo { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.emb-x img.ex-av, .emb-x span.ex-av { flex: none; width: 38px; height: 38px; max-width: none; margin: 0; border-radius: 50%; object-fit: cover; display: grid; place-items: center; background: color-mix(in srgb, var(--ex-txt) 10%, transparent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ex-c2) 55%, transparent); }
+.emb-x .ex-av.ig { color: #fff; font-weight: 800; font-size: 16px; background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fd5949 45%, #d6249f 60%, #285aeb 90%); box-shadow: none; }
+.ex-quem { display: flex; flex-direction: column; min-width: 0; flex: 1; color: inherit; text-decoration: none; line-height: 1.22; cursor: pointer; }
+.ex-quem b { display: flex; align-items: center; gap: 4px; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ex-quem small { font-size: 12px; color: var(--ex-suave); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ex-quem:hover b { text-decoration: underline; }
+.ex-ok { display: inline-grid; place-items: center; width: 15px; height: 15px; flex: none; border-radius: 50%; color: #fff; background: #20d5ec; }
+.ex-logo { flex: none; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 10px; cursor: pointer; background: #000; box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+.ex-logo.ig { background: transparent; box-shadow: none; }
+.ex-txt { font-size: 13.5px; line-height: 1.42; white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+.ex-tag { font-weight: 700; color: color-mix(in srgb, var(--ex-c1) 55%, var(--ex-txt)); }
+/* o vídeo/fotos: a caixa tem a proporção da mídia (em pé fica estreita e centralizada); a imagem nunca é cortada */
+.ex-palco { position: relative; align-self: center; width: 100%; aspect-ratio: var(--ar, .5625); max-height: 520px; border-radius: 14px; overflow: hidden; background: #000; isolation: isolate; }
+.ex-palco.em-pe { width: auto; height: min(520px, calc((100vw - 120px) / var(--ar, .5625))); max-width: 100%; }
+.ex-capa { position: absolute; inset: 0; display: block; width: 100%; height: 100%; padding: 0; border: 0; cursor: pointer; background: #000; }
+.ex-capa > img, .ex-foto > img { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; object-fit: contain; border-radius: 0; display: block; }
+.ex-play { position: absolute; inset: 0; margin: auto; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; color: #fff; background: rgba(10,14,20,.5); backdrop-filter: blur(6px); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.55), 0 6px 20px rgba(0,0,0,.35); transition: transform .15s; }
+.ex-capa:hover .ex-play, .ex-ig-ver:hover .ex-play { transform: scale(1.08); }
+.ex-dur { position: absolute; right: 8px; bottom: 8px; padding: 2px 7px; border-radius: 6px; font-size: 11.5px; font-weight: 700; color: #fff; background: rgba(0,0,0,.6); }
+.ex-palco.tocando > :is(video, .mp, div) { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ex-palco.tocando video { width: 100%; height: 100%; max-width: none; max-height: none; object-fit: contain; background: #000; }
+.ex-carrossel { touch-action: pan-y; user-select: none; }
+.ex-faixa { position: absolute; inset: 0; display: flex; transition: transform .32s cubic-bezier(.2,.8,.2,1); }
+.ex-foto { position: relative; flex: 0 0 100%; height: 100%; padding: 0; border: 0; cursor: zoom-in; background: #000; }
+.ex-seta { position: absolute; top: 50%; translate: 0 -50%; z-index: 2; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; color: #fff; background: rgba(0,0,0,.45); opacity: .85; }
+.ex-seta.esq { left: 8px; } .ex-seta.dir { right: 8px; } .ex-seta:hover { opacity: 1; background: rgba(0,0,0,.65); }
+.ex-pontos { position: absolute; left: 0; right: 0; bottom: 9px; z-index: 2; display: flex; justify-content: center; gap: 5px; pointer-events: none; }
+.ex-pontos i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.5); } .ex-pontos i.on { background: #fff; width: 14px; border-radius: 3px; }
+.ex-cont { position: absolute; top: 8px; right: 8px; z-index: 2; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; color: #fff; background: rgba(0,0,0,.55); }
+.ex-som { position: absolute; left: 8px; top: 8px; z-index: 2; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; color: #fff; background: rgba(0,0,0,.55); box-shadow: 0 0 0 2px rgba(255,255,255,.35); }
+.tocando-som .ex-som { background: var(--ex-c2); }
+.ex-nums { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--ex-suave); }
+.ex-num { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; } .ex-num b { color: var(--ex-txt); font-weight: 700; }
+.ex-musica { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 12.5px; color: var(--ex-suave); }
+.ex-disco { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; overflow: hidden; background: #111; color: #fff; box-shadow: 0 0 0 3px #222; }
+.ex-disco > img { width: 100%; height: 100%; max-width: none; margin: 0; object-fit: cover; border-radius: 0; }
+.ex-musica-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ex-rod { display: inline-flex; align-items: center; gap: 6px; width: fit-content; font-size: 11.5px; color: var(--ex-suave); text-decoration: none; cursor: pointer; } .ex-rod:hover { text-decoration: underline; }
+/* perfil */
+.emb-x.perfil { padding-top: 0; gap: 8px; }
+.ex-banner { position: relative; height: 74px; margin: 0 -12px; overflow: hidden; background: linear-gradient(120deg, #25f4ee, #000 55%, #fe2c55); }
+.ex-banner-marca { position: absolute; right: -10px; top: -22px; opacity: .22; rotate: -12deg; }
+.ex-perfil-cab { display: flex; align-items: flex-end; justify-content: space-between; margin-top: -40px; }
+.emb-x img.ex-av.grande, .emb-x span.ex-av.grande { width: 76px; height: 76px; box-shadow: 0 0 0 3px var(--ex-bg), 0 4px 14px rgba(0,0,0,.3); }
+.ex-quem.grande b { font-size: 16.5px; }
+.ex-privado { display: flex; align-items: center; gap: 7px; padding: 8px 10px; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--ex-suave); background: color-mix(in srgb, var(--ex-txt) 6%, transparent); }
+.ex-ests { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.ex-est { display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 7px 4px; border-radius: 10px; background: color-mix(in srgb, var(--ex-txt) 5%, transparent); }
+.ex-est b { font-size: 15px; font-weight: 800; } .ex-est small { font-size: 11px; color: var(--ex-suave); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ex-link { display: inline-flex; align-items: center; gap: 5px; min-width: 0; font-size: 12.5px; font-weight: 600; color: color-mix(in srgb, var(--ex-c1) 50%, var(--ex-txt)); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ex-ir { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; padding: 8px 15px; border: 0; border-radius: 999px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; color: #fff; background: linear-gradient(90deg, #25c8e8, #fe2c55); box-shadow: 0 3px 10px rgba(254,44,85,.3); }
+.ex-ir:hover { filter: brightness(1.06); }
+/* Instagram: o botão que carrega o player oficial, e o espaço dele depois do clique */
+.ex-ig-palco { --ar: 1; max-height: none; aspect-ratio: auto; height: 180px; background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fd5949 45%, #d6249f 60%, #285aeb 90%); }
+.ex-ig-ver { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 0; border: 0; cursor: pointer; color: #fff; background: transparent; font: inherit; }
+.ex-ig-ver > .ex-play { position: static; margin: 0; }
+.ex-ig-ver > b { font-size: 14px; text-shadow: 0 1px 6px rgba(0,0,0,.35); }
+.ex-ig-palco.tocando { height: 620px; max-height: 70vh; background: #fff; }
+.ex-ig-palco.tocando.perfil { height: 560px; }
+.ex-ig-palco.tocando > iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+@media (max-width: 560px) {
+  .ex-palco.em-pe { height: min(460px, calc((100vw - 110px) / var(--ar, .5625))); }
+  .ex-ests { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

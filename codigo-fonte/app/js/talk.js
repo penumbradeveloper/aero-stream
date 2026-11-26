@@ -472,10 +472,10 @@
       // (0.6.0) silenciada: nada, a não ser menção (balão sem som, como no Discord); não perturbe: nada
       // (0.7.0) quem já está vendo a conversa (no Aero Talk ou no chat da chamada) não recebe aviso dela
       const naConversa = (TK.aberta === c.id && !document.hidden) || (A.chamada && A.chamada.chatVisivel && A.chamada.chatVisivel(c.id));
-      const avisar = !A.ui.naoPerturbe() && (!c.mudo || mencionou) && !naConversa;
+      const avisar = !A.ui.naoPerturbe(m.de) && (!c.mudo || mencionou) && !naConversa;
       // (0.7.0) a mesma mensagem chegando duas vezes (o servidor reenviou depois de reconectar) avisa uma vez só
       const chave = c.id + ':' + m.seq, repetida = avisados.has(chave); avisados.add(chave); if (avisados.size > 500) avisados.delete(avisados.values().next().value);
-      if (!A.ui.naoPerturbe() && !c.mudo && !repetida) A.som.tocar(mencionou ? 'talk-mencao' : 'talk-msg');
+      if (!A.ui.naoPerturbe(m.de) && !c.mudo && !repetida) A.som.tocar(mencionou ? 'talk-mencao' : 'talk-msg');
       if (avisar && !repetida) A.ui.notificar(c.tipo === 'grupo' ? TK.titulo(c) + ' · ' + nomeDe(m.de) : nomeDe(m.de), (mencionou ? T('mencionou você: ', 'mentioned you: ') : '') + (c.previa || '').slice(0, 120), { cid: c.id, pessoa: pessoaDe(m.de), nome: nomeDe(m.de) });
       if (avisar && !repetida && avisoNaConversa(c, m, mencionou)) { /* (0.8.6) com uma conversa aberta: o cartãozinho embaixo do nome */ }
       else if (avisar && !repetida) A.ui.toast(h('span', {}, h('b', {}, c.tipo === 'grupo' ? TK.titulo(c) + ' · ' + nomeDe(m.de) : nomeDe(m.de)), mencionou ? T(' mencionou você', ' mentioned you') : '', ': ', (c.previa || '').slice(0, 80)), { avatar: pessoaDe(m.de), ms: 4200, som: c.mudo ? 'nenhum' : undefined, acoes: [{ texto: T('Abrir', 'Open'), tipo: 'sec', onclick: () => TK.irPara(c.id) }] });
@@ -743,7 +743,7 @@
         const av = meuCard.querySelector('.avatar'); if (!av) return;
         const t0 = av.getBoundingClientRect().width, x0 = e.clientX, y0 = e.clientY, sx = c[1] === 'd' ? 1 : -1, sy = c[0] === 'b' ? 1 : -1;
         let t = t0; meuCard.classList.add('puxando'); euAvPuxou = true;
-        const mover = (ev) => { const d = Math.max((ev.clientX - x0) * sx, (ev.clientY - y0) * sy); t = Math.round(Math.max(EU_AV[0], Math.min(EU_AV[1], t0 + d * 2))); meuCard.style.setProperty('--eu-av', t + 'px'); };
+        const mover = (ev) => { const d = Math.max((ev.clientX - x0) * sx, (ev.clientY - y0) * sy); t = Math.round(Math.max(EU_AV[0], Math.min(EU_AV[1], t0 + d * 2))); meuCard.style.setProperty('--eu-av', t + 'px'); meuCard.classList.add('tem-eu-av'); };
         const fim = () => {
           removeEventListener('pointermove', mover, true); removeEventListener('pointerup', fim, true); removeEventListener('pointercancel', fim, true);
           meuCard.classList.remove('puxando'); setTimeout(() => { euAvPuxou = false; }, 0);
@@ -819,7 +819,7 @@
       const posicionarEu = () => {
         const v = R.v().perfil, [vert, canto] = v.split('-');
         meuCard.classList.toggle('compacto', !!canto); meuCard.dataset.canto = canto || '';
-        { const ta = (R.v().tam || {}).euAv; if (canto && ta) meuCard.style.setProperty('--eu-av', ta + 'px'); else meuCard.style.removeProperty('--eu-av'); }
+        { const ta = (R.v().tam || {}).euAv; if (canto && ta) meuCard.style.setProperty('--eu-av', ta + 'px'); else meuCard.style.removeProperty('--eu-av'); meuCard.classList.toggle('tem-eu-av', !!(canto && ta)); }
         if (vert === 'cima' && (canto === 'esquerda' || canto === 'direita')) { if (canto === 'esquerda') linhaTopo.prepend(meuCard); else linhaTopo.append(meuCard); }
         else if (vert === 'cima') { if (lado.firstChild !== meuCard) lado.prepend(meuCard); }
         else if (meuCard.parentNode !== lado || lado.lastChild !== meuCard) lado.append(meuCard);
@@ -1248,7 +1248,7 @@
         // (0.7.0) quem está falando NÃO entra na assinatura: só a bolinha verde muda (antes a faixa inteira era refeita e as fotos de todo mundo
         // recarregavam a cada fala). E quem está compartilhando a tela aparece aqui mesmo (não tem a janelinha nessa hora)
         const telaDe = minha ? est.pares.find((q) => q.tela && A.chamada.midiaTela && A.chamada.midiaTela(q.codigo)) : null;
-        const sig = JSON.stringify([minha, !!toque, est && est.modo, est && est.chamando, pessoas.map((q) => [q.codigo, !!q.mudo, !!q.cam, !!q.tela]), est && est.eu.mudo, est && est.eu.surdo, est && est.eu.cam, est && est.eu.tela, telaDe && telaDe.codigo]);
+        const sig = JSON.stringify([minha, !!toque, est && est.modo, est && est.chamando, pessoas.map((q) => [q.codigo, !!q.mudo, !!q.surdo, !!q.cam, !!q.tela]), est && est.eu.mudo, est && est.eu.surdo, est && est.eu.cam, est && est.eu.tela, telaDe && telaDe.codigo]);
         const marcarFala = () => { for (const q of pessoas) { const b = faixa.querySelector('.tk-cham-bolha[data-cod="' + q.codigo + '"]'); if (b) falaEm(b, !!q.falando); } };
         if (sig === assinatura && faixa.querySelector('.tk-cham-tempo')) { const t = faixa.querySelector('.tk-cham-tempo'); const ini = minha ? est.inicio : k && k.inicio; t.textContent = ini ? TK.duracao(Date.now() - ini) : T('chamando…', 'calling…'); marcarFala(); return; }
         assinatura = sig; faixa.hidden = false; faixa.textContent = '';
@@ -1266,7 +1266,7 @@
         // (0.7.2) botão direito na foto de alguém da chamada: o volume dessa pessoa (só para você)
         const volume = (q) => (ev) => { if (q.eu || !minha || !A.chamada.volumePessoa) return; ev.preventDefault(); ev.stopPropagation(); A.chamada.volumePessoa(q.codigo, fotoDe(q)); };
         const bolhas = h('div', { class: 'tk-cham-bolhas' }, ...pessoas.map((q, i) => (A.extras ? A.extras.marcarChamada : (x) => x)(h('div', { class: 'tk-cham-bolha' + (vistos.has(q.codigo) ? '' : ' nova') + (q.falando ? ' falando' : '') + (q.mudo ? ' mudo' : ''), dados: { cod: q.codigo }, estilo: { '--i': i }, oncontextmenu: volume(q), title: (q.eu ? T('Você', 'You') : nomeDe(q.codigo) + (minha ? T(' · botão direito: volume', ' · right-click: volume') : '')) + (q.mudo ? T(' (microfone desligado)', ' (mic off)') : '') },
-          fotoDe(q), q.mudo ? h('span', { class: 'tk-cham-mudo' }, A.icone('micOff', 13)) : null, q.tela ? h('span', { class: 'tk-cham-tela' }, 'TELA') : null), q.codigo)));
+          fotoDe(q), q.mudo ? h('span', { class: 'tk-cham-mudo' }, A.icone('micOff', 13)) : q.surdo ? h('span', { class: 'tk-cham-mudo surdo' }, A.icone('fonesOff', 13)) : null, q.tela ? h('span', { class: 'tk-cham-tela' }, 'TELA') : null), q.codigo)));
         const ini = minha ? est.inicio : k && k.inicio;
         const outroAparelho = !minha && k && API.eu && k.quem.includes(API.eu.codigo); // (0.6.0) a chamada é do aparelho
         const info = h('div', { class: 'tk-cham-info' }, h('b', {}, minha ? (est.chamando ? T('Chamando…', 'Calling…') : T('Você está na chamada', 'You are in the call')) : toque ? nomeDe(toque.de.codigo) + T(' está te ligando…', ' is calling you…') : outroAparelho ? T('Você está nesta chamada em outro aparelho', 'You are in this call on another device') : T('Chamada em andamento', 'Call in progress')), h('span', { class: 'tk-cham-tempo' }, ini ? TK.duracao(Date.now() - ini) : T('chamando…', 'calling…')));
@@ -1707,6 +1707,8 @@
         const subir = (rota, max, f) => (async () => {
           try {
             if (f) f = await U.encolher(f, max * 1048576); // (0.9.4) acima do limite: reduz a qualidade até caber
+            // (1.0.3) formatos que o servidor não guarda (AVIF, BMP, HEIC, sem tipo...): vira WebP aqui antes de mandar
+            if (f && !/^image\/(gif|jpeg|png|webp)$/.test(f.type || '')) { let bmp; try { bmp = await createImageBitmap(f); } catch (_) { throw new Error(T('Não consegui abrir essa imagem.', 'Could not open that image.')); } const cv = document.createElement('canvas'); cv.width = bmp.width; cv.height = bmp.height; cv.getContext('2d').drawImage(bmp, 0, 0); try { bmp.close(); } catch (_) { /* ok */ } f = await new Promise((ok) => cv.toBlob(ok, 'image/webp', 0.92)); if (!f) throw new Error(T('Não consegui abrir essa imagem.', 'Could not open that image.')); }
             if (f && f.size > max * 1048576) throw new Error(T('Imagem grande demais (máximo ', 'Image too large (max ') + max + ' MB).');
             const r = await fetch(`${API.servidor}/api/conv/${c.id}/${rota}`, { method: 'POST', headers: { Authorization: 'Bearer ' + API.token, 'Content-Type': (f && f.type) || 'image/png' }, body: f || new Uint8Array(0) });
             const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.erro || T('Não consegui enviar a imagem.', 'Could not upload the image.'));

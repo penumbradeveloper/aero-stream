@@ -50,8 +50,13 @@
         if (A.kms && S.local && S.local.kms) add('Captura direta', JSON.stringify({ ...(A.kms.info() || {}), transformacao: A.kms._est || null })); // (0.7.4) modo jogo pela placa
         add('Peers', [...S.peers.values()].map((p) => `${p.id}:${p.pc.connectionState}/${p.pc.iceConnectionState}/${p.pc.signalingState}`).join(' '));
       }
+      try { const c = A.chamada && A.chamada.diag ? await A.chamada.diag() : null; if (c) add('Chamada', JSON.stringify(c)); } catch (e) { add('Chamada', 'erro: ' + e.message); } // (1.0.3) as salas viraram chamadas: sem isto o relatório não dizia nada da tela
       try { add('Desempenho', JSON.stringify(await A.diag.desempenho())); } catch (e) { add('Desempenho', 'erro: ' + e.message); }
-      L.push('', '--- últimas linhas do log ---', ...A.log.linhas().slice(-120));
+      // (1.0.3) o log citava o código de amigo de quem estava na chamada: no relatório vira "pessoa 1", "pessoa 2"...
+      const H = A.hub || {}, cods = new Set([...(H.amigos || []).map((x) => x && x.codigo), ...[...((H.presenca && H.presenca.values()) || [])].map((x) => x && x.codigo)].filter((c) => typeof c === 'string' && c.length >= 5));
+      const apelido = new Map([...cods].map((c, i) => [c, 'pessoa' + (i + 1)]));
+      const semCodigo = (t) => { let r = String(t); for (const [c, n] of apelido) if (r.includes(c)) r = r.split(c).join(n); return r; };
+      L.push('', '--- últimas linhas do log ---', ...A.log.linhas().slice(-120).map(semCodigo));
       return L.join('\n');
     },
   };

@@ -93,7 +93,7 @@ export async function validar(buf) {
 // ---------- a loja ----------
 const MP = 'https://api.mercadopago.com';
 const PEDACO = 1048576;
-const HASH = /^[0-9a-f]{64}$/, ID = /^[a-z0-9-]{3,32}$/;
+const HASH = /^[0-9a-f]{64}$/, ID = /^[a-z0-9-]{3,32}$/, INTEG = /^c-[a-f0-9]{10}$/;
 const REF = /^aerl\.([0-9a-f-]{36})\.([a-z0-9-]{3,32})\.([0-9a-f]{8})$/;
 const ESTORNO = ['refunded', 'charged_back'];
 const PRECO_MIN = 2, PRECO_MAX = 200;
@@ -112,6 +112,23 @@ export class Loja {
   async vitrine(s, conta) {
     const a = s.autor && (await this.st.get('c:' + s.autor));
     return { id: s.id, nome: s.nome, descricao: s.descricao, versao: s.versao, preco: s.preco, oficial: !!s.oficial, autor: s.oficial ? 'Aero' : (a && a.nome) || '', autorCod: !s.oficial && a ? a.codigo : '', tam: s.tam, em: s.em, vendas: s.vendas || 0, minha: !!conta && s.autor === conta.id, tenho: !!conta && (!s.preco || s.autor === conta.id || !!(await this.st.get(`lic:${conta.id}:${s.id}`))) };
+  }
+  // (1.0.3) o que vende: uma skin (ls:) ou uma integração paga da Comunidade (igc:, os ids c-xxxxxxxxxx)
+  async item(id) {
+    if (INTEG.test(id)) {
+      const x = await this.st.get('igc:' + id); if (!x) return null;
+      return { id, integ: true, nome: (x.pac && x.pac.nome) || 'Integração', preco: x.preco || 0, autor: x.dono, removida: !!x.oculta, vendas: x.vendas || 0 };
+    }
+    return this.st.get('ls:' + id);
+  }
+  async contarVenda(id, d) {
+    const k = (INTEG.test(id) ? 'igc:' : 'ls:') + id, s = await this.st.get(k);
+    if (s) { s.vendas = Math.max(0, (s.vendas || 0) + d); await this.st.put(k, s); }
+  }
+  // o que o app precisa para mostrar o preço e o "Conectar Mercado Pago"
+  async infoVenda(conta) {
+    const v = await this.st.get('vend:' + conta.id);
+    return { vendedor: !!v, splitPronto: !!(this.env.MP_CLIENT_ID && this.env.MP_CLIENT_SECRET), pagamento: !!this.env.MP_TOKEN, comissao: this.comissao(), creditos: this.creditos(conta), desconto: desconto(nivelDe(conta)) };
   }
   creditos(conta) { const b = conta.bolha || {}; return nivelDe(conta) >= 4 ? Math.max(0, mesesSeguidos(conta) * CREDITO_MES - (b.lojaCredDe === b.desde ? b.lojaCred || 0 : 0)) : 0; }
   // o preço para quem compra (o desconto e o crédito saem da comissão do Aero)
@@ -200,6 +217,7 @@ export class Loja {
     let v; try { v = await validar(b); } catch (e) { return erro(e.message || 'Arquivo .aer inválido.'); }
     if (await this.st.get('lban:' + v.hash)) return erro('Esta skin foi removida da loja e não pode voltar.', 403);
     const outro = await this.st.get('lh:' + v.hash); if (outro && outro !== v.manifesto.id) return erro('Esta mesma skin já está na loja.');
+    if (INTEG.test(v.manifesto.id)) return erro('Esse id é reservado. Mude o id no manifesto.');
     const antes = await this.st.get('ls:' + v.manifesto.id);
     if (antes && antes.autor !== conta.id && !(dev && antes.oficial)) return erro('Já existe uma skin com este id na loja. Mude o id no manifesto.');
     if (antes && antes.removida) return erro('Esta skin foi removida da loja.', 403);
@@ -220,18 +238,18 @@ export class Loja {
 
   // ---------- comprar ----------
   async comprar(conta, id, b, url) {
-    const s = await this.st.get('ls:' + id);
-    if (!s || s.removida) return erro('Skin não encontrada.', 404);
+    const s = await this.item(id);
+    if (!s || s.removida) return erro(s && s.integ ? 'Integração não encontrada.' : 'Skin não encontrada.', 404);
     if (!s.preco || s.autor === conta.id || (await this.st.get(`lic:${conta.id}:${id}`))) { if (!s.preco) await this.st.put(`lic:${conta.id}:${id}`, { t: Date.now(), gratis: 1 }); return resposta({ ok: true, tenho: true }); }
-    if (!this.env.MP_TOKEN) return erro('Pagamento ainda não disponível.', 503);
+    if (!this.env.MP_TOKEN && s.oficial) return erro('Pagamento ainda não disponível.', 503);
     const email = String((b && b.email) || '').trim().toLowerCase(); if (!emailOk(email)) return erro('Escreva um e-mail válido (é para o recibo do Mercado Pago).');
     if (!this.hub.limitar('lojac:' + conta.id, 8, 600000)) return erro('Devagar! Tente de novo em alguns minutos.', 429);
     const q = this.preco(s, conta, !!(b && b.credito));
     let token = this.env.MP_TOKEN;
-    if (!s.oficial) { token = await this.tokenVendedor(s.autor); if (!token) return erro('Quem fez esta skin ainda não pode receber. Tente mais tarde.', 503); }
+    if (!s.oficial) { token = await this.tokenVendedor(s.autor); if (!token) return erro(s.integ ? 'Quem fez esta integração ainda não pode receber. Tente mais tarde.' : 'Quem fez esta skin ainda não pode receber. Tente mais tarde.', 503); }
     const cod = hexA(4), ref = `aerl.${conta.id}.${id}.${cod}`;
     await this.st.put('lpg:' + cod, { comprador: conta.id, skin: id, vendedor: s.oficial ? '' : s.autor, total: q.total, credito: q.credito, t: Date.now() });
-    const corpo = { transaction_amount: q.total, description: 'Skin do Aero: ' + s.nome, payment_method_id: 'pix', payer: { email }, external_reference: ref, notification_url: url.origin + '/api/loja/mp?c=' + cod, date_of_expiration: new Date(Date.now() + 30 * 60000 - 3 * 3600000).toISOString().replace('Z', '-03:00') };
+    const corpo = { transaction_amount: q.total, description: (s.integ ? 'Integração do Aero: ' : 'Skin do Aero: ') + s.nome, payment_method_id: 'pix', payer: { email }, external_reference: ref, notification_url: url.origin + '/api/loja/mp?c=' + cod, date_of_expiration: new Date(Date.now() + 30 * 60000 - 3 * 3600000).toISOString().replace('Z', '-03:00') };
     if (!s.oficial) corpo.application_fee = q.taxa; // a comissão do Aero (o resto vai direto para quem fez)
     const r = await this.mpApi(token, '/v1/payments', 'POST', corpo, ref);
     const t = (r.d.point_of_interaction && r.d.point_of_interaction.transaction_data) || {};
@@ -254,7 +272,7 @@ export class Loja {
     if (!m || m[1] !== pg.comprador || m[2] !== pg.skin || m[3] !== cod) return 'pendente';
     const chave = `lmp:${p.id}`, feito = await this.st.get(chave);
     if (ESTORNO.includes(p.status)) { // devolveram o dinheiro: a licença sai (uma vez só)
-      if (feito && !feito.estorno) { feito.estorno = Date.now(); await this.st.put(chave, feito); await this.st.delete(`lic:${pg.comprador}:${pg.skin}`); const s = await this.st.get('ls:' + pg.skin); if (s) { s.vendas = Math.max(0, (s.vendas || 0) - 1); await this.st.put('ls:' + s.id, s); } }
+      if (feito && !feito.estorno) { feito.estorno = Date.now(); await this.st.put(chave, feito); await this.st.delete(`lic:${pg.comprador}:${pg.skin}`); await this.contarVenda(pg.skin, -1); }
       return 'cancelado';
     }
     if (['rejected', 'cancelled'].includes(p.status)) return 'cancelado';
@@ -263,7 +281,7 @@ export class Loja {
     if (feito) return 'pago';
     await this.st.put(chave, { t: Date.now(), cod, comprador: pg.comprador, skin: pg.skin, valor: +p.transaction_amount });
     await this.st.put(`lic:${pg.comprador}:${pg.skin}`, { t: Date.now(), pid: String(p.id) });
-    const s = await this.st.get('ls:' + pg.skin); if (s) { s.vendas = (s.vendas || 0) + 1; await this.st.put('ls:' + s.id, s); }
+    await this.contarVenda(pg.skin, 1);
     if (pg.credito > 0) { const c = await this.st.get('c:' + pg.comprador); if (c && c.bolha) { const bl = c.bolha; if (bl.lojaCredDe !== bl.desde) { bl.lojaCredDe = bl.desde; bl.lojaCred = 0; } bl.lojaCred = centavos((bl.lojaCred || 0) + pg.credito); await this.st.put('c:' + c.id, c); } }
     return 'pago';
   }
@@ -281,8 +299,8 @@ export class Loja {
 
   // ---------- quem vende: conecta a própria conta do Mercado Pago (OAuth do marketplace) ----------
   async mpConectar(conta, url) {
-    if (!this.env.MP_CLIENT_ID || !this.env.MP_CLIENT_SECRET) return erro('A venda de skins ainda não está disponível.', 503);
-    if (nivelDe(conta) < 3 && !(await this.ehDev(conta))) return erro('Vender na loja é do Aero Bubble Donator.', 403);
+    if (!this.env.MP_CLIENT_ID || !this.env.MP_CLIENT_SECRET) return erro('A venda ainda não está disponível.', 503);
+    if (nivelDe(conta) < 3 && !(await this.ehDev(conta))) return erro('Vender é do Aero Bubble Donator e do Supporter.', 403);
     const estado = hexA(16); await this.st.put('lmps:' + estado, { conta: conta.id, t: Date.now() });
     const volta = url.origin + '/api/loja/mp/volta';
     return resposta({ url: 'https://auth.mercadopago.com.br/authorization?' + new URLSearchParams({ client_id: this.env.MP_CLIENT_ID, response_type: 'code', platform_id: 'mp', state: estado, redirect_uri: volta }) });

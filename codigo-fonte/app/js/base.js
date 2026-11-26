@@ -3,7 +3,7 @@
 (() => {
   'use strict';
   const A = (window.Aero = window.Aero || {});
-  A.versao = '1.0.2';
+  A.versao = '1.0.3';
   A.autor = 'Ryan Victtor';
 
   // ---------- plataforma ----------
@@ -222,6 +222,7 @@
     volume: '<path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/>',
     volume1: '<path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>',
     volume0: '<path d="M11 5 6 9H2v6h4l5 4V5z"/>',
+    vivaVoz: '<rect x="6" y="2" width="10" height="20" rx="2.4"/><path d="M10 18.2h2"/><path d="M19 8.5a5 5 0 0 1 0 7"/><path d="M21.6 6a8.6 8.6 0 0 1 0 12"/>', // (1.0.3) viva-voz do celular
     mudo: '<path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/>',
     chat: '<path d="M3 7a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v3a4 4 0 0 1-4 4H9.5L5 17.5V13.4A4 4 0 0 1 3 10z"/><circle cx="18.6" cy="16.6" r="2.6"/><circle cx="20.6" cy="21.4" r="1"/>', // (0.8.7) o do Aero: um balão e as bolhas subindo
     pessoas: '<circle cx="9" cy="8" r="3.6"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="7.6" r="2.6"/><path d="M17.6 13.2A5 5 0 0 1 21.5 18"/>',
@@ -295,6 +296,7 @@
     painel: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/>',
     chevron: '<path d="m18 15-6-6-6 6"/>',
     parar: '<rect width="12" height="12" x="6" y="6" rx="2" fill="currentColor"/>',
+    fonesOff: '<path d="M4 15v-3a8 8 0 0 1 13.3-6"/><path d="M20 12v3"/><rect x="2.5" y="13.5" width="5" height="7.5" rx="2.5"/><rect x="16.5" y="13.5" width="5" height="7.5" rx="2.5"/><path d="M3 3l18 18"/>', // (1.0.3) som desligado (não está ouvindo)
     fones: '<path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="2.5" y="13.5" width="5" height="7.5" rx="2.5"/><rect x="16.5" y="13.5" width="5" height="7.5" rx="2.5"/>',
     cadeado: '<rect x="4" y="10.5" width="16" height="11" rx="3.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.8" r="1.4"/>',
     seta: '<path d="m6 9 6 6 6-6"/>',
@@ -343,12 +345,22 @@
     // (0.8.0) cheios, para as bolinhas brilhantes (estilo Aero): Spotify, Apple
     traduzir: '<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>',
     livro: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/><path d="M8 7h8" opacity=".6"/>', // (0.9.0) livros do Mural
+    hq: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v9H3"/><path d="M12 12h9" opacity=".6"/><path d="M7.5 15.5c0-1 1-1.7 2.2-1.7s2.2.7 2.2 1.7-1 1.7-2.2 1.7l-1.3 1z" opacity=".8"/>', // (1.0.3) HQs do Mural (quadros de gibi)
+    manga: '<path d="M12 6c-2-1.6-5-2.2-8-2v14c3-.2 6 .4 8 2 2-1.6 5-2.2 8-2V4c-3-.2-6 .4-8 2z"/><path d="M12 6v14"/><path d="M15 9l3-.4M15 12.5l3-.4" opacity=".6"/>', // (1.0.3) mangás do Mural (abre da direita)
     disco: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><path d="M12 5.5a6.5 6.5 0 0 0-6.5 6.5" opacity=".6"/>', // (0.8.7) álbum
     letterboxd: '<circle stroke="none" fill="#ff8000" cx="5.5" cy="12" r="3.6"/><circle stroke="none" fill="#00e054" cx="12" cy="12" r="3.6"/><circle stroke="none" fill="#40bcf4" cx="18.5" cy="12" r="3.6"/>', // (0.8.7) widget do Letterboxd
     spotify: '<circle stroke="none" fill="currentColor" cx="12" cy="12" r="9.5"/><path d="M6.8 9.4c3.6-1.1 7.6-.8 10.6 1M7.4 12.4c2.9-.8 6-.5 8.5.9M8 15.2c2.3-.6 4.6-.4 6.5.7" stroke="#1db954" stroke-width="1.9"/>',
     apple: '<path stroke="none" fill="currentColor" d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9s-1.8-.8-3-.8c-1.5 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.3.9-1.3 1.3-2.6 1.3-2.7 0 0-2.5-1-2.5-3.7zM14.2 5.8c.6-.8 1.1-1.9 1-3-.9 0-2.1.6-2.7 1.4-.6.7-1.1 1.8-1 2.9 1 .1 2.1-.5 2.7-1.3z"/>',
   };
+  // (1.0.3) cada ícone é montado uma vez só e depois copiado (montar pelo innerHTML a cada botão pesava nas listas grandes, como o Mural)
+  const moldeIc = new Map();
   A.icone = (nome, tam = 22) => {
+    let m = moldeIc.get(nome);
+    if (!m) { m = montarIcone(nome); moldeIc.set(nome, m); }
+    const s = m.cloneNode(true); s.setAttribute('width', tam); s.setAttribute('height', tam);
+    return s;
+  };
+  const montarIcone = (nome, tam = 22) => {
     const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('width', tam); s.setAttribute('height', tam);
     s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor'); s.setAttribute('stroke-width', '2');

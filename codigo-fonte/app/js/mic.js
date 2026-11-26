@@ -6,11 +6,14 @@
   const A = window.Aero;
   const cfg = () => A.cfg.v.audio.mic;
 
-  const M = (A.mic = { ativo: false, saida: null, db: -90, aberto: true, _c: null });
+  const M = (A.mic = { ativo: false, saida: null, db: -90, dbSaida: -90, limiarAtual: null, aberto: true, _c: null });
 
   // Mapas dos controles para números reais (funções puras, testáveis)
   // sensibilidade 0..100 -> limiar da porta em dB (mais sensível = abre com som mais baixo)
-  M.limiarDb = (sens) => -25 - A.limitar(sens, 0, 100) * 0.4;
+  // (1.0.3) faixa maior (-22 a -68 dB; o 50 continua -45) e, com o supressor, também uma margem acima do ruído de fundo medido:
+  // 100 abre com 3 dB acima do ruído, 50 com 8 dB, 0 só com 13 dB acima. Assim o controle muda algo em qualquer microfone e em qualquer quarto
+  M.limiarDb = (sens) => -22 - A.limitar(sens, 0, 100) * 0.46;
+  M.margemDb = (sens) => 3 + (100 - A.limitar(sens, 0, 100)) * 0.1;
   // potência 0..100 -> quanto a porta fechada abaixa o som (dB)
   // (0.8.4) bem mais forte: 60 -> 68 dB, e de 95 para cima a porta fechada fica muda
   M.reducaoDb = (forca) => 20 + A.limitar(forca, 0, 100) * 0.8;
@@ -71,6 +74,7 @@
     c.porta = ctx.createGain(); c.porta.gain.value = 1;
     c.vol = ctx.createGain(); c.vol.gain.value = A.limitar(cfg().ganho, 0, 200) / 100;
     c.destino = ctx.createMediaStreamDestination();
+    c.analiseSaida = ctx.createAnalyser(); c.analiseSaida.fftSize = 1024; c.analiseSaida.smoothingTimeConstant = 0; // (1.0.3) o que sai de verdade (o medidor mostra o efeito da supressão)
     // (0.8.4) supressão na thread de áudio: tira o ruído de dentro da fala e continua agindo com o app minimizado ou atrás de um jogo.
     // Sem AudioWorklet: a porta antiga (relógio da interface)
     try {
@@ -78,10 +82,10 @@
       if (!ctx._supressorAero) ctx._supressorAero = ctx.audioWorklet.addModule('js/supressor.worklet.js');
       await ctx._supressorAero;
       c.sup = new AudioWorkletNode(ctx, 'supressor-aero', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1], channelCount: 1, channelCountMode: 'explicit' });
-      c.sup.port.onmessage = (e) => { if (M._c === c && e.data) M.aberto = !!e.data.aberto; };
+      c.sup.port.onmessage = (e) => { if (M._c === c && e.data) { M.aberto = !!e.data.aberto; if (typeof e.data.limiar === 'number') M.limiarAtual = e.data.limiar; } };
     } catch (e) { ctx._supressorAero = null; c.sup = null; A.log.aviso('supressão de ruído: sem AudioWorklet, usando a porta simples', e && e.message); }
-    if (c.sup) { c.hpf.connect(c.analise); c.hpf.connect(c.sup); c.sup.connect(c.vol); c.vol.connect(c.destino); }
-    else { c.hpf.connect(c.analise); c.hpf.connect(c.atraso); c.atraso.connect(c.porta); c.porta.connect(c.vol); c.vol.connect(c.destino); }
+    if (c.sup) { c.hpf.connect(c.analise); c.hpf.connect(c.sup); c.sup.connect(c.vol); c.vol.connect(c.destino); c.vol.connect(c.analiseSaida); }
+    else { c.hpf.connect(c.analise); c.hpf.connect(c.atraso); c.atraso.connect(c.porta); c.porta.connect(c.vol); c.vol.connect(c.destino); c.vol.connect(c.analiseSaida); }
     if (M._c !== c) { try { c.sup && c.sup.disconnect(); } catch (e) { /* ok */ } bruto.getTracks().forEach((t) => t.stop()); return M.saida; } // parou enquanto carregava
     ligarFonte(bruto);
     c.buf = new Float32Array(c.analise.fftSize);
@@ -97,10 +101,11 @@
     let soma = 0; for (let i = 0; i < c.buf.length; i++) soma += c.buf[i] * c.buf[i];
     const db = 10 * Math.log10(soma / c.buf.length + 1e-12);
     M.db = Math.max(db, M.db - 1.2); // o medidor desce devagar
+    if (c.analiseSaida) { c.analiseSaida.getFloatTimeDomainData(c.buf); let s2 = 0; for (let i = 0; i < c.buf.length; i++) s2 += c.buf[i] * c.buf[i]; M.dbSaida = Math.max(10 * Math.log10(s2 / c.buf.length + 1e-12), M.dbSaida - 1.2); }
     const cf = cfg(), agora = performance.now();
     if (c.sup) { // o trabalho é do supressor: aqui só os ajustes (mandados quando mudam)
       const ch = (cf.supressao ? 1 : 0) + '|' + cf.forca + '|' + cf.sens + '|' + (cf.eco ? 1 : 0);
-      if (ch !== c.ajustes) { c.ajustes = ch; c.sup.port.postMessage({ p: { ligado: !!cf.supressao, forca: A.limitar(+cf.forca || 0, 0, 100), limiar: M.limiarDb(cf.sens), eco: !!cf.eco } }); }
+      if (ch !== c.ajustes) { c.ajustes = ch; c.sup.port.postMessage({ p: { ligado: !!cf.supressao, forca: A.limitar(+cf.forca || 0, 0, 100), limiar: M.limiarDb(cf.sens), margem: M.margemDb(cf.sens), eco: !!cf.eco } }); }
       // (1.0.2) anti-eco: o supressor recebe o quanto está tocando agora (as vozes e as transmissões que saem da caixa). Som no microfone que
       // só acompanha o que está tocando é eco, e não abre a porta (a sua voz por cima continua abrindo)
       if (cf.eco && (c.nRef = (c.nRef || 0) + 1) % 3 === 0) {
@@ -113,7 +118,7 @@
     }
     let alvo = 1;
     if (cf.supressao && !document.hidden) { // janela escondida: o navegador atrasa este relógio, então a porta fica aberta
-      const limiar = M.limiarDb(cf.sens);
+      const limiar = M.limiarDb(cf.sens); M.limiarAtual = limiar;
       if (db > limiar) c.ultimoSom = agora;
       c.portaAberta = agora - c.ultimoSom < 220; // segura 220 ms depois da última sílaba (sem cortar o final das palavras)
       alvo = c.portaAberta ? 1 : M.dbParaGanho(-M.reducaoDb(cf.forca));
@@ -142,13 +147,14 @@
     const c = M._c;
     clearInterval(c && c.timer);
     if (c) {
-      try { c.fonte && c.fonte.disconnect(); c.hpf && c.hpf.disconnect(); c.sup && c.sup.disconnect(); c.atraso && c.atraso.disconnect(); c.porta && c.porta.disconnect(); c.vol && c.vol.disconnect(); } catch (e) { /* ok */ }
+      try { c.fonte && c.fonte.disconnect(); c.hpf && c.hpf.disconnect(); c.sup && c.sup.disconnect(); c.atraso && c.atraso.disconnect(); c.porta && c.porta.disconnect(); c.vol && c.vol.disconnect(); c.analiseSaida && c.analiseSaida.disconnect(); } catch (e) { /* ok */ }
       c.bruto && c.bruto.getTracks().forEach((t) => t.stop());
       if (c.destino) c.destino.stream.getTracks().forEach((t) => t.stop());
     }
-    M.ativo = false; M.saida = null; M._c = null; M.db = -90;
+    M.ativo = false; M.saida = null; M._c = null; M.db = -90; M.dbSaida = -90; M.limiarAtual = null;
   };
 
   // Medidor para a interface (0..1)
   M.nivel = () => A.limitar((M.db + 70) / 60, 0, 1);
+  M.nivelSaida = () => A.limitar((M.dbSaida + 70) / 60, 0, 1);
 })();

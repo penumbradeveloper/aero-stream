@@ -145,7 +145,7 @@
     dados(u).then((d) => {
       if (!d || d.tipo !== 'loja') { el.replaceWith(soLink ? h('div', { class: 'cx-txt' }, ...A.ui.textoComLinks(u)) : h('span')); return; }
       const L = LOJAS[d.loja] || LOJAS.amazon, url = d.url || u, abrir = (e) => { if (e) { e.preventDefault(); e.stopPropagation(); } A.ui.abrirFora(url); };
-      cartao.style.setProperty('--lj', L.cor);
+      cartao.style.setProperty('--lj', L.cor); cartao.dataset.loja = d.loja;
       const fotos = (d.fotos || []).slice(0, 20), itens = fotos.map((f, i) => ({ url: f, video: false, nome: d.loja + '-' + (i + 1) + '.jpg', link: url }));
       let atual = 0;
       const grande = fotos.length ? h('img', { src: fotos[0], alt: '', loading: 'lazy', decoding: 'async', draggable: 'false', referrerpolicy: 'no-referrer' }) : null;
@@ -164,7 +164,7 @@
         if (d.de && d.de > d.preco) pr.append(h('s', null, dinheiro(d.de, d.moeda)), h('span', { class: 'emb-lj-off' }, '-' + Math.round((1 - d.preco / d.de) * 100) + '%'));
         info.append(pr);
       } else info.append(h('div', { class: 'emb-lj-preco sem' }, T('Preço só na loja', 'Price on the store only')));
-      if (d.incluso) info.append(h('div', { class: 'emb-lj-imp ok' }, A.icone('check', 13), T('Impostos já inclusos no preço', 'Taxes already included')));
+      if (d.incluso) info.append(h('div', { class: 'emb-lj-imp ok' }, A.icone('check', 13), d.nacional ? T('Enviado do Brasil: sem imposto de importação', 'Ships from Brazil: no import tax') : T('Impostos já inclusos no preço', 'Taxes already included')));
       else if (d.imposto) {
         const im = d.imposto, mo = im.moeda || d.moeda;
         info.append(h('div', { class: 'emb-lj-imp', title: T('Estimativa do Remessa Conforme: imposto de importação (20% até US$ 50; 60% menos US$ 20 acima) e ICMS de 17%. O valor final pode mudar.', 'Brazil import estimate (Remessa Conforme). The final amount may change.') },
@@ -172,7 +172,7 @@
           h('div', null, h('span', null, 'ICMS'), h('b', null, dinheiro(im.icms, mo))),
           h('div', { class: 'tot' }, h('span', null, T('Total com impostos (estim.)', 'Total with taxes (est.)')), h('b', null, dinheiro(im.final, mo)))));
       }
-      if (d.frete) info.append(h('div', { class: 'emb-lj-frete' }, d.frete));
+      if (d.frete) info.append(h('div', { class: 'emb-lj-frete' }, T('Frete', 'Shipping') + ': ', h('b', null, d.frete)));
       info.append(h('button', { type: 'button', class: 'emb-lj-ir', onclick: abrir }, T('Ver na ', 'View on ') + L.nome, A.icone('externo', 13)));
       cartao.classList.remove('carregando');
       cartao.replaceChildren(h('div', { class: 'emb-lj-fotos' }, palco, faixa), info);

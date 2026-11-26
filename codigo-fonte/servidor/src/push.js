@@ -33,9 +33,40 @@ export class Push {
     return corpo + '.' + b64u(ass);
   }
 
+  // (1.0.3) o push do Google para o app do Android: a conta de serviço do Firebase (segredo FCM_CONTA, JSON) vira um acesso de 1 h
+  async fcmAcesso() {
+    const env = this.hub.env || {};
+    if (!env.FCM_CONTA) return null;
+    if (this._fcm && this._fcm.ate > Date.now() + 60000) return this._fcm;
+    let sa; try { sa = JSON.parse(env.FCM_CONTA); } catch (_) { return null; }
+    if (!sa.client_email || !sa.private_key || !sa.project_id) return null;
+    const enc = (o) => b64u(new TextEncoder().encode(JSON.stringify(o))), agora = Math.floor(Date.now() / 1000);
+    const corpo = enc({ alg: 'RS256', typ: 'JWT' }) + '.' + enc({ iss: sa.client_email, scope: 'https://www.googleapis.com/auth/firebase.messaging', aud: 'https://oauth2.googleapis.com/token', iat: agora, exp: agora + 3600 });
+    const der = Uint8Array.from(atob(sa.private_key.replace(/-----[^-]+-----/g, '').replace(/\s+/g, '')), (c) => c.charCodeAt(0));
+    const ch = await crypto.subtle.importKey('pkcs8', der, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+    const jwt = corpo + '.' + b64u(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', ch, new TextEncoder().encode(corpo)));
+    const r = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=' + jwt });
+    if (!r.ok) return null;
+    const d = await r.json().catch(() => ({}));
+    if (!d.access_token) return null;
+    this._fcm = { tk: d.access_token, pid: sa.project_id, ate: Date.now() + (Math.max(300, +d.expires_in || 3600) * 1000) };
+    return this._fcm;
+  }
+  // um toque vazio (k: 'n' = chegou mensagem, 'l' = leram em outro aparelho): o app pergunta as novidades com o token dele
+  async fcmTocar(contaId, k, ap, tipo) {
+    try {
+      const a = await this.fcmAcesso(); if (!a) return;
+      const r = await fetch(`https://fcm.googleapis.com/v1/projects/${a.pid}/messages:send`, { method: 'POST', headers: { Authorization: 'Bearer ' + a.tk, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: { token: ap.f, data: { k: tipo }, android: { priority: tipo === 'n' ? 'HIGH' : 'NORMAL', ttl: tipo === 'n' ? '86400s' : '3600s', ...(tipo === 'l' ? { collapse_key: 'lidas' } : {}) } } }) });
+      if (r.status === 404 || r.status === 400) { const x = await this.st.get(k); if (x && x.f === ap.f) { delete x.f; await this.st.put(k, x); } } // o token morreu (app desinstalado)
+      else if (r.status === 401) this._fcm = null;
+    } catch (_) { /* fica a checagem de tempos em tempos */ }
+  }
+
   // rota sem login: o aparelho (ou o service worker) pergunta as novidades com o token de push dele
   async rotaPublica(rota, b, ip) {
     if (rota === 'push/fundo') return this.fundo(b, ip);
+    if (rota === 'push/fcm') return this.guardarFcm(b, ip);
     if (rota !== 'push/novas') return null;
     if (!this.hub.limitar('pushn:' + ip, 40, 60000)) return erro('Devagar!', 429);
     const t = typeof b.t === 'string' && /^[A-Za-z0-9]{40}$/.test(b.t) ? b.t : '';
@@ -94,6 +125,18 @@ export class Push {
     return resposta({ ok: true });
   }
 
+  // (1.0.3) o app do Android entrega o token do push do Google, preso ao token de push dele (sem login: o token já é a prova)
+  async guardarFcm(b, ip) {
+    if (!this.hub.limitar('pushg:' + ip, 20, 60000)) return erro('Devagar!', 429);
+    const t = typeof b.t === 'string' && /^[A-Za-z0-9]{40}$/.test(b.t) ? b.t : '';
+    const f = typeof b.f === 'string' && /^[A-Za-z0-9_:-]{20,400}$/.test(b.f) ? b.f : '';
+    if (!t || !f) return erro('Inválido.');
+    const k = 'pt:' + (await sha(t)), ap = await this.st.get(k);
+    if (!ap || !(await this.st.get(ap.s))) return resposta({ fim: true });
+    if (ap.f !== f) { ap.f = f; await this.st.put(k, ap); }
+    return resposta({ ok: true });
+  }
+
   async tirar(contaId, k) {
     await this.st.delete(k);
     const l = (await this.st.get('pd:' + contaId)) || [];
@@ -111,6 +154,10 @@ export class Push {
     pl[cid] = agora;
     const ks = Object.keys(pl); if (ks.length > 40) for (const c of ks.sort((a, b) => pl[a] - pl[b]).slice(0, ks.length - 40)) delete pl[c];
     await this.st.put({ ['pn:' + contaId]: resto, ['pl:' + contaId]: pl });
+    // (1.0.3) os celulares com o push do Google tiram a notificação na hora (antes, só na próxima checagem)
+    const envios = [];
+    for (const k of (await this.st.get('pd:' + contaId)) || []) { const ap = await this.st.get(k); if (ap && ap.f) envios.push(this.fcmTocar(contaId, k, ap, 'l')); }
+    if (envios.length) { const p = Promise.all(envios); try { this.hub.ctx.waitUntil(p); } catch (_) { await p; } }
   }
 
   // mensagem nova: vai para cada aparelho com push que não está com o Aero na tela agora (fechado, no fundo ou sem conexão)
@@ -132,6 +179,7 @@ export class Push {
     await this.st.put('pn:' + contaId, av.slice(-MAX_AVISOS));
     const envios = [];
     for (const [k, ap] of longe) {
+      if (ap.f) envios.push(this.fcmTocar(contaId, k, ap, 'n')); // (1.0.3) o app do Android, na hora
       if (!ap.w) continue;
       envios.push((async () => {
         try {

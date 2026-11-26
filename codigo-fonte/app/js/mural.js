@@ -7,15 +7,17 @@
   const A = window.Aero, h = A.h, T = A.T, U = A.ui, API = A.api;
   const MU = (A.mural = {});
   const CATS = {
-    f: { ic: 'video', nome: ['Filmes', 'Movies'], fav: ['Filme favorito', 'Favorite movie'], gosto: ['Filmes que eu gosto', 'Movies I like'], agora: ['Assistindo agora', 'Watching now'], quero: ['Quero assistir', 'Want to watch'], busca: ['Procure um filme', 'Search a movie'] },
+    f: { ic: 'video', nome: ['Filmes', 'Movies'], fav: ['Filme favorito', 'Favorite movie'], gosto: ['Filmes que eu gosto', 'Movies I like'], quero: ['Quero assistir', 'Want to watch'], busca: ['Procure um filme', 'Search a movie'] },
     s: { ic: 'tela', nome: ['Séries', 'Shows'], fav: ['Série favorita', 'Favorite show'], gosto: ['Séries que eu gosto', 'Shows I like'], agora: ['Assistindo agora', 'Watching now'], quero: ['Quero assistir', 'Want to watch'], busca: ['Procure uma série', 'Search a show'] },
     a: { ic: 'estrela', nome: ['Animes', 'Anime'], fav: ['Anime favorito', 'Favorite anime'], gosto: ['Animes que eu gosto', 'Anime I like'], agora: ['Assistindo agora', 'Watching now'], quero: ['Quero assistir', 'Want to watch'], busca: ['Procure um anime', 'Search an anime'] },
     m: { ic: 'musica', nome: ['Músicas', 'Songs'], fav: ['Música favorita', 'Favorite song'], gosto: ['Músicas que eu gosto', 'Songs I like'], busca: ['Procure ou cole um link (Spotify, Deezer, YouTube Music)', 'Search or paste a link (Spotify, Deezer, YouTube Music)'], q: true, link: true },
     l: { ic: 'disco', nome: ['Álbuns', 'Albums'], fav: ['Álbum favorito', 'Favorite album'], gosto: ['Álbuns que eu gosto', 'Albums I like'], busca: ['Procure ou cole um link de álbum', 'Search or paste an album link'], q: true, link: true },
     b: { ic: 'livro', nome: ['Livros', 'Books'], fav: ['Livro favorito', 'Favorite book'], gosto: ['Livros que eu gosto', 'Books I like'], agora: ['Lendo agora', 'Reading now'], quero: ['Quero ler', 'Want to read'], busca: ['Procure um livro (nome, autor ou ISBN)', 'Search a book (title, author or ISBN)'] },
+    h: { ic: 'hq', nome: ['HQs', 'Comics'], fav: ['HQ favorita', 'Favorite comic'], gosto: ['HQs que eu gosto', 'Comics I like'], agora: ['Lendo agora', 'Reading now'], quero: ['Quero ler', 'Want to read'], busca: ['Procure uma HQ', 'Search a comic'] }, // (1.0.3)
+    g: { ic: 'manga', nome: ['Mangás', 'Manga'], fav: ['Mangá favorito', 'Favorite manga'], gosto: ['Mangás que eu gosto', 'Manga I like'], agora: ['Lendo agora', 'Reading now'], quero: ['Quero ler', 'Want to read'], busca: ['Procure um mangá', 'Search a manga'] }, // (1.0.3)
     j: { ic: 'jogo', nome: ['Jogos', 'Games'], fav: ['Jogo favorito', 'Favorite game'], gosto: ['Jogos que eu gosto', 'Games I like'], agora: ['Jogando agora', 'Playing now'], quero: ['Quero jogar', 'Want to play'], busca: ['Procure um jogo', 'Search a game'] },
   };
-  const ORDEM = ['f', 's', 'a', 'm', 'l', 'b', 'j'], MAX = 100;
+  const ORDEM = ['f', 's', 'a', 'm', 'l', 'b', 'h', 'g', 'j'], MAX = 100;
   // (0.8.7) a ordem das abas que a pessoa escolheu (arrastando no editor); as que faltam vão no fim
   const ordemDe = (m) => { const o = (m && Array.isArray(m.ord) ? m.ord : []).filter((c) => ORDEM.includes(c)); return [...new Set([...o, ...ORDEM])]; };
   MU.ordemDe = ordemDe;
@@ -48,16 +50,36 @@
       .then((r) => r.json()).then((d) => { const l = (d && d.itens) || []; const it = l.find((y) => normT(y.t) === normT(x.t) && y.c) || null; return it && it.c !== x.c ? it.c : ''; }).catch(() => ''));
     return novaCapa.get(k);
   };
+  // (1.0.3) jogos: o ícone do jogo (o "L" do League of Legends, o "V" do Valorant), da lista pública de jogos do Discord, no lugar do logo
+  // gigante da Wikipédia (que virava letras enormes cortadas). A capa em pé da Steam continua sendo a preferida. O índice fica no site,
+  // dividido pela primeira letra (scripts/jogos-icones.mjs)
+  const pedacos = new Map();
+  MU.iconeJogo = (t) => {
+    const n = normT(t); if (n.length < 2 || !API.servidor) return Promise.resolve('');
+    const k = /^[a-z]/.test(n) ? n[0] : '0';
+    if (!pedacos.has(k)) pedacos.set(k, fetch(`${API.servidor}/jogos-icones/${k}.json`).then((r) => (r.ok ? r.json() : {})).catch(() => { pedacos.delete(k); return {}; }));
+    return pedacos.get(k).then((m) => { const v = m && m[n]; return v && /^\d{5,25}\/[a-f0-9]{32}$/.test(v) ? 'https://cdn.discordapp.com/app-icons/' + v + '.png?size=256' : ''; });
+  };
+  const capaSteam = (u) => /steamstatic\.com|steamcdn-a\.akamaihd\.net/.test(u || '');
   MU.imgCapa = (x, c, capa = MU.capa) => {
     const img = h('img', { alt: '', loading: 'lazy', draggable: 'false', referrerpolicy: 'no-referrer' });
     let tentou = false;
     const trocar = () => { if (tentou) { img.remove(); return; } tentou = true; MU.capaAtual(x, c).then((u) => { if (u) img.src = capa(u); else img.remove(); }); };
     img.onerror = trocar;
+    // (1.0.3) carregou: o desenho de reserva (o controle) some de trás da imagem (ele aparecia no meio dos logos transparentes)
+    img.addEventListener('load', () => { const caixa = img.parentElement; if (caixa) caixa.classList.add('com-img'); });
+    if (c === 'j' && !capaSteam(x.c)) {
+      MU.iconeJogo(x.t).then((u) => {
+        if (u) { img.onerror = () => { img.onerror = trocar; img.classList.remove('mr-icone-jogo'); if (img.parentElement) img.parentElement.classList.remove('icone-jogo'); if (x.c) img.src = capa(x.c); else trocar(); }; img.classList.add('mr-icone-jogo'); const caixa = img.parentElement; if (caixa) caixa.classList.add('icone-jogo'); else img.dataset.ij = '1'; img.src = capa(u); }
+        else if (x.c) img.src = capa(x.c); else trocar();
+      });
+      return img;
+    }
     if (x.c) img.src = capa(x.c); else trocar();
     return img;
   };
-  const imagem = (x, c) => h('div', { class: 'mr-img' + (CATS[c].q ? ' q' : '') }, x.c || c === 'j' ? MU.imgCapa(x, c) : null, h('span', { class: 'mr-img-ic' }, A.icone(CATS[c].ic, 22)));
-  const NOME_LINK = (u) => (/imdb\.com/.test(u) ? 'IMDb' : /anilist/.test(u) ? 'AniList' : /kitsu\.app/.test(u) ? 'Kitsu' : /deezer/.test(u) ? 'Deezer' : /spotify/.test(u) ? 'Spotify' : /music\.youtube/.test(u) ? 'YouTube Music' : /steampowered/.test(u) ? 'Steam' : /wikipedia\.org/.test(u) ? 'Wikipedia' : /letterboxd/.test(u) ? 'Letterboxd' : T('o site', 'the site'));
+  const imagem = (x, c) => { const im = x.c || c === 'j' ? MU.imgCapa(x, c) : null, el = h('div', { class: 'mr-img' + (CATS[c].q ? ' q' : '') + (im && im.dataset.ij ? ' icone-jogo' : '') }, im, h('span', { class: 'mr-img-ic' }, A.icone(CATS[c].ic, 22))); return el; };
+  const NOME_LINK = (u) => (/imdb\.com/.test(u) ? 'IMDb' : /anilist/.test(u) ? 'AniList' : /wikipedia/.test(u) ? 'Wikipédia' : /books\.google/.test(u) ? 'Google Livros' : /openlibrary/.test(u) ? 'Open Library' : /kitsu\.app/.test(u) ? 'Kitsu' : /deezer/.test(u) ? 'Deezer' : /spotify/.test(u) ? 'Spotify' : /music\.youtube/.test(u) ? 'YouTube Music' : /steampowered/.test(u) ? 'Steam' : /wikipedia\.org/.test(u) ? 'Wikipedia' : /letterboxd/.test(u) ? 'Letterboxd' : T('o site', 'the site'));
 
   // (0.8.7) músicas do Mural tocam como a música do perfil: o trecho de 30 s escolhido (YouTube) ou, sem trecho, a prévia achada pelo nome
   const somDe = (x) => { const dz = /deezer\.com\/track\/(\d+)/.exec(x.u || ''); return { nome: x.t, artista: x.a || '', capa: x.c || '', ...(dz ? { fonte: 'deezer', id: dz[1] } : {}), ...(x.yt && x.yt.length ? { yt: x.yt, inicio: x.ini | 0, duracao: x.dur | 0 } : {}) }; };

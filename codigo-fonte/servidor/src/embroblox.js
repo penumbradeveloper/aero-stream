@@ -8,12 +8,22 @@ const data = (x) => { const t = Date.parse(x); return Number.isFinite(t) ? t : 0
 
 export const RE_ROBLOX = /^https?:\/\/(?:www\.|web\.)?roblox\.com\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?(games|users|catalog|bundles|groups|communities)\/(\d{1,20})/i;
 
-async function pega(url, op = {}) {
-  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 7000);
+// (1.0.6) o Roblox às vezes recusa (429) os pedidos que saem da Cloudflare: tenta de novo pelo espelho roproxy (mesmas APIs) e, se
+// ainda falhar, mais uma vez no endereço de sempre. Antes uma recusa no nome bastava para o cartão de perfil não aparecer
+async function pega1(url, op) {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 6000);
   try {
     const r = await fetch(url, { ...op, headers: { 'User-Agent': 'AeroStream-embed/1.0', Accept: 'application/json', ...(op.headers || {}) }, signal: ctl.signal });
-    return r.ok ? await r.json() : null;
-  } catch (_) { return null; } finally { clearTimeout(t); }
+    if (r.ok) return { j: await r.json() };
+    return { de_novo: r.status === 429 || r.status >= 500 };
+  } catch (_) { return { de_novo: true }; } finally { clearTimeout(t); }
+}
+const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+async function pega(url, op = {}) {
+  let r = await pega1(url, op); if (r.j || !r.de_novo) return r.j || null;
+  const espelho = url.replace(/^https:\/\/([a-z]+)\.roblox\.com\//, 'https://$1.roproxy.com/');
+  if (espelho !== url) { await espera(250); r = await pega1(espelho, op); if (r.j) return r.j; }
+  await espera(700); r = await pega1(url, op); return r.j || null;
 }
 const post = (url, corpo) => pega(url, { method: 'POST', body: JSON.stringify(corpo), headers: { 'Content-Type': 'application/json' } });
 const miniaturas = async (tipo, ids, tam, extra = '') => {
@@ -60,7 +70,7 @@ async function jogo(placeId) {
 
 // ---------- perfil ----------
 async function perfil(id) {
-  const [u, cab, corpo, seg, sgn, ami, vestindo, fundo] = await Promise.all([
+  let [u, cab, corpo, seg, sgn, ami, vestindo, fundo] = await Promise.all([
     pega(`https://users.roblox.com/v1/users/${id}`),
     miniaturas('users/avatar-headshot', [id], '150x150'),
     miniaturas('users/avatar', [id], '420x420'),
@@ -70,7 +80,12 @@ async function perfil(id) {
     pega(`https://avatar.roblox.com/v1/users/${id}/currently-wearing`),
     post('https://apis.roblox.com/profile-platform-api/v1/profiles/get', { profileId: String(id), profileType: 'User', components: [{ component: 'ProfileBackground' }, { component: 'UserProfileHeader' }] }),
   ]);
-  if (!u || !u.id) return null;
+  // (1.0.6) sem os dados do usuário: o nome vem da busca em lote (outra rota do Roblox) e o resto fica como der
+  if (!u || !u.id) {
+    const l = await post('https://users.roblox.com/v1/users', { userIds: [Number(id)], excludeBannedUsers: false });
+    const x = l && l.data && l.data[0]; if (!x || !x.id) return null;
+    u = { id: x.id, name: x.name, displayName: x.displayName, hasVerifiedBadge: x.hasVerifiedBadge };
+  }
   const d = { tipo: 'roblox-perfil', url: `https://www.roblox.com/users/${u.id}/profile`, nome: txt(u.displayName || u.name || '', 40), nick: txt(u.name || '', 40), ok: !!u.hasVerifiedBadge,
     banido: !!u.isBanned, bio: txt(u.description || '', 600), criado: data(u.created), rosto: cab[id] || '', corpo: corpo[id] || '',
     seguidores: num(seg && seg.count), seguindo: num(sgn && sgn.count), amigos: num(ami && ami.count) };

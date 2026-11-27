@@ -1,5 +1,6 @@
 // Aero Stream - (1.0.2) tradução das mensagens, dicionário por palavra (comparando duas línguas, com pronúncia) e o horário de cada pessoa.
-// A tradução passa pelo servidor do Aero (o seu IP não chega no tradutor). Criado por Ryan Victtor.
+// (1.0.6) A tradução sai deste aparelho direto para o tradutor (o Google recusa os servidores do Cloudflare); o servidor do Aero fica de
+// reserva. Vai só o texto, sem cookies e sem dizer de onde veio. Criado por Ryan Victtor.
 (() => {
   const A = window.Aero, { h, T } = A, U = A.ui;
   const LINGUAS = [['pt', 'Português'], ['en', 'English'], ['es', 'Español'], ['fr', 'Français'], ['de', 'Deutsch'], ['it', 'Italiano'], ['ja', '日本語'], ['ko', '한국어'], ['zh-CN', '中文'], ['ru', 'Русский'], ['ar', 'العربية'], ['hi', 'हिन्दी'], ['tr', 'Türkçe'], ['pl', 'Polski'], ['nl', 'Nederlands'], ['sv', 'Svenska'], ['uk', 'Українська'], ['id', 'Bahasa Indonesia']];
@@ -11,10 +12,38 @@
   const cache = new Map(); // id da mensagem -> { texto, de } (sobrevive quando o chat redesenha a mensagem)
   const pedidos = new Map();
 
+  // (1.0.6) o texto longo vai em pedaços (o tradutor só aceita o texto no endereço)
+  const pedacos = (t, max = 700) => {
+    const out = []; let resto = t;
+    while (resto.length > max && out.length < 8) {
+      let i = Math.max(resto.lastIndexOf('. ', max), resto.lastIndexOf('\n', max), resto.lastIndexOf('! ', max), resto.lastIndexOf('? ', max), resto.lastIndexOf('。', max));
+      if (i < max / 3) i = resto.lastIndexOf(' ', max); if (i < max / 3) i = max;
+      out.push(resto.slice(0, i + 1)); resto = resto.slice(i + 1);
+    }
+    if (resto) out.push(resto.slice(0, max)); return out;
+  };
+  const LING = /^[a-z]{2,3}(?:-[A-Za-z]{2,4})?$/;
+  async function direto(texto, para, de) {
+    if (!LING.test(para) || (de !== 'auto' && !LING.test(de))) throw new Error('lingua');
+    let out = '', lingua = ''; const rom = [];
+    for (const p of pedacos(String(texto).slice(0, 4000))) {
+      if (!p.trim()) { out += p; continue; }
+      const u = 'https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&dt=rm&sl=' + de + '&tl=' + para + '&q=' + encodeURIComponent(p);
+      const r = await fetch(u, { credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined });
+      if (!r.ok) throw new Error('tradutor ' + r.status);
+      const d = await r.json(), ps = Array.isArray(d && d[0]) ? d[0] : [];
+      const t = ps.map((x) => (Array.isArray(x) && typeof x[0] === 'string' ? x[0] : '')).join('');
+      if (!t) throw new Error('vazio');
+      out += t + (/\s$/.test(p) ? ' ' : '');
+      const ro = ps.map((x) => (Array.isArray(x) && typeof x[3] === 'string' ? x[3] : '')).join(' ').trim(); if (ro) rom.push(ro);
+      if (!lingua && typeof d[2] === 'string' && LING.test(d[2])) lingua = d[2];
+    }
+    return { texto: out.trim().slice(0, 4000), de: lingua || de, rom: rom.length ? rom.join(' ').slice(0, 400) : undefined };
+  }
   async function traduzir(texto, para, de = 'auto') {
     const ch = para + '|' + de + '|' + texto;
     if (pedidos.has(ch)) return pedidos.get(ch);
-    const p = A.api.req('traduzir', { texto, para, de }).catch((e) => { pedidos.delete(ch); throw e; });
+    const p = direto(texto, para, de).catch(() => A.api.req('traduzir', { texto, para, de })).catch((e) => { pedidos.delete(ch); throw e; });
     pedidos.set(ch, p); if (pedidos.size > 300) pedidos.delete(pedidos.keys().next().value);
     return p;
   }

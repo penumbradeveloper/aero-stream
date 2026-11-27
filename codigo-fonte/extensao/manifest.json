@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Aero - Ouvindo e assistindo",
   "short_name": "Aero Atividade",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Mostra aos seus amigos do Aero a música que você ouve (YouTube Music, Deezer) e o que você assiste (Twitch, Kick, YouTube e os sites que escolher), como no Discord.",
   "author": "Ryan Victtor",
   "icons": {

@@ -9,7 +9,8 @@ const $ = (id) => document.getElementById(id);
 
 if (en) {
   document.documentElement.lang = 'en';
-  $('txt-ajuda').textContent = 'Shows your Aero friends the music you play on YouTube Music and Deezer and what you watch on Twitch, Kick, YouTube and the sites you add in Aero. It connects by itself to Aero on this computer, no code needed.';
+  $('txt-ajuda').textContent = 'Shows your Aero friends the music you play on YouTube Music and Deezer and what you watch on Twitch, Kick, YouTube and the sites you add in Aero. It connects by itself to Aero on this computer; if it does not, paste here the code Aero shows when you click "Install in the browser".';
+  $('txt-rotulo').textContent = 'Pairing code'; $('salvar').textContent = 'Save'; $('codigo').placeholder = 'Paste the code from Aero';
   $('permitir').textContent = 'Allow access';
   $('txt-sites').textContent = 'Your sites (added in Aero > Integrations > Watching now)';
 }
@@ -18,7 +19,7 @@ function estado(t, tipo) { const e = $('estado'); e.textContent = t; e.className
 
 async function permissoesOk() { try { return await api.permissions.contains({ origins: ORIGENS }); } catch (e) { return true; } }
 
-const DICA = () => T('No Aero, abra Integrações > Assistindo agora e clique em "Instalar ou conectar": ela se conecta sozinha.', 'In Aero, open Integrations > Watching now and click "Install or connect": it connects by itself.');
+const DICA = () => T('No Aero, clique em "Instalar ou conectar" (Integrações > Assistindo agora): ela se conecta sozinha, ou cole acima o código que aparece lá.', 'In Aero, click "Install or connect" (Integrations > Watching now): it connects by itself, or paste above the code shown there.');
 // sem código (ou com um que venceu): pede um ao Aero sozinha (só funciona logo depois do clique em "Instalar ou conectar" no app)
 const pedirCodigo = () => new Promise((ok) => { try { Promise.resolve(api.runtime.sendMessage({ tipo: 'parear-auto' })).then((r) => ok(!!(r && r.ok)), () => ok(false)); } catch (e) { ok(false); } });
 async function testar(denovo) {
@@ -39,6 +40,11 @@ async function testar(denovo) {
 
 // o pedido de permissão precisa sair direto do clique (o Firefox recusa depois de um "await")
 const pedir = () => { try { return Promise.resolve(api.permissions.request({ origins: ORIGENS })).catch(() => false); } catch (e) { return Promise.resolve(false); } };
+$('salvar').addEventListener('click', () => {
+  const v = $('codigo').value.trim();
+  if (!/^[a-f0-9]{16,64}$/i.test(v)) return estado(T('Esse código não parece certo.', 'That code does not look right.'), 'erro');
+  Promise.all([pedir(), api.storage.local.set({ token: v })]).then(() => testar(true), () => testar(true));
+});
 $('permitir').addEventListener('click', () => { pedir().then(() => testar()); });
 
 // (1.1.0) os sites que a pessoa adicionou no Aero: cada um precisa ser permitido aqui uma vez (o navegador só deixa ler um site com
@@ -63,4 +69,4 @@ async function sites(s) {
     lista.append(li);
   }
 }
-testar();
+api.storage.local.get('token').then(({ token }) => { if (token) $('codigo').value = token; testar(); });

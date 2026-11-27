@@ -538,13 +538,13 @@
     const dcTimer = setInterval(mostrarDc, 4000); offs.push(() => clearInterval(dcTimer)); depois(mostrarDc);
     // (1.0.0) "Ouvindo agora" pelo navegador: a extensão pede o código de pareamento deste PC (sem ele o app não aceita nada)
     const ouvExtensao = () => { // (1.0.0) um botão: abre a página de instalar no navegador padrão; a extensão se conecta sozinha
-      const estado = h('div', { class: 'peq', estilo: { 'margin-top': '6px' } });
+      const estado = h('div', { class: 'peq', estilo: { 'margin-top': '6px' } }), codO = h('div', { class: 'ass-codigo-caixa', hidden: true });
       const ver = async () => { let e = null; try { e = await window.aero.ouvindo.extensao(); } catch (_) { /* ok */ } estado.textContent = e && e.visto ? T('✓ Extensão conectada neste computador.', '✓ Extension connected on this computer.') : ''; estado.style.color = 'var(--ok, #1f9d55)'; };
       const caixa = h('div', { class: 'opcao com-cena' }, cenaPriv('navegador', true), h('div', { class: 'cresce' },
         h('div', { estilo: { 'font-weight': '600' } }, T('Navegador (YouTube Music e Deezer)', 'Browser (YouTube Music and Deezer)')),
         h('div', { class: 'peq suave' }, T('Clique no botão: o seu navegador abre e mostra como instalar a extensão do Aero. Ela se conecta sozinha. No Linux, o Firefox e o Zen já funcionam sem a extensão.', 'Click the button: your browser opens and shows how to install the Aero extension. It connects by itself. On Linux, Firefox and Zen already work without the extension.')),
-        estado),
-        U.btn(T('Instalar no navegador', 'Install in the browser'), { tipo: 'sec', peq: true, onclick: async () => { try { await window.aero.ouvindo.instalarExtensao(); } catch (e) { U.toast(e.message, { tipo: 'erro' }); } } }));
+        estado, codO),
+        U.btn(T('Instalar no navegador', 'Install in the browser'), { tipo: 'sec', peq: true, onclick: async () => { try { await A.assistindo.instalarComCodigo(codO); } catch (e) { U.toast(e.message, { tipo: 'erro' }); } } }));
       ver(); const t = setInterval(() => { if (!caixa.isConnected) return clearInterval(t); ver(); }, 3000);
       return caixa;
     };

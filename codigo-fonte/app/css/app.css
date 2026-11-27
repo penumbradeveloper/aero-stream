@@ -6415,3 +6415,8 @@ button.cx-recolhe > small { margin-left: auto; font-weight: 600; }
 .ass-ext-tela { display: grid; gap: 10px; text-align: center; } .ass-ext-tela p { margin: 0; overflow-wrap: anywhere; }
 .ass-ext-logos { display: flex; justify-content: center; gap: 12px; padding: 4px 0 2px; } .ass-ext-logos svg { filter: drop-shadow(0 3px 8px rgba(0,0,0,.18)); }
 .ass-ext-estado { min-height: 1.4em; font-weight: 600; } .ass-ext-estado.ok { color: var(--ok, #1f9d55); }
+/* (1.0.6) o código de pareamento da extensão, com o botão de copiar */
+.ass-codigo-caixa { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; min-width: 0; }
+.ass-codigo-caixa[hidden] { display: none; }
+.ass-codigo { padding: 4px 10px; border-radius: 8px; background: color-mix(in srgb, var(--txt, #15232d) 8%, transparent); font-size: 13px; letter-spacing: .04em; overflow-wrap: anywhere; min-width: 0; }
+.ass-cfg .ass-codigo-caixa, .opcao .ass-codigo-caixa { justify-content: flex-start; }

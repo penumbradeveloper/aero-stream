@@ -198,12 +198,24 @@
   ];
   // (1.0.6) o Assistindo agora só funciona com a extensão do navegador: ao instalar a integração (e, depois da atualização, para quem já
   // tinha a integração e nunca conectou a extensão) aparece esta tela. Quem já tem a extensão só clica: ela se conecta sozinha, sem código
+  // (1.0.6) instalar ou conectar: abre a página no navegador E mostra o código de pareamento aqui, com o botão de copiar (para colar na
+  // janelinha da extensão se ela não se conectar sozinha)
+  S.instalarComCodigo = async (caixa) => {
+    const o = window.aero && window.aero.ouvindo; if (!o) return;
+    await o.instalarExtensao();
+    let t = ''; try { t = String(((await o.token(false)) || {}).token || ''); } catch (_) { /* ok */ }
+    if (!caixa || !/^[a-f0-9]{16,64}$/.test(t)) return;
+    caixa.replaceChildren(h('span', { class: 'peq suave' }, T('Código de pareamento:', 'Pairing code:')), h('code', { class: 'selecionavel ass-codigo' }, t),
+      U().btn(T('Copiar', 'Copy'), { icone: 'copiar', tipo: 'sec', peq: true, onclick: (e) => U().copiar(t, e.currentTarget) }));
+    caixa.hidden = false;
+  };
+  const caixaCodigo = () => h('div', { class: 'ass-codigo-caixa', hidden: true });
   let telaExt = null;
   S.exigirExtensao = async () => {
     const p = ponte(); if (!p || !p.extensao || telaExt) return;
     let e0 = null; try { e0 = await p.extensao(); } catch (_) { /* ok */ }
     if ((e0 && e0.conectada) || telaExt) return;
-    const U0 = U(), estado = h('div', { class: 'peq ass-ext-estado', role: 'status' });
+    const U0 = U(), estado = h('div', { class: 'peq ass-ext-estado', role: 'status' }), codT = caixaCodigo();
     let t = 0;
     const ver = async () => {
       let e = null; try { e = await p.extensao(); } catch (_) { /* ok */ }
@@ -214,12 +226,12 @@
     const corpoT = h('div', { class: 'ass-ext-tela' },
       h('div', { class: 'ass-ext-logos', 'aria-hidden': 'true' }, ...CONHECIDOS.map((f) => logo(f, 34))),
       h('p', {}, T('O Assistindo agora mostra aos amigos o que você assiste no navegador, e quem lê isso é a extensão do Aero (a mesma do "Ouvindo agora"). Sem ela, nada aparece.', 'Watching now shows friends what you watch in the browser, and the Aero extension (the same as "Listening now") is what reads it. Without it, nothing shows up.')),
-      h('p', { class: 'peq suave' }, T('Clique em "Instalar ou conectar": o seu navegador abre a página da extensão. Se ela já estiver instalada, ela se conecta sozinha, sem código.', 'Click "Install or connect": your browser opens the extension page. If it is already installed, it connects by itself, no code needed.')),
-      estado);
+      h('p', { class: 'peq suave' }, T('Clique em "Instalar ou conectar": o seu navegador abre a página da extensão. Se ela já estiver instalada, ela se conecta sozinha (ou cole o código na janelinha dela).', 'Click "Install or connect": your browser opens the extension page. If it is already installed, it connects by itself (or paste the code in its popup).')),
+      estado, codT);
     telaExt = U0.modal(T('Instale a extensão do navegador', 'Install the browser extension'), corpoT, { largura: 460, classe: 'ass-ext-modal', aoFechar: () => { clearInterval(t); telaExt = null; }, acoes: [
       { texto: T('Agora não', 'Not now'), tipo: 'sec', valor: false },
       { texto: T('Instalar ou conectar', 'Install or connect'), icone: 'download', onclick: async () => {
-        try { await p.instalarExtensao(); } catch (er) { U0.toast(er.message, { tipo: 'erro' }); return; }
+        try { await S.instalarComCodigo(codT); } catch (er) { U0.toast(er.message, { tipo: 'erro' }); return; }
         if (!estado.classList.contains('ok')) estado.textContent = T('Esperando a extensão se conectar…', 'Waiting for the extension to connect…');
       } }] });
     t = setInterval(ver, 1500);
@@ -249,11 +261,12 @@
         h('div', { class: 'ass-cfg-bts' },
           U0.btn('', { icone: 'lapis', tipo: 'sec', redondo: true, peq: true, titulo: T('Editar', 'Edit'), onclick: () => editor(s) }),
           U0.btn('', { icone: 'lixo', tipo: 'sec', redondo: true, peq: true, titulo: T('Remover', 'Remove'), onclick: async () => { if (!(await U0.confirmar(T('Remover ', 'Remove ') + s.nome + '?', { sim: T('Remover', 'Remove'), perigo: true }))) return; cfg().meus = cfg().meus.filter((y) => y !== s); salvar(); pintar(); } }))));
-      const estado = h('div', { class: 'peq suave ass-cfg-estado' });
+      const estado = h('div', { class: 'peq suave ass-cfg-estado' }), codC = caixaCodigo();
       el.replaceChildren(
         h('h3', {}, A.icone('tela', 16), T('Sites', 'Sites')),
         h('p', { class: 'peq suave' }, T('Funciona pela extensão do Aero no navegador (a mesma do "Ouvindo agora"). Desligue os sites que você não quer mostrar.', 'Works through the Aero browser extension (the same one as "Listening now"). Turn off the sites you do not want to show.')),
-        h('div', { class: 'linha ass-cfg-ext' }, estado, U0.btn(T('Instalar ou conectar', 'Install or connect'), { icone: 'download', tipo: 'sec', peq: true, onclick: async () => { try { await window.aero.ouvindo.instalarExtensao(); estado.textContent = T('Esperando a extensão se conectar…', 'Waiting for the extension to connect…'); } catch (e) { U0.toast(e.message, { tipo: 'erro' }); } } })),
+        h('div', { class: 'linha ass-cfg-ext' }, estado, U0.btn(T('Instalar ou conectar', 'Install or connect'), { icone: 'download', tipo: 'sec', peq: true, onclick: async () => { try { await S.instalarComCodigo(codC); estado.textContent = T('Esperando a extensão se conectar…', 'Waiting for the extension to connect…'); } catch (e) { U0.toast(e.message, { tipo: 'erro' }); } } })),
+        codC,
         h('div', { class: 'ass-cfg-lista' }, ...conhecidos),
         h('h4', {}, T('Seus sites', 'Your sites')),
         meus.length ? h('div', { class: 'ass-cfg-lista' }, ...meus) : h('p', { class: 'peq suave' }, T('Nenhum ainda. Adicione o X, um site de filmes ou qualquer outro.', 'None yet. Add X, a movie site or anything else.')),

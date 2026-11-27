@@ -366,7 +366,7 @@ export class Social {
     const ord = d.get('mr:' + oid + ':o'); if (Array.isArray(ord)) m.ord = ord;
     return resposta({ m, mv: (o.extra || {}).mv || 0 });
   }
-  // perfis salvos (Supporter): até 5 cópias do estilo e do arranjo do perfil, para trocar num clique (a foto e o banner continuam os de agora)
+  // perfis salvos (Supporter): até 5 cópias do perfil (estilo, arranjo, foto, banner e Mural), para trocar num clique
   async perfisSalvos(conta, b) {
     const max = limitesDe(conta).modelos || 0, lista = conta.perfis = Array.isArray(conta.perfis) ? conta.perfis.slice(0, 5) : [];
     const i = Math.round(+b.i);
@@ -375,21 +375,40 @@ export class Social {
     if (!(i >= 0 && i < max)) return erro('Esse espaço não existe.');
     if (b.acao === 'salvar') {
       const e = conta.extra || {}, dados = {};
-      for (const k of [...PERFIL_MODELO, ...PERFIL_MODELO_X]) if (e[k] !== undefined) dados[k] = e[k];
+      for (const k of [...PERFIL_MODELO, ...PERFIL_MODELO_X]) if (e[k] !== undefined) dados[k] = structuredClone(e[k]); // cópia: o espaço não muda junto com o perfil
       // (1.0.2) as imagens (fundo do cartão, nameplate e fundo do Mural) vão junto, numa cópia só deste espaço
       const img = {};
       for (const [pre, v] of IMGS_MODELO) img[pre] = e[v] && (await this.hub.copiarImagem(pre + ':', conta.id, 'ps' + pre + ':', conta.id + ':' + i)) ? 1 : 0;
-      lista[i] = { nome: txt(String(b.nome || ''), 30) || 'Perfil ' + (i + 1), quando: Date.now(), dados, x: 1, img };
+      // (1.0.6) e a foto e o banner também: trocar de perfil sem eles parecia que o perfil salvo não tinha guardado nada
+      img.a = conta.avatarV && (await this.hub.copiarImagem('a:', conta.id, 'psa:', conta.id + ':' + i)) ? 1 : 0;
+      img.bn = e.bannerV && (await this.hub.copiarImagem('bn:', conta.id, 'psbn:', conta.id + ':' + i)) ? 1 : 0;
+      // (1.0.6) e o conteúdo do Mural (filmes, séries, jogos...), numa cópia só deste espaço
+      const mk = [...MURAL_CATS, 'o'], mr = await this.hub.ctx.storage.get(mk.map((c) => 'mr:' + conta.id + ':' + c)), copia = {};
+      await this.hub.ctx.storage.delete(mk.map((c) => 'psmr:' + conta.id + ':' + i + ':' + c));
+      for (const c of mk) { const v = mr.get('mr:' + conta.id + ':' + c); if (v) copia['psmr:' + conta.id + ':' + i + ':' + c] = v; }
+      if (Object.keys(copia).length) await this.hub.put(copia);
+      lista[i] = { nome: txt(String(b.nome || ''), 30) || 'Perfil ' + (i + 1), quando: Date.now(), dados, x: 1, img, mr: 1 };
     } else if (b.acao === 'usar') {
       if (!lista[i]) return erro('Esse espaço está vazio.');
       const e = conta.extra = conta.extra || {};
-      for (const k of [...PERFIL_MODELO, ...(lista[i].x ? PERFIL_MODELO_X : [])]) { if (lista[i].dados[k] !== undefined) e[k] = lista[i].dados[k]; else delete e[k]; } // os salvos antes da 1.0.2 não mexem nos extras
+      for (const k of [...PERFIL_MODELO, ...(lista[i].x ? PERFIL_MODELO_X : [])]) { if (lista[i].dados[k] !== undefined) e[k] = structuredClone(lista[i].dados[k]); else delete e[k]; } // os salvos antes da 1.0.2 não mexem nos extras
       if (lista[i].img) for (const [pre, v] of IMGS_MODELO) {
         if (lista[i].img[pre] && (await this.hub.copiarImagem('ps' + pre + ':', conta.id + ':' + i, pre + ':', conta.id))) e[v] = (e[v] || 0) + 1; // versão nova: ninguém fica com a imagem antiga no cache
       }
+      if (lista[i].mr) { // (1.0.6) o Mural daquele perfil volta inteiro (o de agora sai)
+        const mk = [...MURAL_CATS, 'o'], mr = await this.hub.ctx.storage.get(mk.map((c) => 'psmr:' + conta.id + ':' + i + ':' + c)), novo = {}, tirar = [];
+        for (const c of mk) { const v = mr.get('psmr:' + conta.id + ':' + i + ':' + c); if (v) novo['mr:' + conta.id + ':' + c] = v; else tirar.push('mr:' + conta.id + ':' + c); }
+        if (tirar.length) await this.hub.ctx.storage.delete(tirar);
+        if (Object.keys(novo).length) await this.hub.put(novo);
+        e.mv = (e.mv || 0) + 1; // quem já abriu o mural sabe que mudou
+      }
+      const im = lista[i].img || {};
+      if (im.a) { await this.hub.guardarRecente(conta); if (await this.hub.copiarImagem('psa:', conta.id + ':' + i, 'a:', conta.id)) conta.avatarV = (conta.avatarV || 0) + 1; } // a foto de agora fica nas recentes
+      if (im.bn) { if (await this.hub.copiarImagem('psbn:', conta.id + ':' + i, 'bn:', conta.id)) e.bannerV = (e.bannerV || 0) + 1; }
+      else if (im.bn === 0) { await this.hub.apagarImagem('bn:', conta.id); delete e.bannerV; } // guardado sem banner (os salvos antes da 1.0.6 não mexem nele)
       if (e.nm && EFEITOS_EXCLUSIVOS.includes(e.nm.e) && !limitesDe(conta).exclusivo) e.nm.e = 'solido';
       if (e.nm && EFEITOS_PAGOS[e.nm.e] && EFEITOS_PAGOS[e.nm.e] > nivelDe(conta)) e.nm.e = 'solido'; // (0.9.7) o perfil salvo não traz efeito de um plano que a pessoa não tem
-    } else if (b.acao === 'apagar') { lista[i] = null; for (const [pre] of IMGS_MODELO) await this.hub.apagarImagem('ps' + pre + ':', conta.id + ':' + i); }
+    } else if (b.acao === 'apagar') { lista[i] = null; for (const pre of [...IMGS_MODELO.map((x) => x[0]), 'a', 'bn']) await this.hub.apagarImagem('ps' + pre + ':', conta.id + ':' + i); await this.hub.ctx.storage.delete([...MURAL_CATS, 'o'].map((c) => 'psmr:' + conta.id + ':' + i + ':' + c)); }
     else return erro('Ação desconhecida.');
     for (let k = 0; k < max; k++) if (lista[k] === undefined) lista[k] = null;
     await this.st.put('c:' + conta.id, conta);

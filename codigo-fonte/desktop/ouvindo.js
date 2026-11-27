@@ -188,8 +188,8 @@ function escolher(lista) {
 }
 
 // ---------- o módulo ----------
-function criarOuvindo({ log = () => {}, lerToken = () => '', plataforma = process.platform, gdbus = 'gdbus', fetchCapa = globalThis.fetch, porta = PORTA, lojas = LOJAS, abrirPasta = null, aoMudar = null, dbusMonitor = 'dbus-monitor', abrirExterno = null } = {}) {
-  let extVisto = 0; const convites = new Map(); // código de uma vez (na página de instalar) -> quando foi criado
+function criarOuvindo({ log = () => {}, lerToken = () => '', plataforma = process.platform, gdbus = 'gdbus', fetchCapa = globalThis.fetch, porta = PORTA, lojas = LOJAS, abrirPasta = null, aoMudar = null, aoVerExtensao = null, dbusMonitor = 'dbus-monitor', abrirExterno = null } = {}) {
+  let extVisto = 0, parearAte = 0; const convites = new Map(); // código de uma vez (na página de instalar) -> quando foi criado
   let ativo = false, servidor = null, ps = null, psFila = [], psBuf = '', psFalhas = 0;
   let daExt = null; // { dados, visto }
   let sitesCfg = limparSites(null), daAss = null; // (1.0.0) Assistindo agora: a lista de sites do app e o que a extensão mandou
@@ -356,10 +356,14 @@ while($true){
       // sites não passam (só extensões); e sem o código de pareamento certo, nada
       if (origem && !deExtensao) return fim(403, { erro: 'origem' });
       if (req.method === 'OPTIONS') return fim(204);
+      // (1.0.6) pareamento automático: logo depois de a pessoa clicar em "Instalar ou conectar" no Aero, a extensão já instalada pega o
+      // código sozinha (sem copiar nada). Fora dessa janela de 10 min, ou depois que ela se conecta, nada sai daqui
+      if (req.method === 'GET' && deExtensao && u.pathname === '/parear') return Date.now() < parearAte && String(lerToken() || '').length >= 16 ? fim(200, { token: String(lerToken()) }) : fim(403, { erro: 'fechado' });
       const tok = String(req.headers['x-aero-token'] || ''), certo = String(lerToken() || '');
       const igual = tok.length === certo.length && certo.length >= 16 && crypto.timingSafeEqual(Buffer.from(tok), Buffer.from(certo));
       if (!igual) return fim(401, { erro: 'codigo' });
-      extVisto = Date.now(); // a extensão está instalada e pareada
+      if (!extVisto && aoVerExtensao) { try { aoVerExtensao(); } catch (e) { /* ok */ } }
+      extVisto = Date.now(); parearAte = 0; // a extensão está instalada e pareada
       if (req.method === 'GET' && req.url === '/ping') return fim(200, { ok: true, app: 'aero', ativo, sites: sitesParaExt(sitesCfg), cmd: cmdExt && Date.now() - cmdExt.em < 30000 ? cmdExt : undefined });
       if (req.method !== 'POST' || req.url !== '/ouvindo') return fim(404, { erro: 'rota' });
       let corpo = '';
@@ -423,8 +427,8 @@ while($true){
       } catch (e) { log('ouvindo: tocar', e && e.message); return { ok: false, erro: 'falhou' }; }
     },
     // (1.0.0) o endereço da página de instalar a extensão (o app abre no navegador padrão); vale 30 min
-    convite() { abrirServidor(); const c = crypto.randomBytes(16).toString('hex'); convites.set(c, Date.now()); for (const [k, t] of convites) if (Date.now() - t > 30 * 60000) convites.delete(k); return 'http://127.0.0.1:' + porta + '/instalar?c=' + c; },
-    extensao: () => ({ visto: extVisto, conectada: Date.now() - extVisto < 60000 }),
+    convite() { abrirServidor(); parearAte = Date.now() + 10 * 60000; const c = crypto.randomBytes(16).toString('hex'); convites.set(c, Date.now()); for (const [k, t] of convites) if (Date.now() - t > 30 * 60000) convites.delete(k); return 'http://127.0.0.1:' + porta + '/instalar?c=' + c; },
+    extensao: () => ({ visto: extVisto, conectada: Date.now() - extVisto < 150000, pareando: Date.now() < parearAte }),
     parar() { ativo = false; pararVigia(); if (servidor) { try { servidor.close(); } catch (e) { /* ok */ } servidor = null; } if (ps) { try { ps.stdin.end(); ps.kill(); } catch (e) { /* ok */ } ps = null; } },
   };
 }
@@ -454,7 +458,8 @@ function paginaInstalar({ token, conv, lojas = {}, pasta = false, idioma }) {
 <p>${T('Instale a extensão do Aero neste navegador para os seus amigos verem a música do YouTube Music e do Deezer. Ela se conecta sozinha.', 'Install the Aero extension in this browser so your friends see your YouTube Music and Deezer songs. It connects by itself.')}</p>
 <a id="loja" class="bt" target="_blank" rel="noopener" hidden></a><p id="dica-loja" hidden style="margin-top:10px;font-size:13px"></p>
 <div id="manual" hidden><p id="manual-tit" hidden style="margin-top:16px;font-weight:600;color:var(--txt)"></p><ol id="manual-passos"></ol>${pasta ? `<button id="pasta" class="bt sec" type="button">${T('Abrir a pasta da extensão', 'Open the extension folder')}</button>` : ''}</div>
-<p style="margin-top:14px;font-size:13px">${T('Depois de instalar, volte para esta aba: ela confirma sozinha.', 'After installing, come back to this tab: it confirms by itself.')}</p></div>
+<p style="margin-top:14px;font-size:13px">${T('Depois de instalar, volte para esta aba: ela confirma sozinha.', 'After installing, come back to this tab: it confirms by itself.')}</p>
+<p style="font-size:13px">${T('Já tem a extensão? Ela se conecta sozinha em até 1 minuto (ou clique no botão do Aero na barra do navegador).', 'Already have the extension? It connects by itself within 1 minute (or click the Aero button in the browser toolbar).')}</p></div>
 <div id="ok"><h1>✓ ${T('Pronto!', 'All set!')}</h1><p>${T('A extensão está conectada ao Aero. Pode fechar esta aba.', 'The extension is connected to Aero. You can close this tab.')}</p></div>
 <script>(() => {
 const D = ${dados}, en = ${en}, T = (a, b) => en ? b : a, ua = navigator.userAgent;

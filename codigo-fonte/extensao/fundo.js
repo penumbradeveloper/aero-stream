@@ -1,5 +1,5 @@
 // Aero - Ouvindo e assistindo (extensão): junta o que as abas de música e de vídeo mandam e repassa ao app do Aero NESTE computador
-// (http://127.0.0.1:41783, com o código de pareamento que o app mostra em Configurações > Privacidade). Nada vai para a internet.
+// (http://127.0.0.1:41783, com o código de pareamento que ela pega sozinha do app). Nada vai para a internet.
 // Criado por Ryan Victtor.
 'use strict';
 const api = globalThis.browser || globalThis.chrome;
@@ -30,6 +30,7 @@ async function mandar() {
     let j = null; if (r.ok) { try { j = await r.json(); } catch (e) { /* ok */ } }
     if (j && j.cmd) pedido(j.cmd);
     if (j) guardarSites(j.sites);
+    if (r.status === 401) parearAuto(true);
     await api.storage.local.set({ estado: r.ok ? 'ok' : r.status === 401 ? 'codigo' : 'erro', estadoEm: Date.now() });
   } catch (e) { try { await api.storage.local.set({ estado: 'fechado', estadoEm: Date.now() }); } catch (_) { /* ok */ } }
 }
@@ -120,3 +121,34 @@ api.runtime.onInstalled && api.runtime.onInstalled.addListener(() => {
   buscarSites(); registrar();
   try { Promise.resolve(api.tabs.query({ url: BASE + '/instalar*' })).then((l) => (l || []).forEach((t) => api.tabs.reload(t.id))).catch(() => {}); } catch (e) { /* ok */ }
 });
+
+// (1.2.0) pareamento automático, sem código: logo depois de a pessoa clicar em "Instalar ou conectar" no Aero, o app abre uma janelinha
+// de 10 min em que entrega o código a esta extensão. Ela tenta quando não tem código (ou o código venceu) e, uma vez por minuto, avisa
+// o Aero que está aqui (só para 127.0.0.1, este computador)
+let tentouParear = 0;
+async function parearAuto(forcar) {
+  if (Date.now() - tentouParear < 4000) return false; tentouParear = Date.now();
+  if (!forcar && (await token())) return false;
+  try {
+    const r = await fetch(BASE + '/parear', { cache: 'no-store' });
+    if (!r.ok) return false;
+    const j = await r.json(), t = String((j && j.token) || '');
+    if (!/^[a-f0-9]{16,64}$/i.test(t)) return false;
+    await api.storage.local.set({ token: t });
+    buscarSites(); return true;
+  } catch (e) { return false; }
+}
+async function verAero() {
+  const tok = await token();
+  if (!tok) return parearAuto();
+  try { const r = await fetch(BASE + '/ping', { headers: { 'X-Aero-Token': tok }, cache: 'no-store' }); if (r.status === 401) return parearAuto(true); if (r.ok) guardarSites((await r.json()).sites); } catch (e) { /* o Aero está fechado */ }
+}
+api.runtime.onMessage.addListener((m, quem, responder) => {
+  if (!m || m.tipo !== 'parear-auto' || !quem || quem.id !== api.runtime.id || quem.tab) return;
+  tentouParear = 0; parearAuto(true).then((ok) => responder({ ok }), () => responder({ ok: false })); return true; // a janelinha pediu
+});
+if (api.alarms) {
+  try { Promise.resolve(api.alarms.get('aero-ver')).then((a) => { if (!a) api.alarms.create('aero-ver', { periodInMinutes: 1 }); }).catch(() => {}); } catch (e) { /* ok */ }
+  api.alarms.onAlarm.addListener((a) => { if (a && a.name === 'aero-ver') verAero(); });
+}
+verAero();

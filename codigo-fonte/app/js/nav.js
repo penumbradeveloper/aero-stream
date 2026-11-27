@@ -338,7 +338,7 @@
       const at = document.activeElement, r = at && at !== document.body && at.getBoundingClientRect ? at.getBoundingClientRect() : null;
       cur.x = r && r.width ? r.left + r.width / 2 : innerWidth / 2; cur.y = r && r.height ? r.top + r.height / 2 : innerHeight / 2;
       cur.el.classList.add('on'); cursorPintar(); A.som.tocar('pop-abrir');
-    } else { cur.el.classList.remove('on', 'clicavel'); cur.sob = null; if (!quieto) A.som.tocar('fechar'); }
+    } else { cur.el.classList.remove('on', 'clicavel'); pararHover(); cur.sob = null; if (!quieto) A.som.tocar('fechar'); }
     atualizarLegenda();
   }
   function cursorPintar() {
@@ -347,7 +347,33 @@
     // aparecia até 32% mais para baixo e para a direita de onde o clique caía: mirando numa DM de baixo, abria uma de cima)
     cur.el.style.translate = `${cur.x}px ${cur.y}px`;
     const sob = document.elementFromPoint(cur.x, cur.y);
-    pedirDicas(); cur.sob = sob; cur.el.classList.toggle('clicavel', clicavel(sob));
+    pedirDicas(); passar(cur.sob, sob); cur.sob = sob; cur.el.classList.toggle('clicavel', clicavel(sob));
+  }
+  // (1.0.6) a bolinha "passa o mouse" como o mouse de verdade: em cima de um vídeo aparecem os controles dele, os menus que abrem com o mouse
+  // em cima abrem, as dicas aparecem. No app do PC ela move o mouse de dentro da janela (o :hover do CSS funciona igual ao do mouse);
+  // no site e no celular vão os eventos de mouse para o que está embaixo e a classe .pad-hover marca o caminho até ele
+  let hoverEls = [], ultMov = 0;
+  const caminho = (e) => { const l = []; for (let x = e; x && x.nodeType === 1; x = x.parentElement) l.push(x); return l; };
+  function passar(antes, agora) {
+    const pc = window.aero && window.aero.moverMouse;
+    if (pc) { const t = performance.now(); if (agora !== antes || t - ultMov > 30) { ultMov = t; try { window.aero.moverMouse(cur.x, cur.y); } catch (x) { /* ok */ } } return; }
+    const o = { bubbles: true, cancelable: true, composed: true, clientX: cur.x, clientY: cur.y, view: window, pointerType: 'mouse', isPrimary: true, pointerId: 1 };
+    if (agora !== antes) {
+      const novos = agora ? caminho(agora) : [];
+      for (const e of hoverEls) if (!novos.includes(e)) e.classList.remove('pad-hover');
+      if (antes && antes.isConnected) { antes.dispatchEvent(new PointerEvent('pointerout', { ...o, relatedTarget: agora })); antes.dispatchEvent(new MouseEvent('mouseout', { ...o, relatedTarget: agora })); }
+      for (const e of hoverEls) if (!novos.includes(e) && e.isConnected) { e.dispatchEvent(new PointerEvent('pointerleave', { ...o, bubbles: false })); e.dispatchEvent(new MouseEvent('mouseleave', { ...o, bubbles: false })); }
+      if (agora) {
+        agora.dispatchEvent(new PointerEvent('pointerover', { ...o, relatedTarget: antes })); agora.dispatchEvent(new MouseEvent('mouseover', { ...o, relatedTarget: antes }));
+        for (const e of novos) if (!hoverEls.includes(e)) { e.dispatchEvent(new PointerEvent('pointerenter', { ...o, bubbles: false })); e.dispatchEvent(new MouseEvent('mouseenter', { ...o, bubbles: false })); }
+      }
+      hoverEls = novos; for (const e of novos) e.classList.add('pad-hover');
+    }
+    if (agora) { agora.dispatchEvent(new PointerEvent('pointermove', o)); agora.dispatchEvent(new MouseEvent('mousemove', o)); }
+  }
+  function pararHover() {
+    if (window.aero && window.aero.moverMouse) { try { window.aero.moverMouse(-1, -1); } catch (x) { /* ok */ } }
+    for (const e of hoverEls) e.classList.remove('pad-hover'); hoverEls = [];
   }
   // (1.0.2) só conta como clicável o que é um controle de verdade (botão, link, campo, item com a mãozinha). Antes valia qualquer coisa com
   // menu de botão direito ou foco por teclado: a lateral inteira, o topo e cada mensagem acendiam a bolinha mesmo no espaço vazio

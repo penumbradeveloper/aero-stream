@@ -13,6 +13,7 @@ const fs = require('fs');
 const { criarDiscord } = require('./discord');
 const { criarAudio } = require('./audio');
 const { criarEntrada } = require('./entrada');
+const { criarApertar } = require('./apertar');
 const vaapi = require('./vaapi');
 const { criarVce3 } = require('./vce3');
 const { criarKms } = require('./captura/kms');
@@ -334,6 +335,17 @@ function escDoJogo() {
   } catch (e) { escPreso = false; }
 }
 app.on('will-quit', () => { try { globalShortcut.unregisterAll(); } catch (e) { /* ok */ } });
+// (1.0.6) a bolinha do controle move o mouse SÓ de dentro da janela do Aero (nunca o do sistema): o :hover e os controles do vídeo aparecem
+// como com o mouse. (-1, -1) = a bolinha foi guardada: o mouse "sai" da janela
+ipcMain.on('pad-mouse', (e, x, y) => {
+  if (!confiavel(e) || !janela || janela.isDestroyed() || !janela.isFocused()) return;
+  x = Number(x); y = Number(y); if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  try {
+    if (x < 0 || y < 0) { janela.webContents.sendInputEvent({ type: 'mouseLeave', x: 0, y: 0 }); return; }
+    const z = janela.webContents.getZoomFactor() || 1;
+    janela.webContents.sendInputEvent({ type: 'mouseMove', x: Math.round(Math.min(x, 1e5) * z), y: Math.round(Math.min(y, 1e5) * z) });
+  } catch (x2) { /* ok */ }
+});
 // (0.8.5) a página pede um "toque" (tecla F24 sintética) para poder prender o mouse de novo sem esperar um clique depois de um Esc que escapou
 ipcMain.on('toque-trava', (e) => { if (!confiavel(e) || !teclasDoJogo || !janela || janela.isDestroyed() || !janela.isFocused()) return; try { janela.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'F24' }); janela.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'F24' }); } catch (x) { /* ok */ } });
 handle('tela-cheia', (on) => { if (janela && !janela.isDestroyed()) { cheiaDaChamada = !!on; janela.setFullScreen(!!on); } return true; }); // (0.6.0) tela cheia da chamada pelo app (a do navegador falhava no Windows) // (0.6.0) clicou na notificação do sistema: a janela volta para a frente
@@ -710,7 +722,7 @@ handle('discord-estado', () => discord.estado());
 const ouvindoTok = (novo) => { const c = lerCfg(); if (novo || typeof c.ouvirToken !== 'string' || c.ouvirToken.length < 16) { c.ouvirToken = require('crypto').randomBytes(12).toString('hex'); gravarCfg(c); } return c.ouvirToken; };
 // a pasta da extensão do navegador (vai junto com o app) para quem instala sem a loja
 const pastaExtensao = () => (app.isPackaged ? path.join(process.resourcesPath, 'extensao') : path.join(__dirname, '..', 'extensao'));
-const ouvindo = require('./ouvindo').criarOuvindo({ log, lerToken: () => lerCfg().ouvirToken || '', abrirExterno: (u) => { if (/^(spotify:(track|episode):[A-Za-z0-9]{22}|https:\/\/music\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11}|https:\/\/www\.deezer\.com\/(track|episode)\/[0-9]{1,14})$/.test(u)) shell.openExternal(u); }, aoMudar: () => { if (janela && !janela.isDestroyed()) janela.webContents.send('ouvindo-mudou'); }, abrirPasta: () => { const p = pastaExtensao(); if (fs.existsSync(p)) shell.openPath(p); } });
+const ouvindo = require('./ouvindo').criarOuvindo({ log, lerToken: () => lerCfg().ouvirToken || '', aoVerExtensao: () => { const c = lerCfg(); if (!c.extVista) { c.extVista = Date.now(); gravarCfg(c); } }, abrirExterno: (u) => { if (/^(spotify:(track|episode):[A-Za-z0-9]{22}|https:\/\/music\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11}|https:\/\/www\.deezer\.com\/(track|episode)\/[0-9]{1,14})$/.test(u)) shell.openExternal(u); }, aoMudar: () => { if (janela && !janela.isDestroyed()) janela.webContents.send('ouvindo-mudou'); }, abrirPasta: () => { const p = pastaExtensao(); if (fs.existsSync(p)) shell.openPath(p); } });
 handle('ouvindo-ligar', (v) => { if (v) ouvindoTok(false); return ouvindo.ligar(!!v); });
 handle('ouvindo-agora', () => ouvindo.agora());
 handle('ouvindo-tocar', (c) => ouvindo.tocar(c && typeof c === 'object' ? { f: c.f, id: c.id, k: c.k, p: c.p, tocando: c.tocando, t: c.t } : null)); // (1.0.0) ouvir junto
@@ -723,7 +735,7 @@ async function abrirApp(proto, url) { if (!temApp(proto)) return false; try { aw
 handle('abrir-steam', (id) => /^\d{1,10}$/.test(String(id)) ? abrirApp('steam', 'steam://store/' + id) : false);
 handle('jogar-roblox', (id) => /^\d{1,20}$/.test(String(id)) ? abrirApp('roblox', 'roblox://experiences/start?placeId=' + id) : false);
 handle('ouvindo-instalar', async () => { ouvindoTok(false); await shell.openExternal(ouvindo.convite()); return true; });
-handle('ouvindo-extensao', () => ouvindo.extensao());
+handle('ouvindo-extensao', () => ({ ...ouvindo.extensao(), jaVista: !!lerCfg().extVista })); // (1.0.6) jaVista: já se conectou alguma vez neste PC
 // (1.0.0) Assistindo agora (Twitch, Kick, YouTube e os sites da pessoa, pela extensão do navegador): a lista de sites e o vídeo de agora
 handle('assistindo-sites', (c) => ouvindo.assistir(c && typeof c === 'object' ? c : null));
 handle('assistindo-agora', () => ouvindo.assistindo());
@@ -1007,12 +1019,17 @@ handle('uinput-liberar', async () => {
   await new Promise((res) => setTimeout(res, 700)); // o udev aplica a permissão
   return { ok: true };
 });
+// (1.0.6) apertar para falar com o Aero em segundo plano: só a tecla escolhida, e o aviso vai só para a janela do Aero
+const apertar = criarApertar({ pastaDados: app.getPath('userData'), log, aoMudar: (v) => { try { if (janela && !janela.isDestroyed()) janela.webContents.send('ptt', !!v); } catch (e) { /* ok */ } } });
+handle('ptt-ligar', (atalho) => apertar.ligar(atalho && typeof atalho === 'object' ? { code: typeof atalho.code === 'string' ? atalho.code : undefined, botao: Number.isInteger(atalho.botao) ? atalho.botao : undefined } : {}));
+handle('ptt-parar', () => { apertar.parar(); return true; });
+handle('ptt-liberar', () => apertar.liberar());
 const COMANDOS_ENTRADA = new Set(['mouseRel', 'mouseAbs', 'botao', 'roda', 'tecla', 'pad', 'padSair', 'soltarTudo', 'preparar']);
 ipcMain.on('entrada-cmd', (e, nome, ...args) => { if (!confiavel(e) || !COMANDOS_ENTRADA.has(nome)) return; try { entrada[nome](...args); } catch (err) { log('entrada', err.message); } });
 
 // ao fechar: devolve o som dos aplicativos, solta teclas e tira a atividade do Discord
 let limpou = false;
-const limparTudo = () => { if (limpou) return; limpou = true; soltarAtalhosKde(); try { cursorHost(false); } catch (e) { /* ok */ } gravarSent(null); try { audio.limparAoSair(); } catch (e) { /* ok */ } try { entrada.soltarTudo(); entrada.parar(); } catch (e) { /* ok */ } try { discord.parar(); } catch (e) { /* ok */ } try { kms.parar(); } catch (e) { /* ok */ } };
+const limparTudo = () => { if (limpou) return; limpou = true; soltarAtalhosKde(); try { cursorHost(false); } catch (e) { /* ok */ } gravarSent(null); try { audio.limparAoSair(); } catch (e) { /* ok */ } try { entrada.soltarTudo(); entrada.parar(); } catch (e) { /* ok */ } try { apertar.parar(); } catch (e) { /* ok */ } try { discord.parar(); } catch (e) { /* ok */ } try { kms.parar(); } catch (e) { /* ok */ } };
 app.on('before-quit', limparTudo);
 for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(sig, () => { saindo = true; limparTudo(); app.exit(0); });
 app.on('will-quit', limparTudo);

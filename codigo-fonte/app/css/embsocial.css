@@ -94,3 +94,39 @@
 [data-tema=escuro] .cx-midia.cx-tw.com-pelicula { --tw-bg: rgba(16,20,28,.9); box-shadow: inset 3px 0 0 var(--tw-cor), inset 0 0 0 1px rgba(255,255,255,.1); }
 .cx-midia.cx-tw.com-pelicula > .pelicula { left: -20px !important; top: -20px !important; width: calc(100% + 40px) !important; height: calc(100% + 40px) !important; }
 :root[data-moldura="0"] .cx-midia.cx-tw.com-pelicula { border-width: 0 !important; }
+/* (1.0.6) Pinterest (pin, pasta e perfil), o Instagram completo e o botão de baixar */
+.cx-midia.emb-pin { --ex-c1: #e60023; --ex-c2: #ff7a8a; }
+.cx-midia.emb-ig.ig-completo { --ex-c1: #fd5949; --ex-c2: #d6249f; }
+.ex-logo.pin { background: transparent; box-shadow: none; }
+.emb-x .ex-av.pin { color: #fff; font-weight: 800; font-size: 16px; background: #e60023; box-shadow: none; }
+.emb-x img.ex-av.mini { width: 22px; height: 22px; box-shadow: none; }
+.ex-ok.ig { background: #3897f0; }
+.ex-vslide { cursor: default; }
+.ex-vslide > .ex-capa > img { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; object-fit: contain; border-radius: 0; }
+.ex-vslide.tocando > :is(video, .mp, div) { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ex-vslide.tocando video { width: 100%; height: 100%; max-width: none; max-height: none; object-fit: contain; background: #000; }
+.ex-pin-tit { font-size: 15px; font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ex-pin-tit.grande { font-size: 17px; }
+.ex-pin-salvo { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 12.5px; color: var(--ex-suave); }
+.ex-pin-salvo > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ex-pin-salvo b, .ex-pin-salvo a { color: var(--ex-txt); font-weight: 700; text-decoration: none; }
+.ex-pin-salvo a { cursor: pointer; } .ex-pin-salvo a:hover { text-decoration: underline; }
+.ex-ests.dois { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* o mural da pasta/perfil: colunas como no Pinterest (3; 2 no celular), cada pin na proporção dele (limitada), nada sai da caixa */
+.ex-pin-grade { display: flex; align-items: flex-start; gap: 6px; max-height: 470px; overflow: hidden; border-radius: 14px; -webkit-mask-image: linear-gradient(#000 85%, transparent); mask-image: linear-gradient(#000 85%, transparent); }
+.ex-pin-item { position: relative; display: block; width: 100%; aspect-ratio: var(--ar, .75); margin: 0; padding: 0; border: 0; border-radius: 12px; overflow: hidden; cursor: zoom-in; flex: none; background: color-mix(in srgb, var(--ex-txt) 8%, transparent); }
+.ex-pin-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.ex-pin-item > img { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; object-fit: cover; border-radius: 0; display: block; transition: transform .25s; }
+.ex-pin-item:hover > img { transform: scale(1.04); }
+.ex-pin-play { position: absolute; left: 6px; bottom: 6px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: #fff; background: rgba(0,0,0,.55); }
+.ex-ir.pin { background: #e60023; box-shadow: 0 3px 10px rgba(230,0,35,.3); }
+[data-visual=lite] .ex-pin-item > img, [data-anim=nenhuma] .ex-pin-item > img { transition: none; }
+/* baixar: na ponta da linha dos números (desce para a linha de baixo se não couber) */
+.ex-baixar { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border: 0; border-radius: 999px; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700;
+  color: var(--ex-txt); background: color-mix(in srgb, var(--ex-txt) 8%, transparent); box-shadow: inset 0 0 0 1px var(--ex-linha); }
+.ex-baixar:hover { background: color-mix(in srgb, var(--ex-c1) 18%, transparent); }
+.ex-baixar.baixando { opacity: .7; cursor: progress; }
+.ex-baixar.baixando > svg { animation: ex-baixando 1s ease-in-out infinite; }
+@keyframes ex-baixando { 50% { transform: translateY(2px); } }
+[data-visual=lite] .ex-baixar.baixando > svg, [data-anim=nenhuma] .ex-baixar.baixando > svg { animation: none; }
+@media (max-width: 560px) { .ex-pin-grade { max-height: 420px; } }

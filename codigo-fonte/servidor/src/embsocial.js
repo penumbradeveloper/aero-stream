@@ -91,13 +91,4 @@ export async function ttMidia(request, url, env) {
   for (const k of ['Content-Length', 'Content-Range']) { const v = r.headers.get(k); if (v) h.set(k, v); }
   return new Response(r.body, { status: r.status, headers: h });
 }
-
-// ---------- Instagram ----------
-export const RE_INSTAGRAM = /^https?:\/\/(?:www\.|m\.)?instagram\.com\/(?:([A-Za-z0-9._]{1,30})\/)?(p|reel|reels|tv)\/([A-Za-z0-9_-]{5,40})|^https?:\/\/(?:www\.|m\.)?instagram\.com\/([A-Za-z0-9._]{1,30})\/?(?:[?#]|$)/i;
-const RESERVADOS_IG = /^(explore|accounts|direct|stories|about|legal|developer|p|reel|reels|tv|web)$/i;
-export function instagram(url) {
-  const m = RE_INSTAGRAM.exec(url); if (!m) return null;
-  if (m[3]) { const tipo = /^reel|tv/i.test(m[2]) ? 'reel' : 'post'; return { tipo: 'instagram', sub: tipo, codigo: m[3], nick: m[1] ? txt(m[1], 30) : '', url: 'https://www.instagram.com/' + (tipo === 'reel' ? 'reel' : 'p') + '/' + m[3] + '/' }; }
-  if (m[4] && !RESERVADOS_IG.test(m[4])) return { tipo: 'instagram', sub: 'perfil', nick: txt(m[4], 30), url: 'https://www.instagram.com/' + m[4] + '/' };
-  return null;
-}
+// (1.0.6) o Instagram foi para o embpin.js (agora com o post de verdade)

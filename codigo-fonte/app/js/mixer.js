@@ -146,6 +146,36 @@
     forca.classList.toggle('desativada', !mc.supressao);
     const eco = U.chave(mc.eco, async (v) => { mc.eco = v; salvar(); try { await X.reiniciar(); } catch (e) { /* ok */ } });
     const agc = U.chave(mc.agc, async (v) => { mc.agc = v; salvar(); try { await X.reiniciar(); } catch (e) { /* ok */ } });
+    // (1.0.6) apertar para falar: escolhe qualquer tecla ou um botão do mouse (meio, 4, 5); no PC vale com o Aero em segundo plano
+    const btAtalho = h('button', { type: 'button', class: 'btn sec peq ptt-atalho', title: T('Trocar o atalho', 'Change the shortcut') });
+    const avisoPtt = h('div', { class: 'peq suave ptt-aviso' });
+    const pintarPtt = () => {
+      btAtalho.replaceChildren(A.icone('teclado', 14), h('span', {}, mc.pttAtalho ? A.mic.nomeAtalho(mc.pttAtalho) : T('Escolher atalho', 'Pick a shortcut')));
+      linhaAtalho.hidden = !mc.ptt; avisoPtt.hidden = !mc.ptt; avisoPtt.replaceChildren();
+      if (!mc.ptt) return;
+      const mot = A.mic.pttMotivo || '';
+      if (!mc.pttAtalho) avisoPtt.textContent = T('Escolha a tecla ou o botão do mouse.', 'Pick the key or mouse button.');
+      else if (!window.aero) avisoPtt.textContent = T('No site, funciona com a aba do Aero aberta na frente.', 'On the website it works while the Aero tab is in front.');
+      else if (mot === 'permissao') avisoPtt.append(h('span', {}, T('O Linux ainda não deixa o Aero ouvir esse atalho com outra janela na frente. ', 'Linux does not let Aero hear this shortcut with another window in front yet. ')),
+        U.btn(T('Permitir', 'Allow'), { tipo: 'sec', peq: true, icone: 'cadeado', onclick: async (e) => { const b = e.currentTarget; b.disabled = true; const r = await A.mic.pttLiberar(); b.disabled = false; if (r && r.ok === false && r.motivo === 'cancelado') return; pintarPtt(); } }));
+      else if (mot) avisoPtt.textContent = T('Com outra janela na frente, o atalho não funcionou neste computador: vale com o Aero em foco.', 'With another window in front the shortcut did not work on this computer: it works with Aero in focus.');
+      else avisoPtt.textContent = T('Funciona até com o Aero em segundo plano.', 'Works even with Aero in the background.');
+    };
+    let gravando = null;
+    const pararGravar = () => { if (!gravando) return; const g = gravando; gravando = null; removeEventListener('keydown', g.tecla, true); removeEventListener('pointerdown', g.botao, true); g.sairEsc(); delete document.documentElement.dataset.gravandoAtalho; btAtalho.classList.remove('gravando'); pintarPtt(); };
+    btAtalho.addEventListener('click', (ev) => {
+      if (gravando) { pararGravar(); return; }
+      ev.stopPropagation();
+      const usar = async (at) => { mc.pttAtalho = at; salvar(); pararGravar(); A.som.tocar('click'); await A.mic.pttAplicar(); pintarPtt(); };
+      const tecla = (e) => { if (['Escape'].includes(e.key)) return; e.preventDefault(); e.stopPropagation(); const nome = e.key && e.key.length === 1 ? e.key.toUpperCase() : ({ ' ': T('Espaço', 'Space') }[e.key] || e.code.replace(/^(Key|Digit)/, '').replace(/(Left|Right)$/, (m) => (m === 'Left' ? T(' esquerdo', ' left') : T(' direito', ' right')))); usar({ code: e.code, nome: nome.slice(0, 24) }); };
+      const botao = (e) => { if (![1, 3, 4].includes(e.button)) return; e.preventDefault(); e.stopPropagation(); usar({ botao: e.button }); };
+      gravando = { tecla, botao, sairEsc: U.pilhaEsc ? U.pilhaEsc(() => pararGravar()) : () => {} };
+      document.documentElement.dataset.gravandoAtalho = '1';
+      btAtalho.classList.add('gravando'); btAtalho.replaceChildren(A.icone('teclado', 14), h('span', {}, T('Aperte a tecla ou o botão…', 'Press the key or button…')));
+      setTimeout(() => { if (gravando && gravando.tecla === tecla) { addEventListener('keydown', tecla, true); addEventListener('pointerdown', botao, true); } }, 0);
+    });
+    const ptt = U.chave(!!mc.ptt, async (v) => { mc.ptt = v; salvar(); pintarPtt(); await A.mic.pttAplicar(); pintarPtt(); if (v && !mc.pttAtalho) btAtalho.click(); });
+    const linhaAtalho = h('div', { class: 'opcao curta' }, h('div', { class: 'cresce' }, T('Atalho', 'Shortcut')), btAtalho);
 
     // medidor: a barra clara é o que entra; a cheia, o que sai depois da supressão; o risco, o limiar da sensibilidade (já com o ruído
     // de fundo medido); a cor, se a porta está aberta
@@ -161,7 +191,7 @@
         barra.style.transform = `scaleX(${(A.mic.nivelSaida ? A.mic.nivelSaida() : A.mic.nivel()).toFixed(3)})`;
         marcar();
         barra.classList.toggle('fechada', !!mc.supressao && !A.mic.aberto);
-        estado.textContent = !X.ligado() ? T('Microfone mudo', 'Microphone muted') : mc.supressao ? (A.mic.aberto ? T('Captando voz', 'Picking up voice') : T('Ruído de fundo suprimido', 'Background noise suppressed')) : T('Captando', 'Picking up');
+        estado.textContent = !X.ligado() ? T('Microfone mudo', 'Microphone muted') : A.mic.pttLigado && A.mic.pttLigado() && !A.mic.pttApertado() ? T('Segure ', 'Hold ') + A.mic.nomeAtalho(mc.pttAtalho) + T(' para falar', ' to talk') : mc.supressao ? (A.mic.aberto ? T('Captando voz', 'Picking up voice') : T('Ruído de fundo suprimido', 'Background noise suppressed')) : T('Captando', 'Picking up');
       } else { barra.style.transform = entrada.style.transform = 'scaleX(0)'; estado.textContent = T('Ligue o microfone para ver o nível.', 'Turn the microphone on to see the level.'); }
       raf = requestAnimationFrame(laco);
     };
@@ -169,9 +199,11 @@
     const ligar = U.btn(X.ligado() ? T('Silenciar', 'Mute') : T('Ligar o microfone', 'Turn mic on'), { icone: X.ligado() ? 'micOff' : 'mic', tipo: 'sec', peq: true, onclick: async () => { try { await X.alternar(); } catch (e) { U.toast(T('Não consegui usar o microfone.', 'Could not use the microphone.'), { tipo: 'erro' }); } p.fechar(); } });
 
     corpo.append(titulo(T('Dispositivo', 'Device')), selDev, medidor, estado,
+      linhaOpc(T('Apertar para falar', 'Push to talk'), ptt, T('O microfone só abre enquanto você segura o atalho.', 'The mic only opens while you hold the shortcut.')), linhaAtalho, avisoPtt,
       linhaOpc(T('Supressão de ruído', 'Noise suppression'), supr, T('Corta teclado, ventilador e ruído de fundo.', 'Cuts keyboard, fan and background noise.')), forca, sens, vol,
       h('details', { class: 'mais' }, h('summary', {}, T('Mais opções', 'More options')), linhaOpc(T('Cancelamento de eco', 'Echo cancellation'), eco, T('Use com alto-falante. Com fone, pode desligar.', 'Use with speakers. With headphones you can turn it off.')), linhaOpc(T('Ganho automático', 'Automatic gain'), agc)), ligar);
-    const p = U.popover(ancora, corpo, { largura: 360, titulo: T('Microfone', 'Microphone'), aoFechar: () => { vivo = false; cancelAnimationFrame(raf); } });
+    pintarPtt();
+    const p = U.popover(ancora, corpo, { largura: 360, titulo: T('Microfone', 'Microphone'), aoFechar: () => { vivo = false; cancelAnimationFrame(raf); pararGravar(); } });
     return p;
   };
 

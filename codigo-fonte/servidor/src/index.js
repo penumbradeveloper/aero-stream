@@ -6,6 +6,8 @@
 // O vídeo NÃO passa por aqui: ele vai direto entre os aparelhos (WebRTC).
 import * as midia from './midia.js';
 import { ttMidia } from './embsocial.js';
+import { pinMidia, igMidia } from './embpin.js';
+import { falar } from './idiomas.js';
 import { steamVideo } from './embsteam.js';
 import { SEGURANCA, CORS } from './util.js';
 export { Hub } from './hub.js';
@@ -99,6 +101,9 @@ export default {
     if (url.pathname === '/api/capa' && request.method === 'GET') return midia.capa(url.searchParams.get('u') || '', env, request);
     if (url.pathname === '/api/img' && request.method === 'GET') return midia.imgProxy(url.searchParams.get('u') || '', env, request);
     if (url.pathname === '/api/tt' && request.method === 'GET') return ttMidia(request, url, env); // (1.0.3) vídeo e música da TikTok
+    if (url.pathname === '/api/pin' && request.method === 'GET') return pinMidia(request, url, env); // (1.0.6) vídeo do Pinterest
+    if (url.pathname === '/api/ig' && request.method === 'GET') return igMidia(request, url, env); // (1.0.6) vídeo e fotos do Instagram
+    if (url.pathname === '/api/falar' && request.method === 'GET') return falar(request, url, env, midia.limiteIp); // (1.0.6) "Ouvir" do dicionário
     if (url.pathname === '/api/sv' && request.method === 'GET') return steamVideo(request, url, env); // (1.0.3) trailer da Steam e fundo animado do perfil
     if (url.pathname === '/api/twvideo' && request.method === 'GET') return midia.twVideo(request, url.searchParams.get('u') || '', env);
     if (url.pathname.startsWith('/api/musica') || ['/api/letterboxd', '/api/busca', '/api/link'].includes(url.pathname)) {

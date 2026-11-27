@@ -196,6 +196,45 @@
     { nome: 'Crunchyroll', dom: 'crunchyroll.com', ic: 'C', cor: '#f47521', vb: T('Assistindo', 'Watching'), quando: 'video', tit: 'aba', aut: 'nada', tirar: 'Crunchyroll|- Watch on|- Assista na|- Assistir na' },
     { nome: 'Prime Video', dom: 'primevideo.com', ic: 'P', cor: '#00a8e1', vb: T('Assistindo', 'Watching'), quando: 'video', tit: 'aba', aut: 'nada', tirar: 'Prime Video:|Prime Video' },
   ];
+  // (1.0.6) o Assistindo agora só funciona com a extensão do navegador: ao instalar a integração (e, depois da atualização, para quem já
+  // tinha a integração e nunca conectou a extensão) aparece esta tela. Quem já tem a extensão só clica: ela se conecta sozinha, sem código
+  let telaExt = null;
+  S.exigirExtensao = async () => {
+    const p = ponte(); if (!p || !p.extensao || telaExt) return;
+    let e0 = null; try { e0 = await p.extensao(); } catch (_) { /* ok */ }
+    if ((e0 && e0.conectada) || telaExt) return;
+    const U0 = U(), estado = h('div', { class: 'peq ass-ext-estado', role: 'status' });
+    let t = 0;
+    const ver = async () => {
+      let e = null; try { e = await p.extensao(); } catch (_) { /* ok */ }
+      if (!telaExt || !e || !e.conectada) return;
+      clearInterval(t); estado.textContent = T('✓ Extensão conectada. Tudo pronto!', '✓ Extension connected. All set!'); estado.classList.add('ok');
+      setTimeout(() => telaExt && telaExt.fechar(true), 1600);
+    };
+    const corpoT = h('div', { class: 'ass-ext-tela' },
+      h('div', { class: 'ass-ext-logos', 'aria-hidden': 'true' }, ...CONHECIDOS.map((f) => logo(f, 34))),
+      h('p', {}, T('O Assistindo agora mostra aos amigos o que você assiste no navegador, e quem lê isso é a extensão do Aero (a mesma do "Ouvindo agora"). Sem ela, nada aparece.', 'Watching now shows friends what you watch in the browser, and the Aero extension (the same as "Listening now") is what reads it. Without it, nothing shows up.')),
+      h('p', { class: 'peq suave' }, T('Clique em "Instalar ou conectar": o seu navegador abre a página da extensão. Se ela já estiver instalada, ela se conecta sozinha, sem código.', 'Click "Install or connect": your browser opens the extension page. If it is already installed, it connects by itself, no code needed.')),
+      estado);
+    telaExt = U0.modal(T('Instale a extensão do navegador', 'Install the browser extension'), corpoT, { largura: 460, classe: 'ass-ext-modal', aoFechar: () => { clearInterval(t); telaExt = null; }, acoes: [
+      { texto: T('Agora não', 'Not now'), tipo: 'sec', valor: false },
+      { texto: T('Instalar ou conectar', 'Install or connect'), icone: 'download', onclick: async () => {
+        try { await p.instalarExtensao(); } catch (er) { U0.toast(er.message, { tipo: 'erro' }); return; }
+        if (!estado.classList.contains('ok')) estado.textContent = T('Esperando a extensão se conectar…', 'Waiting for the extension to connect…');
+      } }] });
+    t = setInterval(ver, 1500);
+  };
+  // depois da atualização: tem a integração ligada e a extensão nunca se conectou neste PC (uma vez por versão)
+  if (ponte()) setTimeout(async () => {
+    if (!S.ligado() || !A.api || !A.api.eu) return;
+    let ja = ''; try { ja = localStorage.getItem('aero.assExt') || ''; } catch (_) { /* ok */ }
+    if (ja === String(A.versao)) return;
+    let e = null; try { e = await ponte().extensao(); } catch (_) { return; }
+    if (!e || e.jaVista || e.visto) return;
+    try { localStorage.setItem('aero.assExt', String(A.versao)); } catch (_) { /* ok */ }
+    S.exigirExtensao();
+  }, 90000);
+
   const novoId = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
 
   S.configuracao = () => {
@@ -214,15 +253,20 @@
       el.replaceChildren(
         h('h3', {}, A.icone('tela', 16), T('Sites', 'Sites')),
         h('p', { class: 'peq suave' }, T('Funciona pela extensão do Aero no navegador (a mesma do "Ouvindo agora"). Desligue os sites que você não quer mostrar.', 'Works through the Aero browser extension (the same one as "Listening now"). Turn off the sites you do not want to show.')),
-        h('div', { class: 'linha ass-cfg-ext' }, estado, U0.btn(T('Instalar no navegador', 'Install in the browser'), { icone: 'download', tipo: 'sec', peq: true, onclick: async () => { try { await window.aero.ouvindo.instalarExtensao(); } catch (e) { U0.toast(e.message, { tipo: 'erro' }); } } })),
+        h('div', { class: 'linha ass-cfg-ext' }, estado, U0.btn(T('Instalar ou conectar', 'Install or connect'), { icone: 'download', tipo: 'sec', peq: true, onclick: async () => { try { await window.aero.ouvindo.instalarExtensao(); estado.textContent = T('Esperando a extensão se conectar…', 'Waiting for the extension to connect…'); } catch (e) { U0.toast(e.message, { tipo: 'erro' }); } } })),
         h('div', { class: 'ass-cfg-lista' }, ...conhecidos),
         h('h4', {}, T('Seus sites', 'Your sites')),
         meus.length ? h('div', { class: 'ass-cfg-lista' }, ...meus) : h('p', { class: 'peq suave' }, T('Nenhum ainda. Adicione o X, um site de filmes ou qualquer outro.', 'None yet. Add X, a movie site or anything else.')),
         h('div', { class: 'linha ass-cfg-add' }, U0.btn(T('Adicionar site', 'Add site'), { icone: 'mais', peq: true, onclick: () => editor(null) }),
           meus.length ? h('span', { class: 'peq suave' }, T('Cada site novo precisa ser permitido uma vez na janelinha da extensão (no botão dela no navegador).', 'Each new site must be allowed once in the extension popup (its button in the browser).')) : null));
-      let e = null; try { e = window.aero && window.aero.ouvindo ? await window.aero.ouvindo.extensao() : null; } catch (_) { /* ok */ }
-      estado.textContent = e && e.conectada ? T('✓ Extensão conectada neste computador.', '✓ Extension connected on this computer.') : e && e.visto ? T('A extensão já se conectou aqui (abra uma aba para ela voltar).', 'The extension has connected here before (open a tab for it to come back).') : T('A extensão ainda não se conectou neste computador.', 'The extension has not connected on this computer yet.');
-      estado.classList.toggle('ok', !!(e && e.conectada));
+      // (1.0.6) o estado da extensão se atualiza sozinho enquanto a tela está aberta
+      const verExt = async () => {
+        let e = null; try { e = window.aero && window.aero.ouvindo ? await window.aero.ouvindo.extensao() : null; } catch (_) { /* ok */ }
+        estado.textContent = e && e.conectada ? T('✓ Extensão conectada neste computador.', '✓ Extension connected on this computer.') : e && e.pareando ? T('Esperando a extensão se conectar…', 'Waiting for the extension to connect…') : e && (e.visto || e.jaVista) ? T('A extensão já se conectou aqui (abra uma aba para ela voltar).', 'The extension has connected here before (open a tab for it to come back).') : T('A extensão ainda não se conectou neste computador.', 'The extension has not connected on this computer yet.');
+        estado.classList.toggle('ok', !!(e && e.conectada));
+      };
+      await verExt();
+      clearInterval(el._tExt); el._tExt = setInterval(() => { if (!el.isConnected) return clearInterval(el._tExt); verExt(); }, 2000);
     };
     // o editor de um site (novo ou existente), com a prévia do cartão
     function editor(atual) {

@@ -1105,7 +1105,7 @@
     if (document.documentElement.dataset.entrada === 'pad') setTimeout(() => { const b = el.querySelector('.mini-av'); if (b) b.focus({ preventScroll: true }); }, 60); // aberto pelo controle: o foco já entra nele
     let fechado = false;
     function fechar() {
-      if (fechado) return; fechado = true; if (miniAberto === fechar) miniAberto = null;
+      if (fechado) return; fechado = true; if (miniAberto === fechar) miniAberto = null; sairEsc();
       document.removeEventListener('pointerdown', fora, true); document.removeEventListener('keydown', tecla, true); removeEventListener('resize', fechar);
       P.pararPrevia(); A.som.tocar('mini-fechar');
       el.classList.add('fechando'); setTimeout(() => el.remove(), 260);
@@ -1114,6 +1114,7 @@
     const fora = (e) => { if (!el.contains(e.target) && !(ancora && ancora.contains && ancora.contains(e.target))) fechar(); };
     const tecla = (e) => { if (e.key === 'Escape') { e.stopPropagation(); fechar(); } };
     setTimeout(() => { document.addEventListener('pointerdown', fora, true); document.addEventListener('keydown', tecla, true); addEventListener('resize', fechar); }, 0);
+    const sairEsc = A.ui.pilhaEsc(() => fechar());
     miniAberto = fechar;
     return { fechar, el };
   };
@@ -1875,7 +1876,7 @@
           x ? U.btn('', { icone: 'fechar', peq: true, tipo: 'sec', redondo: true, titulo: T('Apagar', 'Delete'), onclick: () => fazer('apagar', i) }) : null);
       });
       salvos.replaceChildren(h('div', { class: 'rot' }, T('Perfis salvos', 'Saved profiles')), ...linhas,
-        dica(T('Guarda o perfil como está no editor (estilo do nome, fundo, nameplate, arranjo, bio e música); as mudanças são salvas junto. A foto e o banner continuam os de agora.', 'Keeps your profile as it is in the editor (name style, background, nameplate, layout, bio and song); your changes are saved too. Your photo and banner stay the same.')));
+        dica(T('Guarda o perfil como está no editor (foto, banner, estilo do nome, fundo, nameplate, arranjo, bio, música e Mural); as mudanças são salvas junto.', 'Keeps your profile as it is in the editor (photo, banner, name style, background, nameplate, layout, bio, song and Wall); your changes are saved too.')));
     };
     if (!para) { API.req('perfis-salvos', { acao: 'listar' }).then(pintarSalvos).catch(() => {}); abaPerfil.append(salvos); }
     const abas = { perfil: abaPerfil, widgets: abaWidgets, mural: abaMural, nome: abaNome, fundo: abaFundo, np: abaNp, arranjo: abaArranjo };

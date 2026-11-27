@@ -1,4 +1,4 @@
-// Aero - Ouvindo e assistindo (extensão): a janelinha do botão. Guarda o código de pareamento e testa se o app do Aero responde.
+// Aero - Ouvindo e assistindo (extensão): a janelinha do botão. Testa se o app do Aero responde e, sem código, pede um sozinha (1.2.0).
 'use strict';
 const api = globalThis.browser || globalThis.chrome;
 const BASE = 'http://127.0.0.1:41783';
@@ -9,8 +9,8 @@ const $ = (id) => document.getElementById(id);
 
 if (en) {
   document.documentElement.lang = 'en';
-  $('txt-ajuda').textContent = 'Shows your Aero friends the music you play on YouTube Music and Deezer and what you watch on Twitch, Kick, YouTube and the sites you add in Aero. It connects by itself when you click "Install in the browser" in Aero (Settings > Privacy).';
-  $('txt-rotulo').textContent = 'Pairing code'; $('salvar').textContent = 'Save'; $('permitir').textContent = 'Allow access';
+  $('txt-ajuda').textContent = 'Shows your Aero friends the music you play on YouTube Music and Deezer and what you watch on Twitch, Kick, YouTube and the sites you add in Aero. It connects by itself to Aero on this computer, no code needed.';
+  $('permitir').textContent = 'Allow access';
   $('txt-sites').textContent = 'Your sites (added in Aero > Integrations > Watching now)';
 }
 
@@ -18,14 +18,17 @@ function estado(t, tipo) { const e = $('estado'); e.textContent = t; e.className
 
 async function permissoesOk() { try { return await api.permissions.contains({ origins: ORIGENS }); } catch (e) { return true; } }
 
-async function testar() {
-  const { token } = await api.storage.local.get('token');
-  if (!token) return estado(T('No Aero, clique em "Instalar no navegador" (Configurações > Privacidade).', 'In Aero, click "Install in the browser" (Settings > Privacy).'));
+const DICA = () => T('No Aero, abra Integrações > Assistindo agora e clique em "Instalar ou conectar": ela se conecta sozinha.', 'In Aero, open Integrations > Watching now and click "Install or connect": it connects by itself.');
+// sem código (ou com um que venceu): pede um ao Aero sozinha (só funciona logo depois do clique em "Instalar ou conectar" no app)
+const pedirCodigo = () => new Promise((ok) => { try { Promise.resolve(api.runtime.sendMessage({ tipo: 'parear-auto' })).then((r) => ok(!!(r && r.ok)), () => ok(false)); } catch (e) { ok(false); } });
+async function testar(denovo) {
   if (!(await permissoesOk())) { $('permitir').hidden = false; return estado(T('Falta permitir o acesso (botão acima).', 'Access still needs to be allowed (button above).'), 'erro'); }
   $('permitir').hidden = true;
+  const { token } = await api.storage.local.get('token');
+  if (!token) { if (!denovo && (await pedirCodigo())) return testar(true); return estado(DICA()); }
   try {
     const r = await fetch(BASE + '/ping', { headers: { 'X-Aero-Token': token } });
-    if (r.status === 401) return estado(T('O Aero trocou o código. Clique em "Instalar no navegador" no Aero de novo.', 'Aero changed the code. Click "Install in the browser" in Aero again.'), 'erro');
+    if (r.status === 401) { if (!denovo && (await pedirCodigo())) return testar(true); return estado(DICA(), 'erro'); }
     const j = await r.json();
     if (j.sites !== undefined) { try { await api.storage.local.set({ sites: j.sites || null }); } catch (e) { /* ok */ } }
     sites(j.sites);
@@ -36,12 +39,7 @@ async function testar() {
 
 // o pedido de permissão precisa sair direto do clique (o Firefox recusa depois de um "await")
 const pedir = () => { try { return Promise.resolve(api.permissions.request({ origins: ORIGENS })).catch(() => false); } catch (e) { return Promise.resolve(false); } };
-$('salvar').addEventListener('click', () => {
-  const v = $('codigo').value.trim();
-  if (!/^[a-f0-9]{16,64}$/i.test(v)) return estado(T('Esse código não parece certo.', 'That code does not look right.'), 'erro');
-  Promise.all([pedir(), api.storage.local.set({ token: v })]).then(testar, testar);
-});
-$('permitir').addEventListener('click', () => { pedir().then(testar); });
+$('permitir').addEventListener('click', () => { pedir().then(() => testar()); });
 
 // (1.1.0) os sites que a pessoa adicionou no Aero: cada um precisa ser permitido aqui uma vez (o navegador só deixa ler um site com
 // permissão, e o pedido precisa sair de um clique nesta janelinha)
@@ -65,4 +63,4 @@ async function sites(s) {
     lista.append(li);
   }
 }
-api.storage.local.get('token').then(({ token }) => { if (token) $('codigo').value = token; testar(); });
+testar();

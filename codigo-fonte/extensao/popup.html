@@ -12,8 +12,6 @@
   h1 img { width: 22px; height: 22px; }
   p { margin: 0 0 10px; color: var(--suave); }
   label { display: block; margin-bottom: 4px; font-weight: 600; }
-  .linha { display: flex; gap: 6px; }
-  input { flex: 1; min-width: 0; padding: 7px 9px; border: 1px solid var(--borda); border-radius: 8px; background: transparent; color: inherit; font: inherit; }
   button { padding: 7px 12px; border: 0; border-radius: 8px; background: var(--ac); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
   button[hidden] { display: none; }
   #estado { margin-top: 10px; font-weight: 600; }
@@ -27,9 +25,7 @@
 </head>
 <body>
   <h1><img src="icone.png" alt="">Aero - Ouvindo e assistindo</h1>
-  <p id="txt-ajuda">Mostra aos seus amigos do Aero a música que você ouve no YouTube Music e no Deezer e o que você assiste na Twitch, na Kick, no YouTube e nos sites que você adicionar no Aero. Ela se conecta sozinha quando você clica em "Instalar no navegador" no Aero (Configurações &gt; Privacidade).</p>
-  <label for="codigo" id="txt-rotulo">Código de pareamento</label>
-  <div class="linha"><input id="codigo" autocomplete="off" spellcheck="false" maxlength="64"><button id="salvar" type="button">Salvar</button></div>
+  <p id="txt-ajuda">Mostra aos seus amigos do Aero a música que você ouve no YouTube Music e no Deezer e o que você assiste na Twitch, na Kick, no YouTube e nos sites que você adicionar no Aero. Ela se conecta sozinha ao Aero deste computador, sem código.</p>
   <button id="permitir" type="button" hidden style="margin-top:10px;width:100%">Permitir acesso</button>
   <div id="estado"></div>
   <div id="sites" hidden><label id="txt-sites">Seus sites (adicionados no Aero &gt; Integrações &gt; Assistindo agora)</label><ul id="sites-lista"></ul></div>

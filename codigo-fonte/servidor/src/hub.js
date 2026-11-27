@@ -9,6 +9,7 @@ import { Social, privDe, bloqueio } from './social.js';
 import { capaOk } from './midia.js';
 import * as Embeds from './embeds.js';
 import * as EmbSocial from './embsocial.js';
+import * as EmbPin from './embpin.js';
 import * as EmbRoblox from './embroblox.js';
 import * as EmbSteam from './embsteam.js';
 import { Acesso } from './acesso.js';
@@ -646,8 +647,10 @@ export class Hub {
       try { d = await Embeds.reddit(u); } catch (_) { d = null; }
     } else if (EmbSocial.RE_TIKTOK.test(u)) { // (1.0.3) TikTok: vídeo, fotos com música, números e perfil
       try { d = await EmbSocial.tiktok(u.split('?')[0]); } catch (_) { d = null; }
-    } else if (EmbSocial.RE_INSTAGRAM.test(u)) { // (1.0.3) Instagram: o que o link diz; o player oficial abre no clique
-      d = EmbSocial.instagram(u);
+    } else if (EmbPin.RE_INSTAGRAM.test(u)) { // (1.0.6) Instagram: o post/reel de verdade (vídeo, fotos, legenda e números); sem ele, o player oficial no clique
+      try { d = await EmbPin.instagram(u); } catch (_) { d = null; }
+    } else if (EmbPin.RE_PINTEREST.test(u)) { // (1.0.6) Pinterest: pin (foto, vídeo, carrossel), pasta e perfil
+      try { d = await EmbPin.pinterest(u.split('#')[0]); } catch (_) { d = null; }
     } else if (EmbSteam.RE_STEAM.test(u)) { // (1.0.3) Steam: jogo (fotos, trailers, análises, tags, preço) e perfil (fundo, nível, vitrines)
       try { d = await EmbSteam.steam(u); } catch (_) { d = null; }
     } else if (EmbRoblox.RE_ROBLOX.test(u)) { // (1.0.3) Roblox: jogo, perfil, item/pacote e comunidade

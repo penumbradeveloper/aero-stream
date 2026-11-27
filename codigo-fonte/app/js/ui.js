@@ -756,6 +756,15 @@
   // (0.5.9-9) "tem janela aberta" fica marcado na raiz (data-modal): o fundo e as películas de trás param. Antes era um ":has()" no CSS e
   // uma busca no documento a cada quadro
   const marcarModais = () => { const r = document.documentElement, m = document.querySelector('#modais .fundo-modal, .fundo-modal.prioridade') ? '1' : ''; if ((r.dataset.modal || '') !== m) { if (m) r.dataset.modal = m; else delete r.dataset.modal; A.evt.emit('modal', !!m); } };
+  // (1.0.6) Esc (e o B do controle) fecha SÓ a janela de cima. Cada janela ouvia o Esc sozinha e um aperto fechava todas de uma vez
+  // (no perfil de alguém, abrir um anime e apertar B voltava tudo). Agora as janelas, menus e balões entram nesta pilha e o Esc vai só para a última
+  const pilhaEsc = [];
+  U.pilhaEsc = (fechar) => { const it = { fechar }; pilhaEsc.push(it); return () => { const i = pilhaEsc.indexOf(it); if (i >= 0) pilhaEsc.splice(i, 1); }; };
+  addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !pilhaEsc.length || e.defaultPrevented) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    pilhaEsc[pilhaEsc.length - 1].fechar(e);
+  }, true);
   U.modal = (titulo, conteudo, { largura, acoes = [], aoFechar, som = ['janela-abrir', 'janela-fechar'], classe = '', prioridade = false } = {}) => {
     const raiz = prioridade ? document.body : document.getElementById('modais'); // (0.6.0) prioridade: por cima de tudo (chamada, sala, menus)
     const fundo = h('div', { class: 'fundo-modal' + (prioridade ? ' prioridade' : '') });
@@ -764,11 +773,11 @@
     const fechar = (valor) => {
       if (fechado) return; fechado = true;
       A.som.tocar(som[1]); fundo.classList.add('fechando'); // fechou: a bolha estoura
-      document.removeEventListener('keydown', tecla, true);
+      document.removeEventListener('keydown', tecla, true); sairEsc();
       setTimeout(() => { fundo.remove(); marcarModais(); aoFechar && aoFechar(valor); }, 260);
     };
     const tecla = (e) => { if (e.key === 'Escape') { e.stopPropagation(); fechar(); } };
-    document.addEventListener('keydown', tecla, true);
+    document.addEventListener('keydown', tecla, true); const sairEsc = U.pilhaEsc(() => fechar());
     fundo.addEventListener('pointerdown', (e) => { if (e.target === fundo) fechar(); });
     caixa.append(titulo ? h('div', { class: 'linha entre' }, h('h2', {}, titulo), U.btn('', { icone: 'fechar', tipo: 'sec', redondo: true, peq: true, titulo: A.T('Fechar', 'Close'), onclick: () => fechar(), mudo: true })) : null, h('div', { class: 'col', estilo: { 'margin-top': titulo ? '14px' : '0' } }, conteudo),
       acoes.length ? h('div', { class: 'linha', estilo: { 'justify-content': 'flex-end', 'margin-top': '18px', 'flex-wrap': 'wrap' } }, acoes.map((a) => U.btn(a.texto, { tipo: a.tipo, icone: a.icone, onclick: () => (a.onclick ? a.onclick(fechar) : fechar(a.valor)) }))) : null);
@@ -1435,7 +1444,7 @@
     A.som.tocar('menu-abrir');
     let fechado = false;
     function fechar(semSom) {
-      if (fechado) return; fechado = true; U._menu = null; fecharSub();
+      if (fechado) return; fechado = true; U._menu = null; fecharSub(); sairEsc();
       doc.removeEventListener('pointerdown', fora, true); doc.removeEventListener('keydown', tecla, true); win.removeEventListener('blur', fecharJa); win.removeEventListener('resize', fecharJa);
       setTimeout(() => doc.removeEventListener('click', cliqueAncora, true), porAncora ? 600 : 0); // fechou tocando no botão: o clique que vem depois não reabre
       if (!semSom) A.som.tocar('menu-fechar');
@@ -1446,6 +1455,7 @@
     const fora = (e) => { if (!el.contains(e.target) && !(sub && sub.contains(e.target))) { porAncora = !!(ancora && ancora.contains(e.target)); fechar(); } };
     const cliqueAncora = (e) => { if (ancora && ancora.contains(e.target)) { e.stopPropagation(); e.preventDefault(); doc.removeEventListener('click', cliqueAncora, true); fechar(); } };
     const tecla = (e) => { if (e.key === 'Escape') { e.stopPropagation(); if (sub) { const b = subDe; fecharSub(); if (b) b.focus(); } else fechar(); } };
+    const sairEsc = U.pilhaEsc(() => { if (sub) { const b = subDe; fecharSub(); if (b) b.focus(); } else fechar(); });
     setTimeout(() => { doc.addEventListener('click', cliqueAncora, true); doc.addEventListener('pointerdown', fora, true); doc.addEventListener('keydown', tecla, true); win.addEventListener('blur', fecharJa); win.addEventListener('resize', fecharJa); const b = el.querySelector('.menu-it'); if (b && doc.documentElement.dataset.entrada === 'pad') b.focus(); }, 0);
     U._menu = { fechar, ancora };
     return U._menu;
@@ -1511,7 +1521,7 @@
       else { el.style.top = r.bottom + 10 + 'px'; el.style.bottom = 'auto'; el.style.maxHeight = Math.max(160, win.innerHeight - r.bottom - 24) + 'px'; el.dataset.lado = 'baixo'; }
     };
     const fechar = () => {
-      if (fechado) return; fechado = true;
+      if (fechado) return; fechado = true; sairEsc();
       doc.removeEventListener('pointerdown', fora, true); doc.removeEventListener('keydown', tecla, true); win.removeEventListener('resize', posicionar);
       setTimeout(() => doc.removeEventListener('click', cliqueAncora, true), 0);
       el.classList.add('fechando'); setTimeout(() => el.remove(), 200); A.som.tocar('pop-fechar');
@@ -1523,7 +1533,7 @@
     // (0.6.0) clicar de novo no botão que abriu fecha (o clique não chega ao botão, então ele não abre outra vez)
     const cliqueAncora = (e) => { if (ancora.contains && ancora.contains(e.target)) { e.stopPropagation(); e.preventDefault(); fechar(); } };
     const tecla = (e) => { if (e.key === 'Escape') { e.stopPropagation(); fechar(); } };
-    doc.addEventListener('pointerdown', fora, true); doc.addEventListener('keydown', tecla, true); win.addEventListener('resize', posicionar);
+    doc.addEventListener('pointerdown', fora, true); doc.addEventListener('keydown', tecla, true); win.addEventListener('resize', posicionar); const sairEsc = U.pilhaEsc(() => fechar());
     setTimeout(() => { if (!fechado) doc.addEventListener('click', cliqueAncora, true); }, 0);
     raiz.append(el); posicionar();
     try { ancora.setAttribute('aria-expanded', 'true'); } catch (e) { /* ok */ }
@@ -1537,8 +1547,9 @@
   // fora dele, então eles entram junto enquanto durar a tela cheia (e voltam para o lugar ao sair). Antes ficavam invisíveis.
   document.addEventListener('fullscreenchange', () => {
     const fe = document.fullscreenElement;
-    const raizes = ['popovers', 'modais', 'toasts'].map((id) => document.getElementById(id)).filter(Boolean);
-    for (const r of raizes) { if (fe && fe !== document.documentElement && fe !== document.body) { if (r.parentNode !== fe) fe.append(r); } else if (r.parentNode !== document.body) document.body.append(r); }
+    // (1.0.6) a bolinha do controle (cursor-pad) também: no vídeo em tela cheia ela sumia. Um <video>/<iframe> sozinho não tem onde pôr filho
+    const raizes = ['popovers', 'modais', 'toasts', 'cursor-pad'].map((id) => document.getElementById(id)).filter(Boolean);
+    for (const r of raizes) { if (fe && fe !== document.documentElement && fe !== document.body && !/^(VIDEO|IFRAME|CANVAS|IMG)$/.test(fe.tagName)) { if (r.parentNode !== fe) fe.append(r); } else if (r.parentNode !== document.body) document.body.append(r); }
   });
   // ---------- idioma da tela e relógio de tela cheia ----------
   U.tela = {
@@ -1593,7 +1604,7 @@
       const rolar = (e) => { if (!el.contains(e.target)) fechar(); };
       document.addEventListener('pointerdown', fora, true); document.addEventListener('keydown', tecla, true);
       addEventListener('resize', () => fechar(), { once: true }); document.addEventListener('scroll', rolar, true);
-      aberto = { el, sel, offs: [() => document.removeEventListener('pointerdown', fora, true), () => document.removeEventListener('keydown', tecla, true), () => document.removeEventListener('scroll', rolar, true)] };
+      aberto = { el, sel, offs: [() => document.removeEventListener('pointerdown', fora, true), () => document.removeEventListener('keydown', tecla, true), () => document.removeEventListener('scroll', rolar, true), U.pilhaEsc(() => fechar(true))] };
       sel.classList.add('sel-aberto'); try { sel.setAttribute('aria-expanded', 'true'); } catch (e) { /* ok */ }
       try { A.som.tocar('pop-abrir'); } catch (e) { /* ok */ }
     };

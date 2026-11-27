@@ -1,6 +1,6 @@
 {
   "name": "aero-stream",
-  "version": "1.0.5-beta",
+  "version": "1.0.6-beta",
   "description": "Aero - transmita sua tela, jogue e converse com os amigos",
   "author": {
     "name": "Ryan Victtor",
@@ -57,6 +57,7 @@
       "audio/**/*",
       "prioridade/**/*",
       "entrada/**/*",
+      "apertar/**/*",
       "captura/**/*",
       "build/icon.png",
       {

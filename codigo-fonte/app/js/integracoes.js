@@ -721,7 +721,7 @@
         if (x.emBreve) { acao.append(h('span', { class: 'ig-selo breve grande' }, T('Em breve', 'Coming soon'))); return; }
         // (1.0.2) do catálogo, mas este app ainda não sabe fazer ela funcionar (ou o plano não alcança)
         if (x.bloqueio && !I.instalada(x.id)) { acao.append(seloBloqueio(x, true), h('p', { class: 'suave peq ig-bloq' }, textoBloqueio(x))); return; }
-        if (!I.instalada(x.id)) { acao.append(U.btn(T('Instalar', 'Install'), { icone: 'download', grande: true, onclick: async () => { await I.instalar(x.id, true); pintarAcao(); if (x.reinicio) reiniciar(); } })); return; }
+        if (!I.instalada(x.id)) { acao.append(U.btn(T('Instalar', 'Install'), { icone: 'download', grande: true, onclick: async () => { await I.instalar(x.id, true); pintarAcao(); if (x.cat && x.cat.modulo === 'assistindo' && A.assistindo && A.assistindo.exigirExtensao) A.assistindo.exigirExtensao(); if (x.reinicio) reiniciar(); } })); return; }
         const tr = cfg()[x.id] && cfg()[x.id].trava;
         if (I.precisaAtualizar(x.id)) acao.append(U.btn(T('Atualizar', 'Update'), { icone: 'download', grande: true, onclick: () => { I.atualizar(x.id); pintarAcao(); if (x.reinicio) reiniciar(); } }));
         if ((x.gen === 'link' || x.gen === 'janela') && !x.bloqueio && I.ligada(x.id)) acao.append(U.btn(x.cat.rotulo ? K().texto(x.cat.rotulo) : T('Abrir', 'Open'), { icone: x.gen === 'link' ? 'externo' : x.icone, grande: true, onclick: () => I.usar(x.id) }));

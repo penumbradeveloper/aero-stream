@@ -62,7 +62,9 @@
   // ---------- dicionário ----------
   const palavrasDe = (t) => [...new Set(String(t || '').replace(/\bhttps?:\/\/\S+/g, '').replace(/<[^>]+>/g, '').match(/[\p{L}][\p{L}'’-]*/gu) || [])].filter((p) => p.length > 1).slice(0, 40);
   const vozes = () => (window.speechSynthesis ? speechSynthesis.getVoices() : []);
-  function falar(palavra, lingua) {
+  // (1.0.6) o PC (principalmente o Linux) não tem voz instalada e o "Ouvir" ficava mudo: o áudio vem do servidor do Aero; a voz do sistema só se ele falhar
+  let tocando = null;
+  function vozDoSistema(palavra, lingua) {
     if (!window.speechSynthesis) return;
     try {
       speechSynthesis.cancel();
@@ -70,6 +72,16 @@
       const v = vozes().find((x) => x.lang && x.lang.toLowerCase().startsWith(lingua.slice(0, 2).toLowerCase())); if (v) u.voice = v;
       speechSynthesis.speak(u);
     } catch (e) {}
+  }
+  function falar(palavra, lingua, bt) {
+    const srv = (A.api && A.api.servidor) || '';
+    if (tocando) { try { tocando.pause(); } catch (e) {} tocando = null; }
+    if (!srv) { vozDoSistema(palavra, lingua); return; }
+    const au = new Audio(srv + '/api/falar?t=' + encodeURIComponent(palavra) + '&l=' + encodeURIComponent(lingua)); tocando = au;
+    if (bt) bt.classList.add('falando');
+    const fim = () => { if (bt) bt.classList.remove('falando'); if (tocando === au) tocando = null; };
+    au.onended = fim; au.onerror = () => { fim(); vozDoSistema(palavra, lingua); };
+    au.play().catch(() => { fim(); vozDoSistema(palavra, lingua); });
   }
   const ehPronuncia = (t) => /pron[uú]n|aussprache|prononciation|произнош|発音/i.test(t || '');
   function coluna(lingua, palavra) {
@@ -83,7 +95,7 @@
       cx.replaceChildren(
         h('div', { class: 'dic-cab' },
           h('b', { class: 'dic-pal' }, d.palavra || palavra),
-          h('button', { class: 'dic-ouvir', type: 'button', title: T('Ouvir', 'Listen'), onclick: () => falar(d.palavra || palavra, lingua) }, A.icone('volume', 15)),
+          h('button', { class: 'dic-ouvir', type: 'button', title: T('Ouvir', 'Listen'), onclick: (e) => falar(d.palavra || palavra, lingua, e.currentTarget) }, A.icone('volume', 15)),
           ipa.length ? h('span', { class: 'dic-ipa' }, ipa.join(' · ')) : null),
         ...(sec.length ? sec : [h('div', { class: 'suave peq' }, T('Não achei essa palavra no dicionário de ', 'Not found in the dictionary for ') + nomeLingua(lingua) + '.')]),
         h('div', { class: 'peq suave dic-fonte' }, T('Fonte: Wikcionário', 'Source: Wiktionary')));

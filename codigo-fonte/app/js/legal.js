@@ -49,8 +49,8 @@
     const fundo = h('div', { class: 'fundo-modal prioridade legal-fundo' }, caixa);
     // não fecha com ESC nem clicando fora: só aceitando (ou saindo da conta)
     const prende = (e) => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); } };
-    document.addEventListener('keydown', prende, true);
-    function fechar() { if (!aberta) return; aberta = null; document.removeEventListener('keydown', prende, true); fundo.classList.add('fechando'); setTimeout(() => fundo.remove(), 260); }
+    document.addEventListener('keydown', prende, true); const sairEsc = U.pilhaEsc ? U.pilhaEsc(() => {}) : () => {}; // (1.0.6) na pilha do Esc: as janelas de trás também não fecham
+    function fechar() { if (!aberta) return; aberta = null; sairEsc(); document.removeEventListener('keydown', prende, true); fundo.classList.add('fechando'); setTimeout(() => fundo.remove(), 260); }
     aberta = fundo; document.body.append(fundo); A.som.tocar('janela-abrir');
   };
   A.evt.on('hub:eu', () => setTimeout(L.conferir, 400));

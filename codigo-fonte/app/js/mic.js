@@ -73,6 +73,7 @@
     c.atraso = ctx.createDelay(0.2); c.atraso.delayTime.value = 0.02; // olha 20 ms à frente: a porta abre ANTES do começo da fala
     c.porta = ctx.createGain(); c.porta.gain.value = 1;
     c.vol = ctx.createGain(); c.vol.gain.value = A.limitar(cfg().ganho, 0, 200) / 100;
+    c.ptt = ctx.createGain(); c.ptt.gain.value = pttAberto() ? 1 : 0; // (1.0.6) apertar para falar: fechado enquanto a tecla está solta
     c.destino = ctx.createMediaStreamDestination();
     c.analiseSaida = ctx.createAnalyser(); c.analiseSaida.fftSize = 1024; c.analiseSaida.smoothingTimeConstant = 0; // (1.0.3) o que sai de verdade (o medidor mostra o efeito da supressão)
     // (0.8.4) supressão na thread de áudio: tira o ruído de dentro da fala e continua agindo com o app minimizado ou atrás de um jogo.
@@ -82,10 +83,11 @@
       if (!ctx._supressorAero) ctx._supressorAero = ctx.audioWorklet.addModule('js/supressor.worklet.js');
       await ctx._supressorAero;
       c.sup = new AudioWorkletNode(ctx, 'supressor-aero', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1], channelCount: 1, channelCountMode: 'explicit' });
-      c.sup.port.onmessage = (e) => { if (M._c === c && e.data) { M.aberto = !!e.data.aberto; if (typeof e.data.limiar === 'number') M.limiarAtual = e.data.limiar; } };
+      c.sup.port.onmessage = (e) => { if (M._c === c && e.data) { M.aberto = !!e.data.aberto && pttAberto(); if (typeof e.data.limiar === 'number') M.limiarAtual = e.data.limiar; } };
     } catch (e) { ctx._supressorAero = null; c.sup = null; A.log.aviso('supressão de ruído: sem AudioWorklet, usando a porta simples', e && e.message); }
-    if (c.sup) { c.hpf.connect(c.analise); c.hpf.connect(c.sup); c.sup.connect(c.vol); c.vol.connect(c.destino); c.vol.connect(c.analiseSaida); }
-    else { c.hpf.connect(c.analise); c.hpf.connect(c.atraso); c.atraso.connect(c.porta); c.porta.connect(c.vol); c.vol.connect(c.destino); c.vol.connect(c.analiseSaida); }
+    if (c.sup) { c.hpf.connect(c.analise); c.hpf.connect(c.sup); c.sup.connect(c.vol); }
+    else { c.hpf.connect(c.analise); c.hpf.connect(c.atraso); c.atraso.connect(c.porta); c.porta.connect(c.vol); }
+    c.vol.connect(c.ptt); c.ptt.connect(c.destino); c.ptt.connect(c.analiseSaida);
     if (M._c !== c) { try { c.sup && c.sup.disconnect(); } catch (e) { /* ok */ } bruto.getTracks().forEach((t) => t.stop()); return M.saida; } // parou enquanto carregava
     ligarFonte(bruto);
     c.buf = new Float32Array(c.analise.fftSize);
@@ -125,7 +127,7 @@
     } else c.portaAberta = true;
     const atual = c.porta.gain.value;
     if (Math.abs(atual - alvo) > 0.002) c.porta.gain.setTargetAtTime(alvo, c.ctx.currentTime, alvo > atual ? 0.006 : 0.07);
-    M.aberto = c.portaAberta;
+    M.aberto = c.portaAberta && pttAberto();
   }
 
   // Ajustes que valem na hora (volume). Os da porta são lidos a cada ciclo.
@@ -147,14 +149,54 @@
     const c = M._c;
     clearInterval(c && c.timer);
     if (c) {
-      try { c.fonte && c.fonte.disconnect(); c.hpf && c.hpf.disconnect(); c.sup && c.sup.disconnect(); c.atraso && c.atraso.disconnect(); c.porta && c.porta.disconnect(); c.vol && c.vol.disconnect(); c.analiseSaida && c.analiseSaida.disconnect(); } catch (e) { /* ok */ }
+      try { c.fonte && c.fonte.disconnect(); c.hpf && c.hpf.disconnect(); c.sup && c.sup.disconnect(); c.atraso && c.atraso.disconnect(); c.porta && c.porta.disconnect(); c.vol && c.vol.disconnect(); c.ptt && c.ptt.disconnect(); c.analiseSaida && c.analiseSaida.disconnect(); } catch (e) { /* ok */ }
       c.bruto && c.bruto.getTracks().forEach((t) => t.stop());
       if (c.destino) c.destino.stream.getTracks().forEach((t) => t.stop());
     }
     M.ativo = false; M.saida = null; M._c = null; M.db = -90; M.dbSaida = -90; M.limiarAtual = null;
   };
 
-  // Medidor para a interface (0..1)
+  // ---------- (1.0.6) apertar para falar ----------
+  // Ligado: o microfone só manda som enquanto o atalho (uma tecla ou um botão do mouse) está apertado, na sala e na chamada. Com a janela do
+  // Aero em foco o próprio app ouve o atalho; no app do PC um auxiliar ouve também com o Aero em segundo plano (Windows e Linux)
+  const nomesMouse = { 1: ['Botão do meio', 'Middle button'], 3: ['Mouse 4', 'Mouse 4'], 4: ['Mouse 5', 'Mouse 5'] };
+  M.nomeAtalho = (at) => { if (!at) return A.T('Nenhum', 'None'); if (Number.isInteger(at.botao)) { const n = nomesMouse[at.botao]; return n ? A.T(n[0], n[1]) : 'Mouse ' + (at.botao + 1); } return at.nome || at.code || '?'; };
+  const pttLigado = () => !!(cfg().ptt && cfg().pttAtalho);
+  let local = false, global = false, globalAtivo = false;
+  function pttAberto() { return !pttLigado() || local || global; }
+  M.pttLigado = pttLigado; M.pttApertado = () => local || global;
+  function aplicarPtt() {
+    const c = M._c, ab = pttAberto();
+    if (c && c.ptt) c.ptt.gain.setTargetAtTime(ab ? 1 : 0, c.ctx.currentTime, ab ? 0.004 : 0.03); // abre na hora; fecha sem estalo
+    if (!ab) M.aberto = false;
+    A.evt.emit('mic:ptt', ab);
+  }
+  const mesmaTecla = (at, e) => at && !Number.isInteger(at.botao) && at.code === e.code;
+  const mesmoBotao = (at, e) => at && Number.isInteger(at.botao) && at.botao === e.button;
+  const pondo = () => document.documentElement.dataset.gravandoAtalho === '1'; // a tela de escolher o atalho está ouvindo: não conta
+  const mudarLocal = (v) => { if (local === v) return; local = v; aplicarPtt(); };
+  addEventListener('keydown', (e) => { if (pttLigado() && !pondo() && !e.repeat && mesmaTecla(cfg().pttAtalho, e)) mudarLocal(true); }, true);
+  addEventListener('keyup', (e) => { if (pttLigado() && mesmaTecla(cfg().pttAtalho, e)) mudarLocal(false); }, true);
+  addEventListener('pointerdown', (e) => { if (pttLigado() && !pondo() && mesmoBotao(cfg().pttAtalho, e)) { mudarLocal(true); if (e.button > 2) e.preventDefault(); } }, true);
+  addEventListener('pointerup', (e) => { if (pttLigado() && mesmoBotao(cfg().pttAtalho, e)) { mudarLocal(false); if (e.button > 2) e.preventDefault(); } }, true);
+  addEventListener('mouseup', (e) => { if (pttLigado() && mesmoBotao(cfg().pttAtalho, e) && e.button > 2) e.preventDefault(); }, true); // os botões de lado não voltam página
+  addEventListener('blur', () => { if (!globalAtivo) mudarLocal(false); else if (local) { local = false; aplicarPtt(); } });
+  // o auxiliar do PC: liga/desliga junto com a opção; devolve por que não deu (ex.: "permissao" no Linux)
+  const nativo = () => (window.aero && window.aero.ptt) || null;
+  if (nativo()) nativo().aoMudar((v) => { if (global === v) return; global = v; aplicarPtt(); });
+  M.pttGlobal = async () => {
+    const N = nativo(); if (!N) return { ok: false, motivo: 'sem-app' };
+    if (!pttLigado()) { globalAtivo = false; global = false; try { await N.parar(); } catch (e) { /* ok */ } aplicarPtt(); return { ok: true, desligado: true }; }
+    let r; try { r = await N.ligar(cfg().pttAtalho); } catch (e) { r = { ok: false, motivo: 'falhou' }; }
+    globalAtivo = !!(r && r.ok); M.pttMotivo = globalAtivo ? '' : (r && r.motivo) || 'falhou';
+    if (!globalAtivo && A.log) A.log.info('apertar para falar: só com o Aero em foco (' + M.pttMotivo + ')');
+    return r;
+  };
+  M.pttLiberar = async () => { const N = nativo(); if (!N) return { ok: false }; const r = await N.liberar(); return r && r.ok ? M.pttGlobal() : r; };
+  M.pttAplicar = () => { local = false; global = false; aplicarPtt(); return M.pttGlobal(); };
+  setTimeout(() => { if (pttLigado()) M.pttGlobal(); }, 1500);
+
+
   M.nivel = () => A.limitar((M.db + 70) / 60, 0, 1);
   M.nivelSaida = () => A.limitar((M.dbSaida + 70) / 60, 0, 1);
 })();

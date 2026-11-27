@@ -1291,7 +1291,7 @@ input[type=range].ajustando::-webkit-slider-thumb { transform: scale(1.35); }
 .mp-video.tocando .mp-grande { opacity: 0; pointer-events: none; }
 .mp-ctl { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 8px; padding: 22px 10px 8px; background: linear-gradient(transparent, rgba(0,0,0,.65)); transition: opacity .25s; }
 .mp-ctl .mp-tempo { color: #fff; } .mp-ctl .mp-play { width: 30px; height: 30px; }
-.mp-video.tocando:not(:hover) .mp-ctl { opacity: 0; }
+.mp-video.tocando:not(:hover):not(.pad-hover) .mp-ctl { opacity: 0; }
 
 /* (0.6.0) "digitando": três bolhas numa onda contínua (sem pausa nem "pulo" na volta do ciclo): cada uma segue a mesma curva suave,
    defasada de 1/3 do ciclo, e o começo e o fim do ciclo são o mesmo ponto */
@@ -6309,6 +6309,7 @@ button.cx-recolhe > small { margin-left: auto; font-weight: 600; }
 .dic-cab { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
 .dic-pal { font-size: 1.25em; }
 .dic-ouvir { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; border: 0; cursor: pointer; background: color-mix(in srgb, var(--cor-2) 22%, transparent); color: inherit; }
+.dic-ouvir.falando { color: var(--cor-2); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cor-2) 30%, transparent); }
 .dic-ipa { font-family: ui-monospace, monospace; opacity: .75; font-size: .9em; }
 .dic-sec { margin-top: 6px; }
 .dic-sec-t { font-weight: 600; font-size: .85em; opacity: .8; }
@@ -6404,3 +6405,13 @@ button.cx-recolhe > small { margin-left: auto; font-weight: 600; }
 .vi-seta, .ex-seta { touch-action: manipulation; user-select: none; -webkit-user-select: none; }
 /* (1.0.4) vídeo do YouTube na galeria: ocupa o palco inteiro */
 .vi-img.vi-yt { width: 100%; height: 100%; border: 0; }
+/* (1.0.6) apertar para falar: o botão do atalho pulsa enquanto espera a tecla */
+.ptt-atalho { display: inline-flex; align-items: center; gap: 6px; max-width: 180px; } .ptt-atalho > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ptt-atalho.gravando { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cor-2) 45%, transparent); animation: pttGrav 1.1s ease-in-out infinite; }
+@keyframes pttGrav { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--cor-2) 18%, transparent); } }
+[data-anim=nenhuma] .ptt-atalho.gravando, [data-visual=lite] .ptt-atalho.gravando { animation: none; }
+.ptt-aviso { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: -4px; }
+/* (1.0.6) a tela que pede a extensão do Assistindo agora */
+.ass-ext-tela { display: grid; gap: 10px; text-align: center; } .ass-ext-tela p { margin: 0; overflow-wrap: anywhere; }
+.ass-ext-logos { display: flex; justify-content: center; gap: 12px; padding: 4px 0 2px; } .ass-ext-logos svg { filter: drop-shadow(0 3px 8px rgba(0,0,0,.18)); }
+.ass-ext-estado { min-height: 1.4em; font-weight: 600; } .ass-ext-estado.ok { color: var(--ok, #1f9d55); }

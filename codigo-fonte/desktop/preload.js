@@ -28,6 +28,12 @@ if (typeof window !== 'undefined') window.addEventListener('unload', () => ipcRe
 contextBridge.exposeInMainWorld('aero', {
   teclasDoJogo: (on, imersivo) => ipcRenderer.send('teclas-do-jogo', !!on, !!imersivo),
   toqueTrava: () => ipcRenderer.send('toque-trava'),
+  // (1.0.6) apertar para falar: liga/desliga o olho na tecla escolhida e avisa quando ela é apertada/solta
+  ptt: {
+    ligar: (atalho) => chamar('ptt-ligar', atalho), parar: () => chamar('ptt-parar'), liberar: () => chamar('ptt-liberar'),
+    aoMudar: (cb) => { const f = (_e, v) => { try { cb(!!v); } catch (e) { /* ok */ } }; ipcRenderer.on('ptt', f); return () => ipcRenderer.removeListener('ptt', f); },
+  },
+  moverMouse: (x, y) => ipcRenderer.send('pad-mouse', Number(x) || 0, Number(y) || 0), // (1.0.6) a bolinha do controle passa o mouse (hover) como o mouse de verdade
   aoEscDoJogo: (cb) => { ipcRenderer.on('esc-do-jogo', (_e, baixo) => cb(!!baixo)); },
   cofreLocal: { fechar: (t) => ipcRenderer.sendSync('cofre-local', 'f', String(t)), abrir: (t) => ipcRenderer.sendSync('cofre-local', 'a', String(t)) },
   info: () => chamar('info'),

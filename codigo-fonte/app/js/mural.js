@@ -196,6 +196,8 @@
       addEventListener('pointermove', mover, true); addEventListener('pointerup', fim, true); addEventListener('pointercancel', fim, true);
     });
     seta.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar(); } });
+    // (1.0.6) o A do controle (e o cursor dele) chega como clique sem mouse (detail 0): antes só o mouse e o Enter abriam/fechavam o mural
+    seta.addEventListener('click', (e) => { if (e.detail === 0) alternar(); });
     // (0.9.0) do lado: o mural na altura do cartão (antes passava muito dele e ficava fora de lugar)
     if (!deitado && typeof ResizeObserver === 'function') {
       const alt = () => { const hc = cartao.offsetHeight; if (hc) el.style.setProperty('--mr-h', Math.max(380, hc) + 'px'); };

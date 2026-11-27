@@ -1280,6 +1280,7 @@
             h('div', { class: 'par' }, bt(est.eu.surdo ? 'mudo' : 'volume', est.eu.surdo ? T('Ligar o som', 'Unmute sound') : T('Deixar de ouvir (mudo geral)', 'Stop hearing (mute all)'), () => A.chamada.mudoSom(), 'sec', est.eu.surdo ? 'desligado' : ''), seta(T('Saída de som e volumes', 'Sound output and volumes'), (b) => A.chamada.opcoesSom(b))),
             A.plat.camera ? h('div', { class: 'par' }, bt(est.eu.cam ? 'video' : 'videoOff', T('Câmera', 'Camera'), () => A.chamada.camera(), 'sec', est.eu.cam ? 'ativo' : ''), seta(T('Escolher a câmera', 'Choose the camera'), (b) => A.chamada.opcoesCamera(b))) : null,
             A.plat.podeCompartilhar ? h('div', { class: 'par' }, bt('enviarTela', est.eu.tela ? T('Parar de compartilhar', 'Stop sharing') : T('Compartilhar a tela', 'Share screen'), () => A.chamada.tela(), 'sec', est.eu.tela ? 'ativo' : ''), seta(T('Opções de compartilhamento', 'Sharing options'), (b) => A.chamada.opcoesTela(b))) : null,
+            A.chamada.botaoViva ? A.chamada.botaoViva((ic, tit, f) => bt(ic, tit, f)) : null, // (1.0.5) celular: viva-voz / modo chamada
             h('i', { class: 'tk-cham-div', 'aria-hidden': 'true' }),
             bt('expandir', T('Maximizar a chamada', 'Maximize the call'), () => A.chamada.modo('max')),
             bt('desligarTel', T('Desligar', 'Hang up'), () => A.chamada.desligar(), 'perigo', 'tk-cham-fim'));

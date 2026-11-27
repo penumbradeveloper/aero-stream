@@ -451,7 +451,7 @@
       // (0.6.1) vídeo da chamada: um pouco mais de folga para segurar a imagem (~0,1 s). Dá tempo do pacote perdido chegar de novo antes de
       // a imagem ser montada, e ela não quebra a cada perdinha (no celular e no Wi-Fi é o que mais acontece)
       if (ev.track.kind === 'video') atrasoTela(par);
-      if (papel === 'tela' && A.receptor) A.receptor.ligar(ev.receiver);
+      if (papel === 'tela' && A.receptor) A.receptor.ligar(ev.receiver, st); // (1.0.5) com o decodificador próprio ligado, a tela nova já nasce nele
       if (papel === 'voz' || papel === 'somTela') ligarSom(par, papel, st);
       pintarTudo();
     };
@@ -641,6 +641,8 @@
     const n = par.pretoN = (par.pretoN || 0) + 1;
     if (n % 2 === 0) pedirQuadro(par, 'tela', trT);
     if (n === 4) { const st = v.srcObject; v.srcObject = null; v.srcObject = st; v.play().catch(() => {}); }
+    // (1.0.5) rede de segurança: sem imagem com o decodificador próprio ligado, volta para o do navegador antes de pedir para refazer o envio
+    if (n === 5 && semImagem) { const c = trT && A.receptor && A.receptor.de(trT.receiver); if (c && c.proprio && c.voltar) c.voltar('a tela ficou sem imagem'); }
     // (1.0.3) pede de novo a cada ~10 voltas: quem manda com uma versão antiga, preso numa oferta que se perdeu, só se recupera quando o
     // pedido chega depois de ela ter voltado (o pedido vale a cada 20 s do lado de lá)
     if (n === 6 || (n > 6 && (n - 6) % 10 === 0 && n <= 66)) sinal(par.codigo, par.dev, { t: 'telaPreta' });
@@ -999,10 +1001,20 @@
   CH.vivaVoz = (on) => {
     A.cfg.v.vivaVoz = !!on; A.cfg.salvar();
     if (ch) vivaAplicar(on);
-    const b = ch && ch.ui && ch.ui.el && ch.ui.el.querySelector('.cham-viva');
-    if (b) { b.classList.toggle('ativo', !!on); b.setAttribute('aria-pressed', String(!!on)); b.title = on ? T('Viva-voz ligado', 'Speakerphone on') : T('Viva-voz', 'Speakerphone'); }
+    document.querySelectorAll('.cham-viva').forEach(CH.pintarViva);
     A.som.tocar('clique');
   };
+  // (1.0.5) o botão troca entre viva-voz (alto-falante) e modo chamada (som no ouvido), com o desenho de cada um; aparece na chamada aberta
+  // e na faixa da chamada dentro da conversa
+  CH.temViva = () => !!vivaPlugin();
+  CH.pintarViva = (b) => {
+    const on = vivaLigado();
+    b.classList.toggle('ativo', on); b.setAttribute('aria-pressed', String(on));
+    const t = on ? T('Viva-voz (toque para ouvir pelo ouvido)', 'Speakerphone (tap to use the earpiece)') : T('Modo chamada, som no ouvido (toque para o viva-voz)', 'Call mode, earpiece (tap for speakerphone)');
+    b.title = t; b.setAttribute('aria-label', t);
+    const ic = b.querySelector('.ic'); if (ic) ic.replaceWith(A.icone(on ? 'vivaVoz' : 'telefone', +(ic.getAttribute('width') || 20)));
+  };
+  CH.botaoViva = (criar) => { if (!vivaPlugin()) return null; const b = criar('vivaVoz', '', () => CH.vivaVoz(!vivaLigado())); b.classList.add('cham-viva'); CH.pintarViva(b); return b; };
   A.evt.on('chamada:entrou', () => { if (!vivaPlugin()) return; [0, 900, 2500, 6000].forEach((t) => setTimeout(() => { if (ch) vivaAplicar(vivaLigado()); }, t)); });
   // (0.6.9) o servidor tirou um aparelho da chamada (o app dele fechou, a internet caiu): ele sai da tela na hora, com a tela compartilhada
   // dele (antes ficava a imagem parada por até 20 s, até a conexão direta desistir)
@@ -1690,8 +1702,7 @@
     const bSom = rb('volume', T('Som (mudo geral)', 'Sound (mute all)'), () => CH.mudoSom());
     const setaSom = seta(T('Saída de som e volumes', 'Sound output and volumes'), (b) => A.mixer.audio(b));
     // (1.0.3) celular: viva-voz (o som sai do alto-falante do aparelho em vez do de ouvido)
-    const bViva = vivaPlugin() ? rb('vivaVoz', T('Viva-voz', 'Speakerphone'), () => CH.vivaVoz(!vivaLigado())) : null;
-    if (bViva) { bViva.classList.add('cham-viva'); bViva.classList.toggle('ativo', vivaLigado()); bViva.setAttribute('aria-pressed', String(vivaLigado())); }
+    const bViva = CH.botaoViva(rb);
     const bFim = rb('desligarTel', T('Desligar', 'Hang up'), () => CH.desligar(), 'perigo'); bFim.classList.add('cham-fim');
     const msEl = h('span', { class: 'cham-ms', 'aria-live': 'off' });
     const bSinal = h('span', { class: 'cham-sinal', role: 'img' }, A.icone('sinal', 20), msEl);

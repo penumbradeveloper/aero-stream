@@ -389,7 +389,29 @@
     return out;
   };
   let prefsConta = null; // o que a conta tem guardado (da última vez que baixou)
-  const pacotePrefs = () => { const v = {}; for (const k of SINC) { if (!sincK(k)) { if (prefsConta && prefsConta[k] !== undefined) v[k] = prefsConta[k]; continue; } if (A.cfg.v[k] !== undefined) v[k] = JSON.parse(JSON.stringify(A.cfg.v[k])); } if (v.tema) { delete v.tema.imagemAnim; delete v.tema.vidroAnim; } /* (0.9.5) o animado é só deste aparelho */ if (v.integ) v.integ = integLeve(v.integ); if (v.tema && JSON.stringify(v.tema).length > 50000) { v.tema = { ...v.tema, imagem: null, bolhasImagem: null }; } return v; };
+  const pacotePrefs = () => { const v = {}; for (const k of SINC) { if (!sincK(k)) { if (prefsConta && prefsConta[k] !== undefined) v[k] = prefsConta[k]; continue; } if (A.cfg.v[k] !== undefined) v[k] = JSON.parse(JSON.stringify(A.cfg.v[k])); } if (v.tema) { delete v.tema.imagemAnim; delete v.tema.vidroAnim; } /* (0.9.5) o animado é só deste aparelho */ if (v.integ) v.integ = integLeve(v.integ); if (v.tema) v.tema = temaParaConta(v.tema); return v; };
+  // (1.0.5) o papel de parede e a imagem das bolhas grandes demais não vão para a conta. Antes iam como "sem imagem": o outro aparelho (o celular)
+  // recebia isso, ficava sem papel de parede e, na primeira configuração que salvava, devolvia o "sem imagem" para a conta, e o PC perdia o dele.
+  // Agora vai uma marca de que a imagem existe em outro aparelho: quem tem a imagem continua com ela, e quem não tem continua passando a marca
+  function temaParaConta(t0) {
+    const t = { ...t0 };
+    if (t.imagem) delete t.imgFora; else if (t.imgFora) t.fundoTipo = 'imagem'; // (o degradê no lugar é só deste aparelho, que não tem a imagem)
+    if (t.bolhasImagem) delete t.bolhasFora;
+    if (JSON.stringify(t).length > 50000) {
+      if (t.imagem) { t.imagem = null; t.imgFora = 1; t.fundoTipo = 'imagem'; }
+      if (t.bolhasImagem) { t.bolhasImagem = null; t.bolhasFora = 1; }
+    }
+    return t;
+  }
+  function temaDaConta(local, conta) {
+    const o = { ...(local || {}), ...conta };
+    if (conta.imgFora && !conta.imagem) { if (local && local.imagem) { o.imagem = local.imagem; o.imagemAnim = local.imagemAnim || null; o.fundoTipo = 'imagem'; delete o.imgFora; } }
+    else delete o.imgFora;
+    if (conta.bolhasFora && !conta.bolhasImagem) { if (local && local.bolhasImagem) { o.bolhasImagem = local.bolhasImagem; delete o.bolhasFora; } }
+    else delete o.bolhasFora;
+    return o;
+  }
+  API._temaParaConta = temaParaConta; API._temaDaConta = temaDaConta; // (para os testes)
   const salvarOriginal = A.cfg.salvar.bind(A.cfg);
   A.cfg.salvar = () => {
     const r = salvarOriginal();
@@ -475,7 +497,7 @@
     aplicandoPrefs = true;
     try {
       const idiomaAntes = A.cfg.v.idioma;
-      for (const k of SINC) if (p.v[k] !== undefined && sincK(k)) A.cfg.v[k] = k === 'integ' ? integDaConta(A.cfg.v.integ, p.v.integ) : p.v[k] && typeof p.v[k] === 'object' && !Array.isArray(p.v[k]) && A.cfg.v[k] && typeof A.cfg.v[k] === 'object' ? { ...A.cfg.v[k], ...p.v[k] } : p.v[k];
+      for (const k of SINC) if (p.v[k] !== undefined && sincK(k)) A.cfg.v[k] = k === 'integ' ? integDaConta(A.cfg.v.integ, p.v.integ) : k === 'tema' && p.v.tema && typeof p.v.tema === 'object' ? temaDaConta(A.cfg.v.tema, p.v.tema) : p.v[k] && typeof p.v[k] === 'object' && !Array.isArray(p.v[k]) && A.cfg.v[k] && typeof A.cfg.v[k] === 'object' ? { ...A.cfg.v[k], ...p.v[k] } : p.v[k];
       API._ultimoPrefs = JSON.stringify(pacotePrefs()); A.store.gravar(chavePrefs(), String(p.t));
       salvarOriginal(); guardarCopia();
       if (A.tema && A.tema.aplicar) A.tema.aplicar();

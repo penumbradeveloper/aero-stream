@@ -14,13 +14,17 @@
   const aplicarJa = () => { clearTimeout(tAplicar); tAplicar = 0; ultimoAplicar = performance.now(); A.tema.aplicar(); };
   const gravarJa = () => { clearTimeout(tGravar); tGravar = 0; if (!A.cfg.salvar()) U.toast(T('Sem espaço para guardar essa configuração (a imagem pode estar pesada demais).', 'No room to store this setting (the image may be too heavy).'), { tipo: 'erro' }); };
   addEventListener('pagehide', () => { if (tGravar) gravarJa(); });
+  // (1.0.5) mexeu no fundo ou nas bolhas aqui: a marca de "imagem em outro aparelho" (veja api.js) deixa de valer
+  function esquecerFora(m) { const t = A.cfg.v.tema || {}; if (m && ('fundoTipo' in m || 'imagem' in m)) delete t.imgFora; if (m && 'bolhasImagem' in m) delete t.bolhasFora; }
   function salvarSuave(mudou) {
+    esquecerFora(mudou);
     Object.assign(A.cfg.v.tema, mudou);
     const falta = 50 - (performance.now() - ultimoAplicar);
     if (falta <= 0 && !tAplicar) aplicarJa(); else if (!tAplicar) tAplicar = setTimeout(aplicarJa, Math.max(0, falta));
     clearTimeout(tGravar); tGravar = setTimeout(gravarJa, 400);
   }
   function salvar(mudou) {
+    esquecerFora(mudou);
     if (tAplicar) { clearTimeout(tAplicar); tAplicar = 0; }
     if (tGravar) { clearTimeout(tGravar); tGravar = 0; }
     Object.assign(A.cfg.v.tema, mudou);

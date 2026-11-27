@@ -943,7 +943,7 @@ app.on('will-quit', () => gameMode(false));
 handle('transmitindo', (on) => {
   prioridadeTransmissao(!!on);
   gameMode(!!on);
-  cursorHost(!!on);
+  if (!on) cursorHost(false); // (1.0.5) a captura já traz o cursor: quem assiste não desenha mais a seta por cima
   if (on) { if (linux && placaCodifica) gravarSent({ transmitindo: true, modo: modoGpu }); }
   else { gravarSent(null); fonteUsada = null; reusarFonte = 0; const c = lerCfg(); if (c.travamentos) { c.travamentos = 0; gravarCfg(c); } } // parou: a próxima captura pede uma sessão NOVA ao portal (nada da antiga é reaproveitado)
   return true;

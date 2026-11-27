@@ -144,9 +144,9 @@
     // desligar e religar o envio (era isso que congelava a tela por um instante, e às vezes por segundos com o codificador da placa)
     pedirInteiro: (receiver) => { const c = receiver && controles.get(receiver); if (!c) return false; try { c.w.postMessage({ t: 'inteiro' }); return true; } catch (e) { return false; } },
     // liga o worker neste receptor de vídeo (pode chamar mais de uma vez: a mesma conexão renegocia)
-    ligar(receiver) {
+    ligar(receiver, stream) {
       if (!receiver || !R.disponivel()) return null;
-      const ja = controles.get(receiver); if (ja) return ja;
+      const ja = controles.get(receiver); if (ja) { if (stream) ja.adotar(stream); return ja; }
       let w;
       try { w = new Worker(url()); receiver.transform = new RTCRtpScriptTransform(w, {}); } catch (e) { A.log.aviso('receptor de vídeo:', e); if (w) w.terminate(); return null; }
       const ctl = { w, receiver, proprio: false, atras: 0, est: { fps: 0, ms: 0, desc: 0, w: 0, h: 0 }, gerador: null, escritor: null };
@@ -181,6 +181,19 @@
         A.log.aviso('receptor de vídeo: decodificador próprio desligado (' + motivo + '), volta o do navegador');
       };
       ctl.voltar = voltar;
+      // (1.0.5) a MESMA conexão trouxe a tela de novo (quem transmite parou e voltou, ou refez o envio) e quem recebe montou um pacote novo com a
+      // trilha de sempre: com o decodificador próprio ligado, por ela só passa o quadrinho cinza de 16x16, e a tela ficava preta para sempre
+      // (pedir para refazer o envio não resolvia). O pacote novo passa a mostrar a imagem do decodificador próprio
+      ctl.adotar = (stream) => {
+        if (!ctl.proprio || !ctl.gerador || !stream || stream === ctl.stream) return;
+        try {
+          const tr = stream.getVideoTracks();
+          if (tr.includes(ctl.gerador) || !tr.includes(receiver.track)) return;
+          stream.removeTrack(receiver.track); stream.addTrack(ctl.gerador); ctl.stream = stream;
+          w.postMessage({ t: 'inteiro' });
+          A.log.info('receptor de vídeo: tela nova na mesma conexão, segue no decodificador próprio');
+        } catch (e) { voltar('não deu para passar a tela nova para ele'); }
+      };
       ctl.medir = () => { if (ctl.proprio) w.postMessage({ t: 'est' }); return ctl.est; };
       // passa para o decodificador próprio. A trilha nova entra no MESMO pacote de vídeo (stream), então quem já mostra esse pacote não muda nada.
       // placa: true deixa o navegador escolher (a placa, se tiver); false vai direto para o processador (a placa deste PC já mostrou imagem verde)

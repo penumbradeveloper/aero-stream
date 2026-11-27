@@ -1126,7 +1126,7 @@
     if (r.tela) for (const [sid, x] of [...S.remotas]) if (x.reatada && x.peerId === peer.id) { S.remotas.delete(sid); if (S.foco === sid) S.foco = null; } // o vídeo de verdade voltou
     r.somTela = !r.tela && somTelaDe.get(peer.id) === stream.id; // (0.7.3) o som da tela que veio separado (modo jogo)
     ajustarReceptor(peer, e.receiver);
-    if (e.track.kind === 'video' && A.receptor) A.receptor.ligar(e.receiver);
+    if (e.track.kind === 'video' && A.receptor) A.receptor.ligar(e.receiver, stream);
     stream.onremovetrack = () => { if (!stream.getTracks().length) { desligarAudio(r); S.remotas.delete(stream.id); if (S.foco === stream.id) S.foco = null; emit('stream-fim', r); } };
     if (stream.getAudioTracks().length) ligarAudio(r);
     emit('stream', r);
@@ -1380,7 +1380,9 @@
           // (0.8.4) o fps que a captura entrega de verdade (o maior dos últimos 10 s): o jogo a 40 fps não gera 120 quadros, então cada quadro leva os bits
           // dos que não existem
           const hist = S.local.capFpsHist || (S.local.capFpsHist = []); if (Date.now() - (S.local.capFpsEm || 0) > 900) { S.local.capFpsEm = Date.now(); hist.push(fonteV.framesPerSecond || 0); if (hist.length > 10) hist.shift(); }
-          if (S.local.capLenta === 5) A.log.aviso('captura lenta: ' + Math.round(fonteV.framesPerSecond) + ' de ' + alvoFps + ' fps (' + fonteV.width + 'x' + fonteV.height + ') - a placa de vídeo pode estar no limite com o jogo');
+          // (1.0.5) a captura só gera quadro novo quando a imagem muda: uma série a 24 fps ou uma janela parada entregam menos que o pedido, e isso
+          // é normal (o aviso antigo falava em "jogo" até mostrando uma série)
+          if (S.local.capLenta === 5) A.log.info('captura entregou ' + Math.round(fonteV.framesPerSecond) + ' de ' + alvoFps + ' fps (' + fonteV.width + 'x' + fonteV.height + ', ' + (S.local.superficie || '?') + ') - normal com vídeo ou imagem parada; num jogo, a placa pode estar no limite');
         }
         if (!S.local.kms && fonteV && fonteV.height > 0 && (fonteV.height !== S.local.capAlt || fonteV.width !== S.local.capLarg)) {
           S.local.capAlt = fonteV.height; S.local.capLarg = fonteV.width; S.aplicarQualidadeTodos(); // o tamanho real da captura chegou (ou mudou): refaz a taxa

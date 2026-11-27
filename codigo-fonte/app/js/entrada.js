@@ -600,13 +600,9 @@
     let noHost = null;
     const desenhar = () => {
       const r = conteudoDoVideo(video), caixa = video.getBoundingClientRect();
-      const hc = E.cursorHost && E.cursorHost.v && performance.now() - E.cursorHost.t < 15000 ? E.cursorHost : null;
-      if (!r || (!E.cursores.size && !hc)) { for (const [id, n] of nos) { n.remove(); nos.delete(id); } if (noHost) { noHost.remove(); noHost = null; } return; }
-      // o cursor de quem transmite (a seta branca de sempre), quando a captura não traz o cursor
-      if (hc) {
-        if (!noHost) { noHost = h('div', { class: 'cursor cursor-host' }); noHost.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.2 2.6c-.5-.4-1.2 0-1.2.6v16.6c0 .7.8 1 1.3.5l4.1-4.1 2.9 6.6c.2.4.7.6 1.1.4l2.4-1.1c.4-.2.6-.7.4-1.1l-2.9-6.5 5.7-.4c.7 0 1-.9.4-1.3z"/></svg>'; el.append(noHost); }
-        noHost.style.left = (hc.x * 100).toFixed(2) + '%'; noHost.style.top = (hc.y * 100).toFixed(2) + '%';
-      } else if (noHost) { noHost.remove(); noHost = null; }
+      if (!r || !E.cursores.size) { for (const [id, n] of nos) { n.remove(); nos.delete(id); } if (noHost) { noHost.remove(); noHost = null; } return; }
+      // (1.0.5) a seta branca do cursor de quem transmite saiu: a captura já traz o cursor de verdade, e a seta ficava por cima dele
+      if (noHost) { noHost.remove(); noHost = null; }
       el.style.left = r.x - caixa.left + 'px'; el.style.top = r.y - caixa.top + 'px'; el.style.width = r.w + 'px'; el.style.height = r.h + 'px';
       for (const [id, n] of nos) if (!E.cursores.has(id)) { n.remove(); nos.delete(id); }
       for (const [id, c] of E.cursores) {
@@ -644,12 +640,6 @@
     off.push(A.evt.on(P + 'dc', aoDC));
     const nat = nativo(); if (nat && nat.aoHost) off.push(nat.aoHost(hostMexeu));
     if (nat && nat.aoMira) off.push(nat.aoMira(miraMudou));
-    // KDE (Wayland): a captura não leva o cursor; o app do PC conta onde ele está e todo mundo que assiste desenha por cima do vídeo
-    if (nat && nat.aoCursorHost) off.push(nat.aoCursorHost((c) => {
-      if (!ehDono()) return;
-      const msg = { t: 'hc', x: +c.x.toFixed(4), y: +c.y.toFixed(4), v: c.dentro ? 1 : 0 };
-      for (const q of S.participantes) if (q.id !== S.id) S.enviarDC(q.id, msg, { rapido: true });
-    }));
     // anuncia o que este computador consegue fazer assim que alguém vira controlador
     off.push(A.evt.on(P + 'ctl', async ({ p, antes, depois }) => {
       if (!ehDono()) return;
